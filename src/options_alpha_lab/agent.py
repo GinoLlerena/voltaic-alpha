@@ -38,6 +38,7 @@ from .components import (
 )
 from .config import Settings
 from .evidence import build_snapshot, parse_bars, parse_occ_symbol
+from .execution.deadline import DeadlineEnforcer, DeadlineOutcome, deadline_for
 from .execution.gateway import AmbiguousSubmission, ExecutionGateway, ExecutionRefused
 from .execution.intent import IntentLeg, OrderIntent, build_close_intent, build_open_intent
 from .execution.lifecycle import (
@@ -110,6 +111,7 @@ class TradingAgent:
         recorder: Any = None,
         reconciler: Reconciler | None = None,
         store: LifecycleStore | None = None,
+        deadlines: DeadlineEnforcer | None = None,
         symbol: str = "SPY",
         clock: Callable[[], datetime] | None = None,
         operator_approval: str | None = None,
@@ -121,6 +123,7 @@ class TradingAgent:
         self.recorder = recorder
         self.reconciler = reconciler
         self.store = store
+        self.deadlines = deadlines
         self.symbol = symbol
         self.operator_approval = operator_approval
         self._clock = clock or (lambda: datetime.now(UTC))
@@ -128,6 +131,7 @@ class TradingAgent:
         self.run_id: str | None = None
         self.decision_row_id: str | None = None
         self.last_reconciliation: ReconciliationReport | None = None
+        self.last_deadline_outcome: DeadlineOutcome | None = None
         #: Completed trading sessions observed in the most recent bar read.
         self._sessions: list[date] = []
         #: Set by reconciliation. Entries are refused while this is not NORMAL.
@@ -224,6 +228,21 @@ class TradingAgent:
         # Reconcile before deciding anything. Stale beliefs about what we hold
         # are the failure this whole cycle exists to prevent.
         report = self.reconcile()
+
+        # Then enforce post-submission deadlines, so an unfilled order is
+        # cancelled rather than left occupying the single strategy slot.
+        if self.deadlines is not None and self.settings.may_write_orders:
+            outcome = self.deadlines.enforce(run_id=self.run_id, now=now)
+            self.last_deadline_outcome = outcome
+            if outcome.late_fills or outcome.failures:
+                self.execution_state = ExecutionState.NO_NEW_RISK
+                if self.gateway is not None:
+                    self.gateway.execution_state = ExecutionState.NO_NEW_RISK
+            if outcome.acted:
+                return self._record(
+                    TickResult(now, "DEADLINE_ACTION", outcome.summary(),
+                               snapshot.snapshot_id)
+                )
 
         # Exits before entries, always.
         managed = self.active_position()
@@ -497,6 +516,7 @@ class TradingAgent:
                 width=abs(long_leg.strike - short_leg.strike),
                 max_loss=outcome.risk.calculated_max_loss,
                 invalidation=self._typed_invalidation(outcome),
+                deadline_at=deadline_for("entry", now),
                 now=now,
             )
 
@@ -663,17 +683,22 @@ def main(argv: Any = None) -> int:
         )
 
     gateway = None
+    gateway_broker = None
     if settings.may_write_orders:
         from .execution.gateway import AlpacaBroker
 
-        gateway = ExecutionGateway(
-            AlpacaBroker(env.get("ALPACA_API_KEY", ""), env.get("ALPACA_SECRET_KEY", "")),
-            settings,
+        gateway_broker = AlpacaBroker(
+            env.get("ALPACA_API_KEY", ""), env.get("ALPACA_SECRET_KEY", "")
         )
+        gateway = ExecutionGateway(gateway_broker, settings)
 
     engine = build_engine(settings)
     create_schema(engine)
     recorder = DecisionRecorder(engine, settings)
+
+    store = LifecycleStore(engine)
+    reconciler = Reconciler(gateway_broker, store) if gateway_broker is not None else None
+    deadlines = DeadlineEnforcer(gateway, store) if gateway is not None else None
 
     agent = TradingAgent(
         settings,
@@ -681,10 +706,18 @@ def main(argv: Any = None) -> int:
         gateway=gateway,
         synthesizer=synthesizer,
         recorder=recorder,
+        store=store,
+        reconciler=reconciler,
+        deadlines=deadlines,
         symbol=args.symbol,
         operator_approval=args.approve,
     )
     agent.run_id = recorder.start_run()
+
+    # Reconcile before the agent is permitted to consider any new risk.
+    startup = agent.startup()
+    if startup is not None:
+        print(f"startup: {startup.summary()}")
 
     print(
         f"mode={settings.bot_mode.value}  writes="

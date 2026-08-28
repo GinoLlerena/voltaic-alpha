@@ -91,6 +91,11 @@ class BrokerPort:
         """Every position the broker believes we hold."""
         raise NotImplementedError
 
+    # -- risk-reducing mutation -------------------------------------------
+    def cancel_order(self, broker_order_id: str) -> None:
+        """Cancel a working order. Never creates exposure."""
+        raise NotImplementedError
+
 
 class ExecutionGateway:
     def __init__(
@@ -202,6 +207,23 @@ class ExecutionGateway:
             reconciled=False,
         )
 
+    def cancel(self, broker_order_id: str, *, reason: str = "deadline") -> None:
+        """Cancel a working order.
+
+        A cancel removes exposure rather than creating it, so it is not subject
+        to the approval, halt, or one-strategy guards. `FREEZE_ALL_WRITES` still
+        blocks it: that state exists for incidents where writing at all is
+        unsafe.
+        """
+        if not self._settings.may_write_orders:
+            raise ExecutionRefused("configuration does not permit order writes")
+        endpoint = self._broker.resolved_endpoint()
+        if PAPER_HOST not in endpoint:
+            raise ExecutionRefused(f"resolved endpoint {endpoint!r} is not the Paper endpoint")
+        if self.execution_state is ExecutionState.FREEZE_ALL_WRITES:
+            raise ExecutionRefused("execution state FREEZE_ALL_WRITES blocks every write")
+        self._broker.cancel_order(broker_order_id)
+
     def reconcile(self, client_order_id: str) -> dict[str, Any] | None:
         """Authoritative local view of one order, by the id we chose."""
         return self._broker.get_by_client_order_id(client_order_id)
@@ -268,6 +290,9 @@ class AlpacaBroker(BrokerPort):
 
     def list_positions(self) -> list[dict[str, Any]]:
         return [_as_dict(position) for position in self._client.get_all_positions()]
+
+    def cancel_order(self, broker_order_id: str) -> None:
+        self._client.cancel_order_by_id(broker_order_id)
 
 
 def _as_dict(obj: Any) -> dict[str, Any]:

@@ -165,6 +165,19 @@ def _new_id() -> str:
     return uuid.uuid4().hex
 
 
+def _aware(value: datetime | None) -> datetime | None:
+    """Normalize a stored timestamp to UTC-aware.
+
+    SQLite discards the offset even on a `DateTime(timezone=True)` column, while
+    PostgreSQL preserves it. Comparing a naive value from one against an aware
+    value from the other raises, so every timestamp is normalized as it leaves
+    the store rather than at each call site that might forget.
+    """
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
 class LifecycleStore:
     """Durable lifecycle writes. The only component allowed to change these rows."""
 
@@ -495,20 +508,25 @@ class LifecycleStore:
         return result
 
     # -- reads -------------------------------------------------------------
-    def active_positions(self) -> list[ManagedPosition]:
-        """Everything still owed management, reconstructed from the database."""
+    def active_positions(self, *, include_abandoned: bool = False
+                         ) -> list[ManagedPosition]:
+        """Everything still owed management, reconstructed from the database.
+
+        `include_abandoned` is for reconciliation and deadline passes: an
+        abandoned entry can still turn out to have filled late, and that is
+        exposure we own.
+        """
+        states = [
+            PositionState.PENDING.value,
+            PositionState.OPEN.value,
+            PositionState.CLOSING.value,
+            PositionState.INCIDENT.value,
+        ]
+        if include_abandoned:
+            states.append(PositionState.ABANDONED.value)
         with self._session() as session:
             rows = session.scalars(
-                select(Position).where(
-                    Position.lifecycle_status.in_(
-                        [
-                            PositionState.PENDING.value,
-                            PositionState.OPEN.value,
-                            PositionState.CLOSING.value,
-                            PositionState.INCIDENT.value,
-                        ]
-                    )
-                )
+                select(Position).where(Position.lifecycle_status.in_(states))
             ).all()
             return [self._to_managed(row) for row in rows]
 
@@ -522,6 +540,41 @@ class LifecycleStore:
         with self._session() as session:
             order = session.get(BrokerOrder, order_id)
             return order.client_order_id if order is not None else None
+
+    def order_record(self, order_id: str) -> dict[str, Any] | None:
+        """A detached view of an order, for deadline and reconciliation logic."""
+        with self._session() as session:
+            order = session.get(BrokerOrder, order_id)
+            if order is None:
+                return None
+            return {
+                "order_id": order.id,
+                "role": order.role,
+                "broker_order_id": order.broker_order_id,
+                "client_order_id": order.client_order_id,
+                "local_state": order.local_state,
+                "status": order.status,
+                "terminal": order.terminal,
+                "strategy_quantity": order.strategy_quantity,
+                "filled_quantity": order.filled_quantity,
+                "submitted_at": _aware(order.submitted_at),
+                "deadline_at": _aware(order.deadline_at),
+            }
+
+    def record_cancel_requested(self, order_id: str, *, now: datetime | None = None) -> None:
+        """Note that a cancel was asked for. It is not confirmed until reconciled.
+
+        Deliberately does not set a terminal state: a cancel can lose a race with
+        a fill, and recording it as canceled here would create exactly the
+        phantom-abandonment this store exists to prevent.
+        """
+        with self._session() as session:
+            order = session.get(BrokerOrder, order_id)
+            if order is None:
+                raise LookupError(f"broker order {order_id} not found")
+            order.last_error = "cancel_requested"
+            order.reconciled_at = None
+            order.deadline_at = order.deadline_at or (now or datetime.now(UTC))
 
     def order_state(self, order_id: str) -> tuple[OrderState, int, Decimal | None]:
         with self._session() as session:
@@ -554,7 +607,7 @@ class LifecycleStore:
             strategy=row.strategy,
             long_symbol=row.long_symbol,
             short_symbol=row.short_symbol,
-            expiration=row.expiration,
+            expiration=_aware(row.expiration) or row.expiration,
             width=Decimal(str(row.width)),
             requested_quantity=row.requested_quantity,
             filled_quantity=row.filled_quantity,
@@ -562,7 +615,7 @@ class LifecycleStore:
                 Decimal(str(row.avg_entry_debit)) if row.avg_entry_debit is not None else None
             ),
             invalidation=invalidation,
-            entry_filled_at=row.entry_filled_at,
+            entry_filled_at=_aware(row.entry_filled_at),
             close_order_id=row.close_order_id,
         )
 
@@ -607,7 +660,7 @@ class LifecycleStore:
                     detail=row.detail,
                     execution_state=row.execution_state,
                     position_id=row.position_id,
-                    opened_at=row.opened_at,
+                    opened_at=_aware(row.opened_at) or row.opened_at,
                 )
                 for row in session.scalars(
                     select(Incident).where(Incident.resolved_at.is_(None))

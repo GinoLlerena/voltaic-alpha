@@ -116,7 +116,7 @@ class Reconciler:
             str(o.get("client_order_id")): o for o in open_orders if o.get("client_order_id")
         }
 
-        managed = self._store.active_positions()
+        managed = self._store.active_positions(include_abandoned=True)
         report.positions_checked = len(managed)
         claimed_symbols: set[str] = set()
 
@@ -156,6 +156,24 @@ class Reconciler:
         stamp: datetime,
     ) -> None:
         broker_holds = bool({position.long_symbol, position.short_symbol} & held_symbols)
+
+        # A position we abandoned that the broker turns out to hold is a late
+        # fill: exposure we own and had stopped managing.
+        if position.state is PositionState.ABANDONED and broker_holds:
+            report.mismatches.append(
+                f"{position.position_id}: abandoned locally but the broker holds a leg"
+            )
+            report.incidents.append(
+                self._store.open_incident(
+                    kind="late_fill_after_terminal",
+                    detail=(
+                        f"broker holds {position.long_symbol} or {position.short_symbol} "
+                        f"for abandoned position {position.position_id}"
+                    ),
+                    position_id=position.position_id, run_id=run_id, now=stamp,
+                )
+            )
+            return
 
         entry_state, _, _ = self._store.order_state(position.entry_order_id)
         entry_order = self._fetch_order(position.entry_order_id, working_by_client_id)
