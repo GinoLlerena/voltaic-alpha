@@ -28,12 +28,16 @@ from options_alpha_lab.execution.request import RequestError, prepare_mleg_reque
 
 NOW = datetime(2026, 8, 28, 15, 40, tzinfo=UTC)
 
+# Approval is disabled in the base environment so each guard can be tested in
+# isolation. The approval gate has its own class below.
 PAPER_ENV = {
     "BOT_MODE": "paper_execute",
     "ALPACA_PAPER_TRADE": "true",
     "ALPACA_TRADING_ENABLED": "true",
+    "REQUIRE_OPERATOR_APPROVAL": "false",
     "DATABASE_URL": "sqlite+pysqlite:///:memory:",
 }
+APPROVAL_ENV = dict(PAPER_ENV, REQUIRE_OPERATOR_APPROVAL="true")
 
 
 def intent(**overrides: Any) -> OrderIntent:
@@ -161,7 +165,7 @@ class PreflightTests(unittest.TestCase):
 
     def test_refuses_when_execution_state_blocks_new_risk(self) -> None:
         self.refuse("blocks new risk", state=ExecutionState.NO_NEW_RISK)
-        self.refuse("blocks new risk", state=ExecutionState.FREEZE_ALL_WRITES)
+        self.refuse("blocks every write", state=ExecutionState.FREEZE_ALL_WRITES)
 
     def test_refuses_a_second_concurrent_strategy(self) -> None:
         self.refuse("one open or pending", open_strategies=1)
@@ -192,6 +196,81 @@ class EndpointResolutionTests(unittest.TestCase):
         broker = AlpacaBroker.__new__(AlpacaBroker)
         broker._client = type("C", (), {"_base_url": BaseURL.TRADING_PAPER})()
         self.assertEqual(broker.resolved_endpoint(), "https://paper-api.alpaca.markets")
+
+
+class OperatorApprovalTests(unittest.TestCase):
+    """REQUIRE_OPERATOR_APPROVAL must be a real control, not a recorded intention."""
+
+    def gateway(self, broker: FakeBroker) -> ExecutionGateway:
+        return ExecutionGateway(broker, load_settings(APPROVAL_ENV), clock=lambda: NOW)
+
+    def test_an_open_without_approval_is_refused(self) -> None:
+        broker = FakeBroker()
+        with self.assertRaises(ExecutionRefused) as ctx:
+            self.gateway(broker).submit(intent(), prepare_mleg_request(intent(), now=NOW))
+        self.assertIn("REQUIRE_OPERATOR_APPROVAL", str(ctx.exception))
+        self.assertEqual(broker.submits, [], "nothing may reach the broker")
+
+    def test_an_open_with_approval_proceeds(self) -> None:
+        broker = FakeBroker()
+        result = self.gateway(broker).submit(
+            intent(), prepare_mleg_request(intent(), now=NOW),
+            operator_approval="operator:gino:2026-08-28",
+        )
+        self.assertEqual(result.status, "accepted")
+
+    def test_a_close_never_needs_approval(self) -> None:
+        # An operator who is asleep must not be able to trap an open position.
+        broker = FakeBroker(open_strategies=1)
+        closing = build_close_intent(
+            intent(), approval_reference="exit:stop_loss",
+            limit_price=Decimal("1.50"), now=NOW,
+        )
+        result = self.gateway(broker).submit(
+            closing, prepare_mleg_request(closing, now=NOW), reduces_risk=True
+        )
+        self.assertEqual(result.status, "accepted")
+
+    def test_a_close_is_permitted_under_no_new_risk(self) -> None:
+        broker = FakeBroker(open_strategies=1)
+        gw = ExecutionGateway(
+            broker, load_settings(APPROVAL_ENV),
+            execution_state=ExecutionState.NO_NEW_RISK, clock=lambda: NOW,
+        )
+        closing = build_close_intent(
+            intent(), approval_reference="exit:halt",
+            limit_price=Decimal("1.50"), now=NOW,
+        )
+        result = gw.submit(closing, prepare_mleg_request(closing, now=NOW), reduces_risk=True)
+        self.assertEqual(result.status, "accepted")
+
+    def test_freeze_all_writes_blocks_even_a_close(self) -> None:
+        # The one state that stops risk reduction, which is why it raises an incident.
+        broker = FakeBroker(open_strategies=1)
+        gw = ExecutionGateway(
+            broker, load_settings(APPROVAL_ENV),
+            execution_state=ExecutionState.FREEZE_ALL_WRITES, clock=lambda: NOW,
+        )
+        closing = build_close_intent(
+            intent(), approval_reference="exit:stop_loss",
+            limit_price=Decimal("1.50"), now=NOW,
+        )
+        with self.assertRaises(ExecutionRefused):
+            gw.submit(closing, prepare_mleg_request(closing, now=NOW), reduces_risk=True)
+        self.assertEqual(broker.submits, [])
+
+    def test_a_close_still_requires_paper_authority_and_a_matching_hash(self) -> None:
+        broker = FakeBroker(endpoint="https://api.alpaca.markets")
+        closing = build_close_intent(
+            intent(), approval_reference="exit", limit_price=Decimal("1.50"), now=NOW
+        )
+        with self.assertRaises(ExecutionRefused):
+            self.gateway(broker).submit(
+                closing, prepare_mleg_request(closing, now=NOW), reduces_risk=True
+            )
+        mismatch = prepare_mleg_request(intent(), now=NOW)
+        with self.assertRaises(ExecutionRefused):
+            self.gateway(FakeBroker()).submit(closing, mismatch, reduces_risk=True)
 
 
 class RequestMappingTests(unittest.TestCase):

@@ -6,12 +6,21 @@ the interesting failures are the ones that develop between the two. In order:
 1. Configuration permits writes at all.
 2. The resolved endpoint is the Paper endpoint, verified from the client that is
    about to be used rather than from the environment variable that configured it.
-3. Durable execution state allows new risk.
-4. No strategy is already open or pending.
-5. The intent has not expired.
-6. The prepared request still matches the intent hash.
+3. Durable execution state allows the write.
+4. An operator has approved, when approval is required.
+5. No strategy is already open or pending.
+6. The intent has not expired.
+7. The prepared request still matches the intent hash.
 
 A failure at any step raises. There is no path that degrades to "submit anyway".
+
+**Risk-reducing closes are treated differently on purpose.** Guards 3, 4, and 5
+exist to stop new risk being taken. Applying them to a close would trap exposure
+at exactly the moment it needs to be reduced: an operator who is asleep, a halt
+state raised by stale data, or the position itself occupying the single strategy
+slot would each prevent an exit. A close still requires Paper authority, an
+unexpired intent, and a matching hash, and `FREEZE_ALL_WRITES` still blocks it,
+because that state exists for integrity incidents where writing at all is unsafe.
 """
 
 from __future__ import annotations
@@ -75,7 +84,14 @@ class ExecutionGateway:
         self._clock = clock or (lambda: datetime.now(UTC))
 
     # -- guards ------------------------------------------------------------
-    def preflight(self, intent: OrderIntent, request: PreparedRequest) -> None:
+    def preflight(
+        self,
+        intent: OrderIntent,
+        request: PreparedRequest,
+        *,
+        reduces_risk: bool = False,
+        operator_approval: str | None = None,
+    ) -> None:
         if not self._settings.may_write_orders:
             raise ExecutionRefused(
                 "configuration does not permit order writes "
@@ -89,11 +105,25 @@ class ExecutionGateway:
             # that configured it. Those can disagree.
             raise ExecutionRefused(f"resolved endpoint {endpoint!r} is not the Paper endpoint")
 
-        if self.execution_state is not ExecutionState.NORMAL:
-            raise ExecutionRefused(f"execution state {self.execution_state.value} blocks new risk")
+        if self.execution_state is ExecutionState.FREEZE_ALL_WRITES:
+            # The one state that blocks a close too. It raises an incident
+            # precisely because it can prevent risk reduction.
+            raise ExecutionRefused("execution state FREEZE_ALL_WRITES blocks every write")
 
-        if self._broker.open_strategy_count() > 0:
-            raise ExecutionRefused("H0 permits one open or pending strategy at a time")
+        if not reduces_risk:
+            if self.execution_state is not ExecutionState.NORMAL:
+                raise ExecutionRefused(
+                    f"execution state {self.execution_state.value} blocks new risk"
+                )
+
+            if self._settings.require_operator_approval and not operator_approval:
+                raise ExecutionRefused(
+                    "REQUIRE_OPERATOR_APPROVAL is set and no operator approval was supplied; "
+                    "an autonomous open is not permitted in this configuration"
+                )
+
+            if self._broker.open_strategy_count() > 0:
+                raise ExecutionRefused("H0 permits one open or pending strategy at a time")
 
         if intent.is_expired(self._clock()):
             raise ExecutionRefused(f"intent expired at {intent.expires_at.isoformat()}")
@@ -102,9 +132,18 @@ class ExecutionGateway:
             raise ExecutionRefused("prepared request does not match the approved intent hash")
 
     # -- write -------------------------------------------------------------
-    def submit(self, intent: OrderIntent, request: PreparedRequest) -> SubmissionResult:
+    def submit(
+        self,
+        intent: OrderIntent,
+        request: PreparedRequest,
+        *,
+        reduces_risk: bool = False,
+        operator_approval: str | None = None,
+    ) -> SubmissionResult:
         """Submit once. An ambiguous response is resolved by lookup, never by retry."""
-        self.preflight(intent, request)
+        self.preflight(
+            intent, request, reduces_risk=reduces_risk, operator_approval=operator_approval
+        )
         submitted_at = self._clock()
 
         try:

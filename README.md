@@ -199,6 +199,30 @@ so they remain free and deterministic.
 - What must be persisted for auditability
 - Which Alpaca fields will later be needed in the live-read adapter
 
+## Run the agent
+
+```bash
+# Full decision cycle against live data, writes disabled
+uv run python -m options_alpha_lab.agent --mode recommend --ticks 1
+
+# Paper writes, still refused without an explicit operator approval
+uv run python -m options_alpha_lab.agent --mode paper_execute --ticks 1
+uv run python -m options_alpha_lab.agent --mode paper_execute --ticks 0 --approve "operator:you"
+```
+
+Each tick observes, then **manages the open position before considering a new
+one**. A tick that entered first could hold a losing position through its own
+stop while spending the single strategy slot.
+
+Opening risk requires `paper_execute` mode, `ALPACA_TRADING_ENABLED=true`, and
+an explicit `--approve` token whenever `REQUIRE_OPERATOR_APPROVAL` is set. Closes
+are deliberately exempt: blocking an exit traps exposure at the moment it most
+needs reducing.
+
+Exit rules and their precedence are frozen in `exits.py` — expiry guard, then
+unmeasurable-value review, then stop loss, invalidation breach, profit capture,
+and time stop. The precedence is declared as data so a test can assert it.
+
 ## The judge dashboard
 
 `app.py` serves five read-only views over the committed evidence in

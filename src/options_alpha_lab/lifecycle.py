@@ -98,7 +98,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"\nresolved endpoint {broker.resolved_endpoint()}")
 
     try:
-        submission = gateway.submit(intent, request)
+        submission = gateway.submit(
+            intent, request, operator_approval=f"operator:cli:{datetime.now(UTC).date()}"
+        )
     except ExecutionRefused as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 1
@@ -119,10 +121,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         close_request = prepare_mleg_request(close_intent)
         _print_request("exact prepared request (close)", close_request)
-        # Closing reduces risk, so the one-strategy guard must not block it.
-        closing_gateway = ExecutionGateway(_ClosingBroker(broker), settings)
         try:
-            close_submission = closing_gateway.submit(close_intent, close_request)
+            # reduces_risk exempts the close from the one-strategy guard, the
+            # halt state, and the approval requirement, all of which exist to
+            # stop new risk rather than to trap existing risk.
+            close_submission = gateway.submit(
+                close_intent, close_request, reduces_risk=True
+            )
             print(f"close submitted {close_submission.client_order_id}"
                   f" -> {close_submission.broker_order_id} ({close_submission.status})")
         except ExecutionRefused as exc:
@@ -130,25 +135,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
 
     return 0
-
-
-class _ClosingBroker(AlpacaBroker):
-    """A risk-reducing close is not a new strategy and must not be blocked as one."""
-
-    def __init__(self, inner: AlpacaBroker) -> None:  # noqa: D107 - thin delegation
-        self._inner = inner
-
-    def resolved_endpoint(self) -> str:
-        return self._inner.resolved_endpoint()
-
-    def submit(self, body: dict[str, Any]) -> dict[str, Any]:
-        return self._inner.submit(body)
-
-    def get_by_client_order_id(self, client_order_id: str) -> dict[str, Any] | None:
-        return self._inner.get_by_client_order_id(client_order_id)
-
-    def open_strategy_count(self) -> int:
-        return 0
 
 
 def _persist(

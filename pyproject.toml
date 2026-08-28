@@ -91,6 +91,12 @@ disallow_any_generics = true
 # Baseline exemption, narrowed to one check in one module rather than relaxing
 # strict mode. `_jsonable` is an untyped recursive serializer; giving it a real
 # return type is a Phase 1 cleanup task.
+# APScheduler ships no type information. Narrowed to the one module rather than
+# relaxing strict mode for the package.
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = "options_alpha_lab.models"
 warn_return_any = false
