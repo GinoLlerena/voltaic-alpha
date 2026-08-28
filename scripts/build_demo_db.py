@@ -95,6 +95,9 @@ def main() -> int:
                     expires_at=datetime.fromisoformat(receipt["recorded_at"]),
                 )
             )
+            # Parent before children: prepared requests and broker orders both
+            # reference this intent, and the insert order is not inferable.
+            session.flush()
             session.add(
                 PreparedOrderRequest(
                     id=uuid.uuid4().hex,
@@ -130,6 +133,7 @@ def main() -> int:
                     reconciled_at=datetime.now(UTC),
                 )
             )
+            session.flush()
             for leg in leg_data["legs"]:
                 session.add(
                     Fill(

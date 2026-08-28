@@ -194,6 +194,8 @@ def _persist(
                 expires_at=intent.expires_at,
             )
         )
+        # The prepared request and the broker order both reference this intent.
+        session.flush()
         session.add(
             PreparedOrderRequest(
                 id=uuid.uuid4().hex,

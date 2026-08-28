@@ -82,5 +82,5 @@ jobs:
         # .secrets.baseline records reviewed non-secrets (the local Postgres
         # password and test fixtures); anything new fails the job.
         run: |
-          git ls-files -z | grep -zv '^uv\.lock$' \
+          git ls-files -z | grep -zvE '^(uv\.lock|\.secrets\.baseline)$' \
             | xargs -0 uv run detect-secrets-hook --baseline .secrets.baseline

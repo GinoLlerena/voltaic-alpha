@@ -283,5 +283,33 @@ class NoBrokerWritePathTests(unittest.TestCase):
             self.assertEqual(_load_guard().offenders(Path(tmp)), [])
 
 
+
+
+class ForeignKeyIntegrityTests(unittest.TestCase):
+    """SQLite must enforce what PostgreSQL enforces, or bugs hide until CI."""
+
+    def test_sqlite_engine_enforces_foreign_keys(self) -> None:
+        from sqlalchemy import text
+
+        from options_alpha_lab.persistence.repository import build_engine
+
+        with tempfile.TemporaryDirectory() as tmp:
+            engine = build_engine(settings_for(Path(tmp) / "fk.db"))
+            with engine.connect() as connection:
+                self.assertEqual(connection.execute(text("PRAGMA foreign_keys")).scalar(), 1)
+
+    def test_every_persisted_row_satisfies_its_foreign_keys(self) -> None:
+        from sqlalchemy import text
+
+        from options_alpha_lab.persistence.repository import build_engine
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = settings_for(Path(tmp) / "fk.db")
+            replay_paths([QUALIFIED, REFUSAL], settings)
+            with build_engine(settings).connect() as connection:
+                violations = connection.execute(text("PRAGMA foreign_key_check")).fetchall()
+        self.assertEqual(violations, [])
+
+
 if __name__ == "__main__":
     unittest.main()

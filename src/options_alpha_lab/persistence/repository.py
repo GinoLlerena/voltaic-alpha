@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..architecture.contracts import DecisionOutcome, DecisionSnapshot
@@ -52,7 +52,19 @@ class RecordedDecision:
 
 
 def build_engine(settings: Settings, *, echo: bool = False) -> Engine:
-    return create_engine(settings.database_url, echo=echo, future=True)
+    engine = create_engine(settings.database_url, echo=echo, future=True)
+
+    if engine.dialect.name == "sqlite":
+        # SQLite ignores foreign keys unless asked. Leaving it off lets a broken
+        # insert order pass locally and fail only on PostgreSQL, which is exactly
+        # what happened once. Development must enforce what production enforces.
+        @event.listens_for(engine, "connect")
+        def _enforce_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return engine
 
 
 def create_schema(engine: Engine) -> None:
@@ -145,6 +157,11 @@ class DecisionRecorder:
                     data_quality=snapshot_payload["data_quality"],
                 )
             )
+            # The snapshot is the parent of the evidence pack, the signals, and
+            # the decision. Flush it before anything references it: SQLAlchemy
+            # cannot infer the order from a bare ForeignKey column.
+            session.flush()
+
             for signal in snapshot.signals:
                 session.add(
                     SignalRecord(
@@ -192,6 +209,9 @@ class DecisionRecorder:
                     decided_at=now,
                 )
             )
+            # Same reason as above: the thesis, spread, and risk rows reference
+            # this decision, and the ordering is not inferable from the columns.
+            session.flush()
 
             model_call_id: str | None = None
             if model_call is not None:
@@ -211,6 +231,7 @@ class DecisionRecorder:
                         input_hash=model_call.input_hash,
                     )
                 )
+                session.flush()
 
             if outcome.thesis is not None:
                 session.add(
