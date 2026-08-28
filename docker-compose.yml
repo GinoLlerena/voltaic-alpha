@@ -1,0 +1,32 @@
+# Local PostgreSQL for development and tests, per implementation plan section 5.1.
+# PostgreSQL is the authoritative store for runs, snapshots, model calls, decisions,
+# risk decisions, intents, prepared requests, orders, fills, positions, and audit events.
+#
+#   docker compose up -d db
+#   DATABASE_URL=postgresql+psycopg://options_alpha:options_alpha@localhost:5432/options_alpha
+#
+# These credentials are local-only and intentionally non-secret. Never point this
+# file at a hosted database, and never place broker or provider keys here.
+
+services:
+  db:
+    image: postgres:16
+    container_name: options-alpha-db
+    environment:
+      POSTGRES_USER: options_alpha
+      POSTGRES_PASSWORD: options_alpha
+      POSTGRES_DB: options_alpha
+    ports:
+      - "5432:5432"
+    volumes:
+      - options-alpha-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Migrations and the worker lease must not start against a half-open server.
+      test: ["CMD-SHELL", "pg_isready -U options_alpha -d options_alpha"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  options-alpha-pgdata:

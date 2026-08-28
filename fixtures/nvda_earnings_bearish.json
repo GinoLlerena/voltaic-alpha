@@ -1,0 +1,53 @@
+{
+  "case_id": "eventedge-nvda-001",
+  "symbol": "NVDA",
+  "event_type": "earnings",
+  "event_date": "2026-09-02",
+  "days_until_event": 3,
+  "underlying_price": 180.0,
+  "account_equity": 100000.0,
+  "expected_direction": "bearish",
+  "confidence": 0.74,
+  "evidence": [
+    "Synthetic fixture: post-event expectations exceed the experiment threshold.",
+    "Synthetic fixture: downside scenario has a defined invalidation level."
+  ],
+  "invalidation_conditions": [
+    "Underlying closes above the synthetic resistance level.",
+    "Event evidence changes before entry."
+  ],
+  "option_chain": [
+    {
+      "symbol": "NVDA260925P00180000",
+      "option_type": "put",
+      "expiration": "2026-09-25",
+      "dte": 26,
+      "strike": 180.0,
+      "bid": 7.1,
+      "ask": 7.5,
+      "delta": -0.49,
+      "implied_volatility": 0.62
+    },
+    {
+      "symbol": "NVDA260925P00170000",
+      "option_type": "put",
+      "expiration": "2026-09-25",
+      "dte": 26,
+      "strike": 170.0,
+      "bid": 3.9,
+      "ask": 4.2,
+      "delta": -0.32,
+      "implied_volatility": 0.6
+    }
+  ],
+  "policy": {
+    "max_risk_pct": 0.005,
+    "min_confidence": 0.65,
+    "min_evidence_items": 2,
+    "min_dte": 14,
+    "max_dte": 45,
+    "max_bid_ask_ratio": 0.15,
+    "max_contracts": 2
+  }
+}
+

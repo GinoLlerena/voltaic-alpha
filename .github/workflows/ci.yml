@@ -1,0 +1,73 @@
+name: CI
+
+# Clean-checkout gate for Phase 1: a fresh clone must lint, type-check, replay the
+# offline suite, and pass secret and dependency scans without provider credentials.
+# Live provider tests are opt-in and never run here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Absent credentials are the point: nothing in CI may reach a broker or a model.
+  ALPACA_TRADING_ENABLED: "false"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: options_alpha
+          POSTGRES_PASSWORD: options_alpha
+          POSTGRES_DB: options_alpha
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U options_alpha -d options_alpha"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://options_alpha:options_alpha@localhost:5432/options_alpha
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install locked dependencies
+        # --frozen fails if uv.lock and pyproject.toml have drifted, so the
+        # committed lockfile is the single source of the environment.
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy
+
+      - name: Tests
+        run: uv run pytest
+
+      - name: Dependency audit
+        run: uv run pip-audit
+
+      - name: Secret scan
+        # Tracked files only, which is the real question: has a secret reached
+        # version control? --all-files would scan gitignored working files such as
+        # .env and fail on credentials that are correctly excluded.
+        # .secrets.baseline records reviewed non-secrets (the local Postgres
+        # password and test fixtures); anything new fails the job.
+        run: |
+          git ls-files -z | grep -zv '^uv\.lock$' \
+            | xargs -0 uv run detect-secrets-hook --baseline .secrets.baseline

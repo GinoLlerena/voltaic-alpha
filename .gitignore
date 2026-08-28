@@ -1,0 +1,33 @@
+# Secrets — never commit. See scripts/configure_secrets.py.
+.env
+.env.*
+!.env.example
+.env.*.tmp
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+
+# Derived confidential/redacted run exports (see implementation plan §5.2)
+run_packages/
+
+# Material kept on disk for reference but deliberately outside the repository:
+# documents that feed no H0 outcome, no G0-G4 gate, and no implementation step.
+# Anything still required to build H0 stays tracked — see the pending task list.
+docs/archive/

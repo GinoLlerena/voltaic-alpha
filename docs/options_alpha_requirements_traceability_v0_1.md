@@ -1,0 +1,383 @@
+# Options Alpha Agent
+
+## Requirements Traceability Matrix
+
+*Living tracker for hackathon eligibility, implementation, safety, testing, deployment, and submission evidence*
+
+| Field | Value |
+|---|---|
+| Version | 0.1.5 |
+| Date | 27 August 2026 |
+| Status | Active product backlog with a separate seven-day hackathon H0 cut line |
+| Implementation plan | [Bot Implementation Plan](./options_alpha_bot_implementation_plan_v0_1.md) |
+| Trading design | [Trading System Design Specification](./options_alpha_trading_design_v0_1.md) |
+| Executable architecture | [Architecture Slice v0.1](./options_alpha_architecture_slice_v0_1.md) |
+
+## 1. How to use this tracker
+
+Each requirement has a stable ID. Code, tests, pull requests, release notes, demo scripts, and submission artifacts should reference these IDs. A requirement is not `COMPLETE` because code exists; it is complete only when its acceptance evidence is linked or named in the final column.
+
+Update rules:
+
+1. Change status in the same change that adds or removes the evidence.
+2. Do not delete requirements during the hackathon. Mark them `DEFERRED` with a decision reference.
+3. Add new requirements with a new ID; never reuse an old ID.
+4. Any change to a P0 risk or execution requirement requires a new policy version and regression tests before that capability is enabled.
+5. Resolve all `NEEDS_CONFIRMATION` event rows before the competition implementation is frozen.
+6. A P0 row cannot be waived informally. Record the organizer decision or team decision in the implementation-plan decision log.
+
+## 2. Status definitions
+
+| Status | Meaning |
+|---|---|
+| `COMPLETE` | Implemented and supported by repeatable evidence. |
+| `PARTIAL` | Some behavior or evidence exists, but the acceptance proof is incomplete or test-only. |
+| `PENDING` | Confirmed requirement with no accepted implementation evidence yet. |
+| `NEEDS_CONFIRMATION` | The exact event rule or acceptance condition has not been verified. |
+| `BLOCKED` | Work cannot proceed because a named dependency is unavailable. |
+| `DEFERRED` | Explicitly outside the current release scope. |
+
+Product-backlog priorities:
+
+- `P0`: required before the corresponding product capability can be called safely implemented; it is not automatically part of the seven-day hackathon cut.
+- `P1`: product hardening, broader evaluation, or operational strength after the vertical slice is stable.
+- `P2`: useful extension; may be deferred without breaking the core submission.
+
+`H0` is the separate hackathon must-ship designation defined below. This prevents 114 product-level P0 acceptance details from being mistaken for 114 seven-day deliverables.
+
+Owner roles are responsibilities, not assigned people: `Product`, `Trading`, `Backend`, `AI`, `Frontend`, `DevOps`, `QA`, and `Presentation`.
+
+### 2.1 Baseline status summary
+
+Update this summary whenever a requirement status changes.
+
+| Status | Count |
+|---|---:|
+| `COMPLETE` | 10 |
+| `PARTIAL` | 47 |
+| `PENDING` | 69 |
+| `NEEDS_CONFIRMATION` | 2 |
+| **Total tracked requirements** | **128** |
+
+Of the 128 requirements, 114 are product P0 and 14 are product P1. These labels express safety or product dependency, not the hackathon schedule.
+
+### 2.2 Hackathon H0 cut line
+
+H0 is accepted through a small set of demonstrable outcomes rather than by completing every product P0 row:
+
+| H0 outcome | Principal requirement evidence |
+|---|---|
+| Verified event and authority boundary | `HK-001` to `HK-008`, `RISK-014` to `RISK-016`, `RISK-022` |
+| One SPY qualified case and one refusal | `AI-003` to `AI-005`, `AI-008`, `DATA-001` to `DATA-005`, `DATA-008`, `DATA-011` to `DATA-014`, `DATA-016`, `RISK-001` to `RISK-006`, `RISK-011`, `RISK-013` |
+| Meaningful bounded-model proof | `AI-002`, `AI-003`, `AI-005` to `AI-010`; deterministic no-LLM ablation is mandatory |
+| One exact Paper MLeg open/close plus one recovery case | `RISK-015` to `RISK-022`, `OPS-001` to `OPS-003`, `OPS-005`, `OPS-012`, `QA-004`, `QA-009`, `QA-010` |
+| Five-view hosted judge experience | `HK-009` to `HK-018`, `OPS-006` to `OPS-010`, `OPS-013`, `QA-012` to `QA-016` |
+
+Multi-position portfolio controls, breakout/breakdown, tradeable QQQ/IWM, general backtesting, learning/recommendation pipelines, and policy promotion are not H0 even when their product requirements remain P0.
+
+## 3. Source registry
+
+| Source ID | Source | Confidence and use |
+|---|---|---|
+| `SRC-EVENT` | [Alpaca AI Trading Agents Hackathon](https://lablab.ai/ai-hackathons/alpaca-ai-trading-agents-hackathon), re-verified 27 August 2026 | Confirms online build 28 August-4 September 2026, Paper environment, named Trading API/MCP/CLI stack, submission categories, and judging dimensions of Application of Technology, Presentation, Business Value, and Originality. Exact cutoff/timezone, account/reset rules, autonomy, whether every sponsor interface is mandatory, and any separate leaderboard still require enrolled-dashboard or organizer confirmation. |
+| `SRC-LABLAB` | [lablab.ai Guide](https://lablab.ai/guide) and [submission guidelines](https://lablab.ai/ai-articles/hackathon-guidelines) | Current generic platform submission requirements and judging categories. |
+| `SRC-DESIGN` | [Trading design](./options_alpha_trading_design_v0_1.md) | Project-approved strategy, scope, policy hypotheses, and previously captured event notes. |
+| `SRC-PLAN` | [Implementation plan](./options_alpha_bot_implementation_plan_v0_1.md) | Selected architecture, technology, phases, and release gates. |
+| `SRC-ARCH` | [Architecture slice](./options_alpha_architecture_slice_v0_1.md) | Executable production-facing contracts, ports, workflow boundaries, and staged extension plan. |
+| `SRC-UI` | [Frontend Design v0.1](./options_alpha_frontend_design_v0_1.md) | Judge/operator UX boundary, five-view information architecture, component and state specifications, responsive/accessibility rules, redacted view models, and frontend delivery increments. |
+| `SRC-CODE` | `src/`, `tests/`, `fixtures/`, and `README.md` | Executable repository evidence as of this version. |
+| `SRC-ALPACA-MCP` | [Alpaca Trading MCP Server](https://docs.alpaca.markets/us/docs/alpaca-mcp-server) | MCP V2 configuration, toolsets, paper default, tools, and security notes. |
+| `SRC-ALPACA-DATA` | [About Market Data API](https://docs.alpaca.markets/us/docs/about-market-data-api) | IEX/indicative/OPRA coverage and request limits. |
+| `SRC-ALPACA-CHAIN` | [Option chain reference](https://docs.alpaca.markets/us/reference/optionchain) | Option-chain fields, filters, feed, pagination, and error behavior. |
+| `SRC-ALPACA-CONTRACT` | [Alpaca-py option-contract model](https://alpaca.markets/sdks/python/api_reference/trading/models.html#optioncontract) | Contract metadata, including open interest and its observation date. |
+| `SRC-ALPACA-MLEG` | [Options Level 3 Trading](https://docs.alpaca.markets/us/docs/options-level-3-trading) | Multi-leg order schema and position intents. |
+| `SRC-ALPACA-ORDER` | [Create an Order](https://docs.alpaca.markets/us/reference/createorderforaccount) | Current order-class, strategy-quantity, order-type, and options time-in-force contract. |
+| `SRC-ALPACA-PAPER` | [Paper Trading](https://docs.alpaca.markets/us/docs/paper-trading) | Paper environment behavior and simulation limitations. |
+| `SRC-ALPACA-PAPER-START` | [How to Start Paper Trading with Alpaca's Trading API](https://alpaca.markets/learn/start-paper-trading), reviewed 27 August 2026 and marked updated 23 March 2026 | Beginner onboarding reference for separate Paper credentials, one-time secret retrieval, credential-regeneration invalidation, explicit `TradingClient(..., paper=True)`, and basic account inspection. It is not sufficient execution or reconciliation guidance. |
+| `SRC-ALPACA-SKILLS` | [Alpaca Trading API skills](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api) at reviewed commit `62891ec` | Advisory agent workflows only. Useful patterns require reconciliation with project trust boundaries and current product documentation before adoption. |
+| `SRC-ALPACA-BACKTEST-SKILL` | [Alpaca Trading API Backtesting skill](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api/backtest) | Reproducibility, fill-model, data-fingerprint, benchmark, and disclosure patterns. Its V1 supported-asset reference excludes options. |
+| `SRC-ALPACA-CLI` | [Alpaca Trading CLI](https://docs.alpaca.markets/us/docs/alpacas-cli) and [CLI paper-trading skill](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api/paper-trading-cli) | Alpha-preview diagnostics, schema discovery, dry-run, structured errors, and client-order-ID lookup. Operator-only for this project. |
+| `SRC-ALPACA-PAPER-SKILL` | [Generic Paper Trading skill](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api/paper-trading) | Advisory preflight, preview, idempotency, lifecycle, artifact, and disclosure checklist. Its optional risk/confirmation model is not project authority. |
+| `SRC-ALPACA-MCP-SKILL` | [MCP paper-trading skill](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api/paper-trading-mcp) and [open MLeg interoperability issue #97](https://github.com/alpacahq/alpaca-mcp-server/issues/97) | Supports the read-only/least-privilege decision; not an execution path. The issue is a current additional reason to test and fail closed on MLeg schema transport. |
+| `SRC-OPENAI` | [OpenAI Docs: GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra) | Model ID, Responses API, structured output, model features, and limits. |
+| `SRC-EXT-REVIEW` | External `options_alpha_bot_implementation_review_v0_2.md` (not present in this repository) | Historical advisory claims are preserved in the disposition register, but the unavailable artifact cannot serve as current release evidence. Every adopted claim requires an independent source or explicit project decision. |
+
+### 3.1 Pre-build inconsistency and clarification register
+
+These rows resolve conflicts between the current code, trading design, event assumptions, and implementation plan. They are P0 requirements, not advisory questions. Feature work must not encode an unresolved choice as an implicit default.
+
+| ID | Inconsistency or ambiguity | Resolution and acceptance proof | Owner | Blocks | Status |
+|---|---|---|---|---|---|
+| `CLR-001` | Public event facts are now available, but exact cutoff/timezone, account/reset rules, autonomy, mandatory-interface interpretation, and any leaderboard remain open. | Record the verified public facts and confirm only the remaining items from the enrolled dashboard or organizers. Update affected `HK-*` rows. | Product | Phase 0 | `PARTIAL` |
+| `CLR-002` | The plan assumed a seven-day build and lacked a feasible cut line. | Confirmed event window: 28 August-4 September 2026. Decision: use the seven-team-day H0 schedule and protect the final 0.75 day for integration/submission only. | Product | Phase 0 | `COMPLETE` |
+| `CLR-003` | The design used SPY/QQQ/IWM; the lab and validation cases use individual equities. | Decision: SPY is the only H0 tradeable underlying; QQQ/IWM may be read-only context; individual equities are test-only/deferred. Proof remaining: align allowlists and replace H0 fixtures. | Product, Trading | Phase 2 | `PARTIAL` |
+| `CLR-004` | The repository describes an event-driven earnings agent; the design contained two ETF setup families. | Decision: one mirrored SPY trend-continuation/retest setup and one vertical-debit-spread structure family in H0. Breakout/breakdown and earnings are post-H0. Proof remaining: consistent metadata, schemas, fixtures, and deck. | Product, Trading | Phase 2 | `PARTIAL` |
+| `CLR-005` | `ExperimentCase` is event-centric and contains expected answers; the design requires timestamped structured signal families. | `DecisionSnapshot` v1 now separates production observations from legacy fixtures and contains no expected answers. Proof remaining: JSON schema/loader, fixture-oracle separation, policy contracts, and legacy fixture migration. | Trading, Backend | Phase 2 | `PARTIAL` |
+| `CLR-006` | The live test fetches Alpaca data but makes its decision from synthetic price, evidence, chain, and equity. | Decision: relabel it as connectivity validation and add a separate live-data shadow test whose decision inputs are mapped from Alpaca. Proof remaining: tests and commands. | Backend, QA | Phase 2 | `PARTIAL` |
+| `CLR-007` | The live Paper account is checked, but risk sizing uses fixture equity. | Decision: require a fresh timestamped Alpaca account snapshot for Paper decisions. Proof remaining: reject fixture equity in `recommend`/`paper_execute` modes. | Backend, Trading | Phase 2 | `PARTIAL` |
+| `CLR-008` | The LLM currently copies supplied direction/confidence rather than forming a thesis. | Decision: deterministic setup supplies the directional envelope; Terra may agree or abstain, not reverse. Remove expected answers from production input and prove prompt/input isolation. | AI, Trading | Phase 3 | `PARTIAL` |
+| `CLR-009` | Design supports a neutral thesis; code supports only bullish/bearish and creates `NO_TRADE` later. | Decision: add neutral as a thesis result that terminates as `NO_TRADE` before option selection. Proof remaining: schema, state transition, and API tests. | Trading, Backend | Phase 2 | `PARTIAL` |
+| `CLR-010` | Design called several overlapping price/volume transformations independent and required three families; code requires two unique free-text items. | Decision: H0 requires objective structure plus one non-duplicative confirmation and explicit counter-evidence. Weighted scores remain research hypotheses. Proof remaining: freeze the H0 formula and negative tests. | Trading | Phase 2 | `PARTIAL` |
+| `CLR-011` | Design targets 14-35 DTE; the validation suite says preferred 21-45 DTE; the fixture permits 14-45 DTE. | Evaluate the external review's candidate hard band 14-45/preferred band 21-35, then freeze target and hard-reject bands from chain-coverage/replay evidence and update policy, fixtures, tests, and dashboard labels. | Trading | Phase 2 | `PENDING` |
+| `CLR-012` | Design proposes 0.75% standard/1.0% hard cap; fixture uses 0.5% per trade. | Freeze standard risk and hard ceiling against confirmed contest equity/scoring, with a versioned policy decision. | Trading, Product | Phase 2 | `PENDING` |
+| `CLR-013` | Portfolio, cluster, daily-loss, and position-count limits are unvalidated product hypotheses. | H0 permits one open or pending strategy and no second entry after a loss/execution incident. Freeze multi-position values only before enabling post-H0 portfolio operation. | Trading | Post-H0 | `PENDING` |
+| `CLR-014` | Design specifies delta profiles; code ranks nearest strikes and does not filter delta. | Decision: production eligibility includes delta, freshness, sourced liquidity, debit/width, and deterministic tie-breaking. Proof remaining: validate exact thresholds, field availability, implementation, and tests. | Trading, Backend | Phase 2 | `PARTIAL` |
+| `CLR-015` | Test uses IEX/indicative feeds; OPRA entitlement is unknown; design assumes trading-quality quote/Greek checks. | Decision: implement labeled feed-specific policies; indicative may support observe/recommend and controlled Paper evaluation. Proof remaining: subscription check, measured data quality, automated-Paper eligibility decision, stress evaluation, and disclosure. | Trading, Backend | Phase 2 | `PARTIAL` |
+| `CLR-016` | Signal concepts are described but formulas, timeframes, lookbacks, breadth sources, thresholds, and freshness are not specified. | Produce a signed-off H0 SPY trend/retest plus one-confirmation specification with deterministic timestamps and missing-data behavior. Broader signals are post-H0. | Trading | Phase 2 | `PENDING` |
+| `CLR-017` | Design names six components, code has a smaller interaction, and plan uses one state machine. | Decision: six logical responsibilities map to modules in one state machine; only thesis synthesis uses an LLM in P0. Proof remaining: interface map and dependency tests. | Backend, AI | Phase 1 | `PARTIAL` |
+| `CLR-018` | The public event page names the Trading API, MCP server, and CLI but does not clarify whether all are mandatory; current test uses raw HTTP. | Decision: H0 visibly uses read-only MCP evidence, deterministic `alpaca-py` execution, and one pinned CLI doctor/dry-run artifact; raw HTTP is contract-test-only. Proof remaining: organizer interpretation and adapter tests. | Product, Backend | Phase 0 | `PARTIAL` |
+| `CLR-019` | Current configuration disables trading; plan includes paper execution; autonomy/human-approval rules are unknown. | Freeze allowed bot modes, operator approval boundary, credential permissions, and demo behavior before write access. | Product, Trading, Backend | Phase 1 | `PENDING` |
+| `CLR-020` | Exit categories exist, but numerical triggers and precedence are not frozen. | Evaluate the external review's candidate thresholds, then approve loss, profit, time, conviction, expiry, event, and emergency exits with sensitivity analysis and deterministic tests before opening orders are enabled. | Trading, Backend | Phase 4 | `PENDING` |
+
+Resolution procedure:
+
+1. Record the decision, owner, date, and authoritative source in the implementation-plan decision log.
+2. Update the design when a strategy or risk-policy statement changes.
+3. Update the relevant requirement rows and create named implementation/test tasks.
+4. Mark a `CLR-*` row `COMPLETE` only when all affected documents agree and the acceptance evidence is identified.
+5. Before feature work, close only the eligibility, code-window, H0-scope, Paper-only, and authority-boundary blockers. Read-only adapters and replay may use explicitly provisional policies.
+6. Before any Paper write, close the account/permission, endpoint/mode, H0 signal/option/risk/exit, exact-request, idempotency, and reconciliation blockers using evidence created in the earlier phases.
+
+### 3.2 External-review disposition register
+
+These `REV-*` rows trace the external v0.2 review but are not additional implementation requirements and are not included in the baseline status counts.
+
+| ID | Disposition | Requirements affected | Evidence or next action |
+|---|---|---|---|
+| `REV-001` | `REJECT`: external self-declared authority/override | All | Keep the project source hierarchy; accept individual claims only after validation. |
+| `REV-002` | `ACCEPT_WITH_CHANGES`: event dates and public rubric are now verified; exact cutoff/timezone, account/autonomy rules, mandatory-interface interpretation, and any leaderboard remain open | `CLR-001`, `CLR-002`, `CLR-018`, `CLR-019`, `HK-001` to `HK-008` | Record the 27 August public-page verification and confirm only the remaining enrolled-dashboard/organizer details. |
+| `REV-003` | `ACCEPT_WITH_CHANGES`: H0 is SPY-only, one mirrored trend/retest setup, and one vertical-debit-spread family; broader ETFs/setups and individual equities are post-H0 | `CLR-003`, `CLR-004`, `DATA-005`, `DATA-008`, `RISK-011`, `QA-005` | Align package descriptions, schemas, two frozen SPY fixtures, and execution allowlists. |
+| `REV-004` | `ACCEPT`: connectivity test vs live shadow test and account-equity provenance | `CLR-006`, `CLR-007`, `DATA-002`, `QA-003`, `QA-004` | Rename/split tests and prove fixture prices/equity cannot enter Paper decisions. |
+| `REV-005` | `ACCEPT`: no expected answers in production prompt; neutral abstains | `CLR-005`, `CLR-008`, `CLR-009`, `AI-003`, `AI-005` | Freeze schemas and add prompt-leakage/neutral-transition tests. |
+| `REV-006` | `ACCEPT_WITH_CHANGES`: logical roles, one LLM component, `alpaca-py` production path | `CLR-017`, `CLR-018`, `AI-004`, `RISK-014` | Retain organizer confirmation for mandatory sponsor interfaces. |
+| `REV-007` | `ACCEPT_WITH_CHANGES`: native MLeg uses strategy quantity | `RISK-019`, `RISK-021`, `QA-009`, `QA-010` | Test partial strategy quantity and ambiguous parent/leg/account state; do not assume reconciliation away. |
+| `REV-008` | `ACCEPT`: primary halt must preserve cancels and risk-reducing exits | `RISK-017`, `OPS-008`, `QA-008` | Implement and test `NORMAL`, `NO_NEW_RISK`, and exceptional `FREEZE_ALL_WRITES`. |
+| `REV-009` | `PROVISIONAL`: imported numeric trading and lifecycle policies | `CLR-011` to `CLR-016`, `CLR-020`, `DATA-013`, `RISK-006` to `RISK-010`, `RISK-020`, `OPS-005`, `QA-008` | Candidate values require replay, sensitivity, boundary, data-availability, and Paper-behavior evidence plus owner approval. |
+| `REV-010` | `ACCEPT_WITH_CHANGES`: Basic/indicative path and liquidity fields | `CLR-014`, `CLR-015`, `DATA-011` to `DATA-013`, `DATA-016` | Chain snapshots provide trade/quote/Greeks; join dated open interest from contract metadata. Require volume only when a reliable timestamped source exists. |
+| `REV-011` | `UNVERIFIED`: autonomous Paper execution after one enablement | `CLR-019`, `RISK-016` | Confirm organizer rules and team approval boundary; keep `recommend` as default. |
+| `REV-012` | `ACCEPT_WITH_CHANGES`: validation-suite correction | `QA-005`, `QA-010` | H0 uses one qualified SPY case and one refusal; keep AAPL/TSLA/NVDA outside H0 and correct native-MLeg partial-strategy-quantity/ambiguous-state semantics. |
+| `REV-013` | `PROVISIONAL`: manually reviewed event calendar | `CLR-016`, `DATA-010`, `RISK-013` | Specify owner, provenance, timezone, effective window, review timestamp, and missing/stale fail-closed behavior. |
+
+### 3.3 Alpaca Trading API skill disposition register
+
+These `ASK-*` rows record the 26 August 2026 review of the official Alpaca agent skills. They are source dispositions, not additional tracked requirements, and are not included in the baseline status counts.
+
+| ID | Disposition | Requirements affected | Evidence or next action |
+|---|---|---|---|
+| `ASK-001` | `ACCEPT_WITH_CHANGES`: backtest reproducibility contract | `DATA-006`, `QA-005` to `QA-007`, `LEARN-006`, `LEARN-011` | Reuse formal strategy specs, data fingerprints, run lineage, explicit fills/friction/fees, benchmarks, and look-ahead controls. Build project-owned options-spread replay because the skill's V1 reference supports stocks/crypto only. |
+| `ASK-002` | `ACCEPT_WITH_CHANGES`: generic Paper preflight and lifecycle | `RISK-015` to `RISK-021`, `OPS-003`, `QA-009`, `QA-010` | Adopt resolved-endpoint proof, exact preview, idempotent client IDs, ambiguous-submit lookup, and lifecycle reporting. Reject optional/waivable risk and conversational confirmation as execution authority. |
+| `ASK-003` | `OPERATOR_ONLY`: Alpaca CLI | `CLR-018`, `QA-004`, `QA-009`, `OPS-014` | Pin the tested Alpha-preview version and allow read-only inspection, schema discovery, `doctor`, and request dry-run in the runbook. Production and unattended writes remain SDK-gateway-only. |
+| `ASK-004` | `REJECT_FOR_EXECUTION`: MCP paper-trading skill | `RISK-014`, `RISK-019`, `QA-004`, `QA-010` | Keep MCP toolsets read-only and exclude `trading`. Track the open MLeg-array client issue as a compatibility test case, not a reason to bypass the gateway. |
+| `ASK-005` | `ACCEPT_WITH_CHANGES`: local run artifacts | `OPS-001`, `OPS-003`, `OPS-010`, `OPS-013`, `QA-011` | PostgreSQL remains authoritative. Define confidential versus redacted derived exports, hashes/lineage/retention, and ignore the export root before any raw account/order data is written. |
+
+## 4. Event, eligibility, and submission requirements
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `HK-001` | Confirm event start/end, build window, submission deadline, timezone, and demo availability window. Proof: copied organizer schedule and team calendar. | `SRC-EVENT` | P0 | Product | `PARTIAL` | Public page confirms online build 28 August-4 September 2026. Record the exact cutoff/timezone and demo availability from the enrolled dashboard or organizers. |
+| `HK-002` | Confirm enrollment, team size, team membership deadline, regional eligibility, and one-submission rules. Proof: registered team and recorded rule link. | `SRC-EVENT` | P0 | Product | `PARTIAL` | Public page states teams of 1-6 and requires enrollment/team participation. Confirm membership deadline, regional/prize eligibility, and one-submission rules. |
+| `HK-003` | Confirm the required Alpaca Paper account type, starting equity, reset policy, account age, and credential-verification process. Proof: eligible account ID recorded without secrets. | `SRC-EVENT`, `SRC-DESIGN` | P0 | Product, Trading | `PARTIAL` | Public page confirms Paper use and current credentials pass connectivity; starting equity, reset/account-age rules, options level, and contest eligibility remain. |
+| `HK-004` | Confirm the eligible asset universe and whether options trading is mandatory, optional, or one category. Proof: organizer rule excerpt and frozen universe. | `SRC-EVENT`, `SRC-DESIGN` | P0 | Product, Trading | `COMPLETE` | Public page permits Alpaca stocks, options, ETFs, and crypto rather than requiring options. Project decision: SPY options are the H0 demonstration; options are a design choice, not an event-scoring fact. |
+| `HK-005` | Determine whether a separate P&L leaderboard or scoring formula exists. Proof: organizer rule or explicit absence recorded; otherwise P&L remains diagnostic only. | `SRC-EVENT`, `SRC-DESIGN` | P0 | Product, Trading | `PARTIAL` | Published judging criteria are Application of Technology, Presentation, Business Value, and Originality and do not list P&L. Confirm only whether a separate enrolled-dashboard leaderboard exists. |
+| `HK-006` | Confirm whether all named Alpaca interfaces or only the sponsor stack generally are mandatory. Proof: architecture compliance note and organizer interpretation. | `SRC-EVENT`, `SRC-ALPACA-MCP` | P0 | Product, Backend | `NEEDS_CONFIRMATION` | H0 plans visible read-only MCP evidence, `alpaca-py` Trading API execution, and one pinned CLI doctor/dry-run artifact without granting MCP/CLI write authority. |
+| `HK-007` | Confirm whether fully autonomous execution is required or whether human approval is permitted. Proof: selected bot mode and demo behavior match rules. | `SRC-EVENT` | P0 | Product, Trading | `NEEDS_CONFIRMATION` | Current repository intentionally has no execution. |
+| `HK-008` | Confirm pre-existing-code, open-source, licensing, and build-during-event requirements. Proof: tagged baseline and dependency license inventory. | `SRC-EVENT`, `SRC-LABLAB` | P0 | Product, DevOps | `PARTIAL` | Public page states submissions must be original and MIT-compliant. Preserve the pre-event baseline and confirm how pre-existing code and event-window commits are treated. |
+| `HK-009` | Provide a working prototype that judges can use online. Proof: unauthenticated or judge-authenticated hosted demo smoke test. | `SRC-LABLAB` | P0 | DevOps, Frontend | `PENDING` | No application or hosting configuration exists. |
+| `HK-010` | Provide a public GitHub repository with reproducible setup and run instructions. Proof: public URL works in a clean session. | `SRC-LABLAB` | P0 | DevOps | `PENDING` | Workspace is not currently a Git repository. |
+| `HK-011` | Provide demo platform and direct application URL. Proof: links pass automated and manual checks. | `SRC-LABLAB` | P0 | DevOps | `PENDING` | Select host after event credits and uptime rules are confirmed. |
+| `HK-012` | Provide a concise video presentation within the current lablab limit. Proof: final public video link, duration, audio, captions, and clean-session playback. | `SRC-LABLAB` | P0 | Presentation | `PENDING` | Generic guidance currently says no more than five minutes; verify event-specific limit. |
+| `HK-013` | Provide a slide presentation/pitch deck. Proof: public PDF or platform link renders correctly. | `SRC-LABLAB` | P0 | Presentation | `PENDING` | Include problem, architecture, safety, demo, results, business value, and limitations. |
+| `HK-014` | Submit title, short description, long description, technology tags, category/track, and additional information. Proof: final submission export or screenshots. | `SRC-LABLAB` | P0 | Product, Presentation | `PENDING` | Generic limits: title 50 characters, short description 255 characters, long description at least 100 words; verify current form. |
+| `HK-015` | Provide a 16:9 cover image and required media assets. Proof: final asset renders on the submission preview. | `SRC-LABLAB` | P1 | Presentation | `PENDING` | Create after product name and dashboard visuals stabilize. |
+| `HK-016` | Demonstrate effective AI and Alpaca technology integration. Proof: live trace from data through bounded model output, deterministic baseline/control, immutable Paper intent, exact request, and reconciled broker state. | `SRC-LABLAB`, `SRC-DESIGN` | P0 | AI, Backend | `PARTIAL` | Opt-in live test proves one OpenAI request and three read-only Alpaca requests; production workflow, ablation, MCP evidence, CLI release artifact, and execution remain. |
+| `HK-017` | Address Application of Technology, Presentation, Business Value, and Originality. Proof: explicit rubric mapping in deck and video script. | `SRC-EVENT`, `SRC-LABLAB` | P0 | Product, Presentation | `PENDING` | Target user: teams building AI-assisted trading apps. Differentiate with evidence-to-intent-to-request hash lineage, deterministic-versus-LLM ablation, reproducible refusal, and ambiguous-write recovery—not the generic “LLM plus guardrails” pattern. |
+| `HK-018` | Disclose paper-trading limitations, data-feed limitations, risk, and non-advisory status. Proof: README, dashboard, deck, and video contain consistent wording. | `SRC-ALPACA-PAPER`, `SRC-DESIGN` | P0 | Product, Trading | `PARTIAL` | README states synthetic data is not investment advice; hosted and submission disclosures remain. |
+
+## 5. AI and orchestration requirements
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `AI-001` | Default to `gpt-5.6-terra` with `OPENAI_MODEL` override. Proof: config test and live response metadata. | `SRC-OPENAI`, `SRC-CODE` | P0 | AI | `COMPLETE` | `tests/test_live_integration.py` defaults to Terra; live test passed on 19 August 2026. |
+| `AI-002` | Use the official OpenAI SDK and Responses API from a production adapter in `src`. Proof: mocked adapter tests and opt-in live test. | `SRC-OPENAI`, `SRC-PLAN` | P0 | AI, Backend | `PARTIAL` | Responses API works through test-only `urllib` code; move behind `ThesisSynthesizer`. |
+| `AI-003` | Require strict structured output for direction, confidence, evidence references, counter-evidence, invalidation, and status. Proof: schema contract tests. | `SRC-OPENAI`, `SRC-DESIGN` | P0 | AI | `PARTIAL` | Live test uses strict JSON schema for a smaller schema-preserving contract. |
+| `AI-004` | Keep orchestration bounded and explicit; no open-ended debate or self-directed tool loop. Proof: state-transition tests and maximum-call assertions. | `SRC-DESIGN`, `SRC-ARCH`, `SRC-CODE` | P0 | Backend, AI | `PARTIAL` | `DecisionWorkflow` has a fixed six-stage path and one call per component; provider implementations and the position lifecycle remain. |
+| `AI-005` | Reject model evidence that cannot be traced to supplied evidence IDs. Proof: hallucinated-reference and duplicate-reference tests. | `SRC-DESIGN`, `SRC-ARCH`, `SRC-CODE` | P0 | AI | `PARTIAL` | Production contracts use evidence IDs and the workflow rejects unknown thesis/setup references; the Terra adapter and duplicate-reference output tests remain. |
+| `AI-006` | Do not request or persist hidden model reasoning. Persist only schema output, metadata, and judge-facing explanation. Proof: payload and database tests. | `SRC-PLAN` | P0 | AI, Backend | `PARTIAL` | Current request asks for structured output only; durable model-call persistence is absent. |
+| `AI-007` | Set `store=False`, bound input/output, configure timeout, and record token/latency metadata. Proof: request-shape and audit tests. | `SRC-OPENAI`, `SRC-CODE` | P0 | AI | `PARTIAL` | Live test sets `store=False` and output limit; production timeout/cost telemetry remains. |
+| `AI-008` | Fail closed to `NO_TRADE` on timeout, 429 exhaustion, refusal, malformed output, unsupported value, or provider outage. Proof: failure-injection tests. | `SRC-PLAN`, `SRC-ARCH`, `SRC-CODE` | P0 | AI, Backend | `PARTIAL` | The production workflow fails closed on unusable data, neutral/invalid thesis, missing structure, and risk veto; provider exception mapping remains. |
+| `AI-009` | Version prompts, schemas, model, reasoning effort, and evaluation corpus with every thesis. Proof: database record and replay report. | `SRC-PLAN` | P0 | AI, Backend | `PENDING` | No versioned production prompt or store. |
+| `AI-010` | Compare the bounded model path with a deterministic no-LLM baseline on identical frozen inputs for fidelity, counter-evidence, invalidation, correct abstention, malformed/hallucinated output, latency, and cost. Proof: H0 ablation report. | `SRC-DESIGN`, `SRC-PLAN` | P1 | AI, QA | `PENDING` | The model's role is not justified by fluent prose; H0 must show measurable incremental value or report that the baseline is equivalent/better. |
+
+## 6. Data, signals, and option-selection requirements
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `DATA-001` | Implement a typed Alpaca market-data gateway in `src`. Proof: provider contract tests and live smoke. | `SRC-ALPACA-DATA`, `SRC-PLAN` | P0 | Backend | `PARTIAL` | Read-only calls exist only in `tests/test_live_integration.py`. |
+| `DATA-002` | Retrieve and validate Paper account state, equity, buying power, restrictions, and options level. Proof: snapshot fixture and live check. | `SRC-ALPACA-MCP`, `SRC-ALPACA-PAPER` | P0 | Backend, Trading | `PARTIAL` | Live test checks account status only. |
+| `DATA-003` | Use Alpaca clock/calendar and respect early close and non-trading days. Proof: calendar edge-case tests. | `SRC-ALPACA-MCP`, `SRC-PLAN` | P0 | Backend | `PENDING` | No scheduler or market-clock adapter exists. |
+| `DATA-004` | Label every market observation with provider, feed, source timestamp, receipt timestamp, and freshness. Proof: schema and stale-data tests. | `SRC-ALPACA-DATA`, `SRC-DESIGN`, `SRC-ARCH` | P0 | Backend | `PARTIAL` | Architecture contracts require timezone-aware observation timestamps, feed/source labels, and explicit stale fields; receipt timestamps and provider mapping remain. |
+| `DATA-005` | Restrict H0 execution to SPY; permit QQQ/IWM only as explicitly labeled read-only context; reject every other order underlying. Proof: read/write allowlist tests. | `SRC-DESIGN`, `SRC-PLAN` | P0 | Trading, Backend | `PENDING` | Current fixture/live probe is NVDA and must remain test-only. |
+| `DATA-006` | Retrieve sufficient historical bars for regime, relative strength, breadth, structure, and replay without future leakage. Accept only finalized bars and declare provider/feed, `America/New_York` session calendar including early closes, adjustment mode, timeframe, source/receipt timestamps, finalization delay, pagination/completeness, and fail-closed handling for missing, late, corrected, or forming bars. Rolling statistics exclude the current signal bar unless their versioned formula explicitly states otherwise. Fingerprint raw and normalized inputs with those semantics, row counts, and file hashes. Proof: deterministic fixture generation, fingerprint mismatch, timestamp, session-edge, forming-bar, and incomplete-page tests. | `SRC-DESIGN`, `SRC-ALPACA-DATA`, `SRC-ALPACA-BACKTEST-SKILL` | P0 | Trading, Backend | `PENDING` | No bar adapter, completed-bar contract, fingerprint contract, or feature pipeline exists. |
+| `DATA-007` | Implement family-level regime evidence as context, not a direct trigger. Proof: regime unit and replay tests. | `SRC-DESIGN` | P0 | Trading | `PENDING` | Design only. |
+| `DATA-008` | Implement the H0 deterministic SPY trend-continuation/retest setup with positive, negative, extended-entry, and ambiguous fixtures. Breakout/breakdown is post-H0. | `SRC-DESIGN` | P0 | Trading | `PENDING` | Current event type is copied from a fixture; no setup classifier. |
+| `DATA-009` | Implement relative-strength and breadth evidence separately and prevent correlated double counting. Proof: aggregation tests. | `SRC-DESIGN` | P0 | Trading | `PENDING` | Design only. |
+| `DATA-010` | Implement bounded sentiment/news/event-safety metadata that cannot authorize a trade. Proof: no-market-evidence and stale-news tests. | `SRC-DESIGN`, `SRC-ALPACA-MCP` | P1 | Trading, AI | `PENDING` | Keep disabled until market-derived P0 evidence is stable. |
+| `DATA-011` | Fetch complete option chains with filters and `next_page_token`; reject incomplete pages, and join required contract metadata explicitly. Proof: pagination, metadata-join, and partial-response tests. | `SRC-ALPACA-CHAIN`, `SRC-ALPACA-CONTRACT` | P0 | Backend | `PARTIAL` | Live test fetches only ten snapshots, does not paginate, and does not join dated open-interest data. |
+| `DATA-012` | Normalize option type, expiration, DTE, strike, bid/ask, quote time, delta, IV, underlying, feed, open interest, open-interest date, and optional sourced volume. Proof: provider mapping and field-availability fixtures. | `SRC-ALPACA-CHAIN`, `SRC-ALPACA-CONTRACT`, `SRC-CODE` | P0 | Backend | `PARTIAL` | Domain quote lacks source timestamps/feed/liquidity metadata and is populated only from fixtures. |
+| `DATA-013` | Filter option candidates by versioned hard/target DTE bands, delta profile, two-sided fresh quotes, verified liquidity fields, relative spread, and debit/width. Proof: boundary and missing-field tests. | `SRC-DESIGN`, `SRC-PLAN` | P0 | Trading, Backend | `PARTIAL` | Candidate hard 14-45/preferred 21-35 bands remain provisional; current code checks configurable DTE, quote shape, relative spread, and geometry but not delta, freshness, or sourced liquidity. |
+| `DATA-014` | Select bull call or bear put debit spreads deterministically with reproducible tie-breaking. Proof: order-independent fixture tests. | `SRC-DESIGN`, `SRC-CODE` | P0 | Trading, Backend | `PARTIAL` | Core construction and deterministic proximity sort exist; live-chain eligibility and full scoring remain. |
+| `DATA-015` | Persist all eligible candidates and reasons for selecting or rejecting each candidate. Proof: audit query from a decision ID. | `SRC-PLAN` | P1 | Backend | `PENDING` | Only the final in-memory proposal is retained. |
+| `DATA-016` | Distinguish IEX/indicative/OPRA behavior in policy, dashboard, metrics, and disclosure. Proof: feed-specific tests and UI label. | `SRC-ALPACA-DATA`, `SRC-ALPACA-CHAIN` | P0 | Backend, Frontend | `PARTIAL` | Live test explicitly uses IEX and indicative, but production policy and UI are absent. |
+
+## 7. Risk and execution requirements
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `RISK-001` | Risk authority must be deterministic and impossible for the LLM to override. Proof: architecture test and no direct broker dependency from AI code. | `SRC-DESIGN`, `SRC-CODE` | P0 | Backend, Trading | `COMPLETE` | `DeterministicRiskGate` owns approval in the current experiment; preserve this dependency direction. |
+| `RISK-002` | Require minimum confidence and independent usable evidence. Proof: range, duplicate, blank, and threshold tests. | `SRC-DESIGN`, `SRC-CODE` | P0 | Trading, QA | `COMPLETE` | Covered by `tests/test_contracts.py` and `tests/test_lab.py`. |
+| `RISK-003` | Require explicit nonblank invalidation conditions. Proof: missing/blank tests. | `SRC-DESIGN`, `SRC-CODE` | P0 | Trading, QA | `COMPLETE` | Covered by deterministic tests. |
+| `RISK-004` | Reject missing, one-sided, crossed, wide, stale, or fabricated option quotes. Proof: one test per failure. | `SRC-DESIGN`, `SRC-CODE` | P0 | Backend, QA | `PARTIAL` | Missing, crossed, wide, and fabricated checks exist; quote timestamp/staleness remains. |
+| `RISK-005` | Recompute debit, spread shape, width, payoff geometry, and maximum loss from observed quotes. Proof: tamper tests. | `SRC-DESIGN`, `SRC-CODE` | P0 | Backend, QA | `COMPLETE` | Current risk suite covers debit mismatch, shape, width, type, expiration, and observed-chain integrity. |
+| `RISK-006` | Enforce a conservative owner-approved H0 maximum-loss cap; if one spread exceeds it, return `NO_TRADE`. Confidence-tier ceilings require later calibration. Proof: policy boundary tests. | `SRC-DESIGN`, `SRC-CODE` | P0 | Trading, Backend | `PARTIAL` | Configurable per-trade budget exists; H0 candidate ceiling is 0.50% of equity and remains provisional until owner approval. |
+| `RISK-007` | Enforce total open defined risk. Proof: portfolio fixtures before and after fills. | `SRC-DESIGN` | P0 | Trading, Backend | `PENDING` | H0 total risk equals the single-strategy cap; multi-position percentage policy is post-H0. |
+| `RISK-008` | Enforce correlation-cluster risk across overlapping ETFs/sectors. Proof: SPY/QQQ/XLK directional exposure tests. | `SRC-DESIGN` | P0 | Trading, Backend | `PENDING` | Not H0 because only SPY may be traded and one strategy may be open/pending. Required before expanding the universe. |
+| `RISK-009` | Stop new entries at the daily realized plus marked loss limit. Proof: threshold and restart-persistence tests. | `SRC-DESIGN` | P0 | Trading, Backend | `PENDING` | H0 permits no second entry after the demonstration loss or execution incident; calibrated daily percentage policy is post-H0. |
+| `RISK-010` | Limit concurrent positions and pending entry risk. Proof: positions plus open-order tests. | `SRC-DESIGN` | P0 | Trading, Backend | `PENDING` | H0 maximum is one open or pending strategy. The broader three-position proposal is rejected for H0. |
+| `RISK-011` | Allow only approved underlyings, setup families, structures, DTE, and order styles. Proof: allowlist matrix tests. | `SRC-DESIGN`, `SRC-PLAN` | P0 | Trading, Backend | `PARTIAL` | Debit spread direction and DTE checks exist; global allowlist and limit-order policy remain. |
+| `RISK-012` | Prohibit averaging down and unintended position increases. Proof: existing-position intent tests. | `SRC-DESIGN` | P0 | Trading, Backend | `PENDING` | Requires broker position awareness. |
+| `RISK-013` | Require fresh account, market, option, portfolio, and policy snapshots before approval. Proof: snapshot TTL tests. | `SRC-DESIGN`, `SRC-PLAN` | P0 | Backend | `PENDING` | No production timestamped snapshots. |
+| `RISK-014` | Prevent the LLM, dashboard, installed skills, and schedulers from calling Alpaca order tools directly. Proof: dependency, MCP-toolset, command-allowlist, and authorization tests. | `SRC-PLAN`, `SRC-ALPACA-MCP`, `SRC-ALPACA-SKILLS`, `SRC-ALPACA-MCP-SKILL` | P0 | Backend, DevOps | `PENDING` | MCP production configuration must omit `trading`; no generic Paper skill or CLI order command is runtime authority; dashboard calls the control API only. |
+| `RISK-015` | Enforce the actual loaded Paper flag and resolved Paper endpoint at startup and immediately before every write. Treat variable/profile names and account payloads as insufficient proof. Proof: parsed-config, resolved-endpoint, mutation, and endpoint-mismatch tests. | `SRC-ALPACA-PAPER`, `SRC-ALPACA-PAPER-SKILL`, `SRC-ALPACA-CLI`, `SRC-CODE` | P0 | Backend, DevOps | `PARTIAL` | Secret generation writes Paper defaults, but `_print_status` currently prints expected Paper/trading values as constants without reading them; no resolved-endpoint or broker-write enforcement exists. |
+| `RISK-016` | Default trading off and require explicit `paper_execute` mode plus an actually loaded `ALPACA_TRADING_ENABLED=true`. A skill's confirmation mode cannot grant authority. Proof: parsed-config and mode/state matrix tests. | `SRC-CODE`, `SRC-PLAN`, `SRC-ALPACA-PAPER-SKILL` | P0 | Backend, DevOps | `PARTIAL` | `.env` generation writes trading false; no production mode controller or parsed enablement verifier exists. |
+| `RISK-017` | Provide durable execution states: `NO_NEW_RISK` blocks opening/exposure-increasing submit and replace calls while permitting cancels and reconciled risk-reducing closes; `FREEZE_ALL_WRITES` blocks all writes only for adapter/credential integrity incidents. Proof: method-by-state integration matrix and incident audit. | `SRC-PLAN` | P0 | Backend, DevOps | `PENDING` | State must not depend only on process memory; ordinary risk halts must not trap exposure. |
+| `RISK-018` | Build immutable approved order intents with policy version, approval ID, hash, TTL, and deterministic idempotency key; persist the exact prepared-request hash before submission. Proof: mutation, expiry, mapping, and replay tests. | `SRC-PLAN`, `SRC-ALPACA-PAPER-SKILL` | P0 | Backend | `PENDING` | No order-intent or prepared-request model. |
+| `RISK-019` | Submit one combined multi-leg limit order with project-approved `day` TIF, explicit position intents, bounded parent strategy quantity, and simplified leg ratios. Proof: exact request mapping/dry-run and partial-strategy-quantity tests. | `SRC-ALPACA-MLEG`, `SRC-ALPACA-ORDER`, `SRC-DESIGN`, `SRC-ALPACA-CLI` | P0 | Backend, Trading | `PENDING` | Use `order_class: mleg`; never implement entry as two independent orders. The SDK mapper is authoritative; optional pinned-CLI dry-run is only a cross-check. |
+| `RISK-020` | Bound replace/cancel behavior by attempt count, time window, and price tolerance. After an ambiguous submit/replace result, query by `client_order_id` and reconcile before retrying. Proof: lifecycle and ambiguous-response tests. | `SRC-PLAN`, `SRC-ALPACA-PAPER-SKILL`, `SRC-ALPACA-CLI` | P0 | Backend, Trading | `PENDING` | Never chase a fill beyond approved economics or resubmit merely because the first response was lost. |
+| `RISK-021` | Reconcile open orders, activities, fills, and positions before new entries, after any ambiguous write, and after restart. Proof: mismatch/recovery tests. | `SRC-PLAN`, `SRC-ALPACA-MCP`, `SRC-ALPACA-PAPER-SKILL` | P0 | Backend | `PENDING` | Any unexplained mismatch must enter `NO_NEW_RISK`; a client-ID miss alone is insufficient when other broker/account state is inconsistent. |
+| `RISK-022` | Keep live-money execution permanently out of the hackathon build. Proof: no live endpoint/config path and negative tests. | `SRC-DESIGN`, `SRC-PLAN` | P0 | Product, Backend | `PARTIAL` | Current code has no order path; future gateway must preserve the restriction. |
+
+## 8. Operations, lifecycle, and interface requirements
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `OPS-001` | Persist all decision and trade lifecycle records in PostgreSQL with migrations; treat filesystem run packages as derived exports only. Proof: migration, round-trip, and export-rebuild tests. | `SRC-PLAN`, `SRC-ALPACA-SKILLS` | P0 | Backend | `PENDING` | No database dependency, schema, or export contract exists. |
+| `OPS-002` | Preserve immutable evidence, original thesis, invalidations, and policy version after entry. Proof: update-rejection tests. | `SRC-DESIGN`, `SRC-PLAN` | P0 | Backend | `PENDING` | Current traces are in memory only. |
+| `OPS-003` | Implement append-only audit events with correlation IDs across model, risk, prepared-request hash, client/order IDs, fill, and exit. Proof: one-query lifecycle reconstruction and derived export manifest. | `SRC-DESIGN`, `SRC-PLAN`, `SRC-ARCH`, `SRC-ALPACA-PAPER-SKILL` | P0 | Backend | `PARTIAL` | `WorkflowTransition` and `AuditSink` define the production decision trace boundary; durable storage, exact request lineage, and order/position lifecycle events remain. |
+| `OPS-004` | Run one market-aware worker with a database lease to prevent duplicate schedules. Proof: two-worker contention test. | `SRC-PLAN` | P0 | Backend, DevOps | `PENDING` | No scheduler. |
+| `OPS-005` | Implement deterministic thesis invalidation, risk stop, profit capture, time stop, conviction decay, and expiry safety exits. Proof: tests for each trigger and precedence. | `SRC-DESIGN` | P0 | Trading, Backend | `PENDING` | No position manager. |
+| `OPS-006` | Expose FastAPI health and readiness endpoints that reflect database, Alpaca, worker lease, reconciliation, and kill switch. Proof: degraded-state tests. | `SRC-PLAN` | P0 | Backend, DevOps | `PENDING` | No service. |
+| `OPS-007` | Expose read APIs for account, evidence, decisions, traces, orders, positions, P&L, policy, and incidents. Proof: API contract tests. | `SRC-PLAN` | P0 | Backend | `PENDING` | No service. |
+| `OPS-008` | Protect control endpoints and record every mode/kill-switch action. Proof: unauthorized and audit tests. | `SRC-PLAN` | P0 | Backend, DevOps | `PENDING` | Define judge read access separately from operator control access. |
+| `OPS-009` | Provide a judge-facing dashboard for health, evidence, correct refusals, risk, orders, positions, P&L, and full trace. Proof: desktop/mobile smoke and demo script. | `SRC-LABLAB`, `SRC-PLAN`, `SRC-UI` | P0 | Frontend | `PARTIAL` | Frontend Design v0.1 defines the judge/operator boundary, five views, lifecycle/refusal/recovery records, component states, and view models; no routes, templates, styles, or UI tests exist. |
+| `OPS-010` | Emit redacted structured logs and redacted review exports with run, decision, intent, client-order, and broker correlation IDs. Proof: log/export snapshots and secret/account-data scans. | `SRC-PLAN`, `SRC-ALPACA-SKILLS` | P0 | Backend, DevOps | `PENDING` | No structured logging or redacted export pipeline. |
+| `OPS-011` | Record provider latency, failures, rate limits, model tokens/cost, stale data, vetoes, order states, and risk utilization. Proof: metrics dashboard. | `SRC-PLAN` | P1 | Backend, DevOps | `PENDING` | No metrics. |
+| `OPS-012` | Use bounded retries, circuit breakers, and fail-closed behavior for provider and database failures. Proof: failure injection. | `SRC-ALPACA-CHAIN`, `SRC-PLAN` | P0 | Backend, QA | `PENDING` | Test HTTP helper has timeout and sanitized errors only. |
+| `OPS-013` | Keep credentials and unapproved confidential account/order payloads out of source, logs, traces, prompts, and submission artifacts. Ignore export roots before creation and separate confidential raw exports from redacted reports. Paper credential rotation must store the replacement secret once without display or artifact capture and must not fall back to live credentials. Proof: ignore-rule, secret/account-data scan, redaction tests, and credential-rotation audit. | `SRC-ALPACA-MCP`, `SRC-ALPACA-SKILLS`, `SRC-ALPACA-PAPER-START`, `SRC-CODE` | P0 | DevOps, QA | `PARTIAL` | Owner-only `.env` and ignored secret workflow exist. `runs/` is not currently ignored, no raw-export contract or rehearsed rotation proof exists, and the status command does not verify the actual Paper/trading flags. |
+| `OPS-014` | Maintain an operator runbook for pre-open, intraday incident, reconciliation, post-close, backup, rollback, Paper credential rotation/recovery, and optional version-pinned CLI diagnostics/dry-run. Rotation must halt new risk, clear in-flight writes, protect the one-time replacement secret, prove retired credentials fail and replacements resolve the expected Paper endpoint/account, and reconcile before restoring `NORMAL`. Proof: rehearsed runbook checklist whose write path remains the SDK gateway. | `SRC-PLAN`, `SRC-ALPACA-CLI`, `SRC-ALPACA-PAPER-START` | P1 | DevOps, Trading | `PENDING` | Minimum workflow and rotation sequence are specified in the implementation plan; rehearsal, CLI version evidence, and credential-rotation evidence remain absent. |
+
+## 9. Quality, deployment, and release requirements
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `QA-001` | Preserve all existing deterministic contract behavior. Proof: current offline suite passes unchanged or with documented schema migration. | `SRC-CODE` | P0 | QA, Backend | `COMPLETE` | All 21 legacy tests plus 15 architecture tests passed on 20 August 2026. |
+| `QA-002` | Keep live provider tests opt-in, clearly billable/read-only where applicable, and excluded from normal CI. Proof: default skip and release command. | `SRC-CODE` | P0 | QA | `COMPLETE` | Live test skips unless `RUN_LIVE_API_TESTS=1`. |
+| `QA-003` | Validate OpenAI Terra plus Alpaca Paper connectivity end to end. Proof: successful live test result without exposing secrets. | `SRC-CODE`, `SRC-OPENAI` | P0 | QA, AI | `COMPLETE` | One live integration test passed in 4.671 seconds after switching to Terra. |
+| `QA-004` | Add provider adapter contract tests for account, clock, bars, option chain, native-MLeg orders, positions, and errors, including SDK/CLI/MCP schema-drift fixtures where relevant. Proof: mocked suite. | `SRC-PLAN`, `SRC-ALPACA-CLI`, `SRC-ALPACA-MCP-SKILL` | P0 | QA, Backend | `PENDING` | Test-only helper is not a production adapter; the SDK remains authoritative and drift must fail closed. |
+| `QA-005` | Add an H0 frozen SPY pair: one qualified trend/retest case and one stale, contradictory, or illiquid refusal, with separate oracles and a versioned manifest. Broader regime coverage is post-H0. | `SRC-DESIGN`, `SRC-PLAN` | P0 | QA, Trading | `PENDING` | Existing P0 narrative cases using AAPL, TSLA, and NVDA are outside H0 and must not drive the released decision path. |
+| `QA-006` | Add look-ahead-bias, completed-bar, and timestamp-integrity tests. A signal computed after finalized bar `t` may fill no earlier than the first eligible observable quote or bar in `t+1`; reject forming-bar inputs and same-bar fills. Persist the quote/bar used and the spread, slippage, latency, and missed-fill assumptions. Proof: replay fails when future data, an unfinalized bar, or a same-bar fill is injected. | `SRC-DESIGN`, `SRC-ARCH`, `SRC-CODE`, `SRC-ALPACA-BACKTEST-SKILL` | P0 | QA, Trading | `PARTIAL` | `DecisionSnapshot` rejects future-dated signals/options/account data; completed-bar timing, historical outcome isolation, and replay mutation tests remain. |
+| `QA-007` | For H0, report broker Paper P&L separately from one conservative spread/latency/missed-fill stress result and name every omitted Paper effect. A general fill simulator is post-H0. | `SRC-ALPACA-PAPER`, `SRC-ALPACA-BACKTEST-SKILL`, `SRC-DESIGN` | P0 | QA, Trading | `PENDING` | Required to avoid overstating Paper performance without building a general options backtester. |
+| `QA-008` | Add the focused H0 matrix for one-strategy cap, per-trade limit, allowlist, freshness, authority, and halt state. Broader portfolio and threshold-sensitivity matrices are post-H0. | `SRC-PLAN` | P0 | QA, Backend | `PARTIAL` | Strong per-trade tests exist; H0 mode/authority/order lifecycle remains unvalidated. |
+| `QA-009` | Add Paper dry-run verification that the exact serialized request/hash matches the approved intent, plus one minimal open/close native-MLeg lifecycle test. Proof: exact request, parent/leg broker IDs, filled strategy quantity, and reconciled local records. | `SRC-ALPACA-MLEG`, `SRC-ALPACA-ORDER`, `SRC-ALPACA-CLI`, `SRC-PLAN` | P0 | QA, Backend | `PENDING` | SDK mapping is authoritative; optional pinned-CLI dry-run may cross-check it only after explicit review and without submitting. |
+| `QA-010` | Add restart, duplicate-submit, client-ID lookup after ambiguous response, partial-MLeg-strategy-quantity, ambiguous parent/leg/account state, 429, timeout, MCP MLeg-array schema rejection, and database-outage tests. Proof: failure-injection report. | `SRC-PLAN`, `SRC-ALPACA-ORDER`, `SRC-ALPACA-PAPER-SKILL`, `SRC-ALPACA-MCP-SKILL` | P0 | QA, Backend | `PENDING` | Do not model a correctly submitted native MLeg as two independent entry orders; never retry until broker/local reconciliation permits it. |
+| `QA-011` | Add Ruff, mypy, coverage, dependency audit, secret scan, confidential-artifact scan, and required ignore-rule checks. Proof: local command and CI artifacts. | `SRC-PLAN`, `SRC-ALPACA-SKILLS` | P1 | DevOps, QA | `PENDING` | No development dependencies, export-root contract, or tool configuration. |
+| `QA-012` | Add GitHub Actions for offline tests and quality gates on every change. Proof: required green checks. | `SRC-LABLAB`, `SRC-PLAN` | P0 | DevOps | `PENDING` | No repository or CI workflow. |
+| `QA-013` | Create a reproducible Docker image and local Compose stack with PostgreSQL. Proof: clean build and smoke test. | `SRC-PLAN` | P0 | DevOps | `PENDING` | No container files. |
+| `QA-014` | Deploy an always-on app/worker/database with protected secrets, backups, and a rollback method. Proof: hosted smoke, restart, and rollback checks. | `SRC-LABLAB`, `SRC-PLAN` | P0 | DevOps | `PENDING` | Hosting decision waits on event resources and budget. |
+| `QA-015` | Verify dashboard usability and no overlap at desktop and mobile judge viewports. Proof: browser screenshots and interaction smoke. | `SRC-PLAN`, `SRC-UI` | P1 | Frontend, QA | `PARTIAL` | Frontend Design v0.1 defines 360, 736, 1024, and 1440 px behavior and release checks; implementation and rendered browser evidence remain. |
+| `QA-016` | Rehearse the final demo from a clean session and maintain a recorded fallback. Proof: timed checklist and accessible backup video. | `SRC-LABLAB`, `SRC-PLAN` | P0 | Presentation, QA | `PENDING` | Begin after hosted P0 workflow is stable. |
+
+## 10. Post-H0 learning, review, and policy-promotion requirements
+
+This entire requirement group is outside the seven-day H0 cut. The review loop may later automate capture, scoring, scheduling, diagnostics, and recommendation generation. Active policy or code changes always require explicit promotion authority and reproducible evidence.
+
+| ID | Requirement and acceptance proof | Source | Priority | Owner | Status | Evidence or next action |
+|---|---|---|---|---|---|---|
+| `LEARN-001` | Preserve the original decision and enrich it later through a separate immutable outcome record. Proof: horizon-completion and mutation-rejection tests. | `SRC-ARCH`, `SRC-PLAN`, `SRC-CODE` | P0 | Backend, QA | `PARTIAL` | `DecisionSnapshot` prevents future observations, and the architecture separates hidden outcomes; outcome contracts and persistence remain. |
+| `LEARN-002` | Score process quality separately from outcome quality and classify favorable/unfavorable results without equating P&L with correctness. Proof: deterministic scoring matrix and review fixtures. | `SRC-ARCH`, `SRC-PLAN` | P1 | Trading, QA | `PENDING` | Define process, outcome, attribution, and not-yet-measurable classifications. |
+| `LEARN-003` | Run idempotent automatic reviews at decision, horizon/exit, end-of-session, rolling-sample, and incident triggers. Proof: scheduler duplication, late-data, and restart tests. | `SRC-ARCH`, `SRC-PLAN` | P1 | Backend, QA | `PENDING` | Time schedules generate reports only; time alone cannot authorize policy changes. |
+| `LEARN-004` | Persist recommendations with current/proposed behavior, supporting/contradicting evidence, uncertainty, evaluation results, owner, and lifecycle status. Proof: repository round trip and state-transition tests. | `SRC-ARCH`, `SRC-PLAN` | P1 | Backend, Trading | `PENDING` | Use `PROPOSED`, `VALIDATING`, `VALIDATED`, `APPROVED`, `SHADOW`, `ACTIVE`, `REJECTED`, and `ROLLED_BACK`. |
+| `LEARN-005` | Store immutable versioned policies/prompts/models with parent, schema, hash, effective time, status, and rollback target. Proof: mutation rejection, load validation, and decision-version linkage. | `SRC-ARCH`, `SRC-PLAN` | P0 | Backend, AI, Trading | `PENDING` | Implement `PolicyRegistry`; every decision must resolve one exact active version. |
+| `LEARN-006` | Require frozen replay, stress, regression, and hard-failure evidence before promotion. Proof: promotion refuses missing, future-leaking, or failing evaluation runs. | `SRC-ARCH`, `SRC-PLAN` | P0 | QA, Trading | `PENDING` | Evaluation records must include dataset, evaluator, code, schema, feed, model, prompt, and policy versions. |
+| `LEARN-007` | Require authenticated manual approval for policy activation and record approver, evidence, source/target versions, and activation time. Proof: unauthorized/duplicate promotion tests and append-only audit. | `SRC-ARCH`, `SRC-PLAN` | P0 | Product, Trading, Backend | `PENDING` | Define approval roles and whether high-risk changes require two reviewers. |
+| `LEARN-008` | Evaluate approved candidates in shadow/champion-challenger mode before activation when operationally possible. Proof: same-snapshot comparison and no-write assertions. | `SRC-ARCH`, `SRC-PLAN` | P1 | Trading, Backend, QA | `PENDING` | Candidate output must not reach execution while in shadow state. |
+| `LEARN-009` | Prohibit autonomous code, prompt, threshold, risk-policy, or active-configuration mutation. Proof: dependency, permission, and negative activation tests. | `SRC-ARCH`, `SRC-PLAN`, `SRC-CODE` | P0 | Backend, DevOps, QA | `PARTIAL` | No mutation or execution mechanism exists and the architecture forbids it; future promotion/configuration paths need enforcement tests. |
+| `LEARN-010` | Review `NO_TRADE` decisions and missed opportunities using predeclared horizons and counterfactual rules that cannot leak outcomes into original decisions. Proof: correct-refusal, missed-opportunity, and look-ahead tests. | `SRC-ARCH`, `SRC-PLAN` | P1 | Trading, QA | `PENDING` | Define benchmark entry/exit assumptions and avoid treating every later move as a missed trade. |
+| `LEARN-011` | Report sample size, uncertainty, regime/feed coverage, selection bias, and multiple-testing/overfitting risk before drawing tuning conclusions. Proof: insufficient-sample and regime-gap tests. | `SRC-ARCH`, `SRC-PLAN` | P1 | Trading, QA | `PENDING` | Paper samples during the hackathon are diagnostic; frozen replay is the primary tuning evidence. |
+| `LEARN-012` | Attribute failures to data, setup, thesis, options, risk, execution, exits, or external causes and trigger immediate incident review on safety violations. Proof: attribution matrix, incident package, halt/resume, and rollback-alarm tests. | `SRC-ARCH`, `SRC-PLAN` | P0 | Trading, Backend, DevOps | `PENDING` | Preserve raw evidence and allow `unattributable` rather than forcing a misleading cause. |
+
+## 11. Deferred requirement register
+
+These are intentionally outside P0/P1. They remain visible so they are not reintroduced accidentally during the competition.
+
+| ID | Deferred requirement | Reason | Reconsider when |
+|---|---|---|---|
+| `DEF-001` | Live-money execution | Hackathon and safety scope is Alpaca Paper | Separate production risk, legal, and operational review |
+| `DEF-002` | Individual equities and earnings strategies | Conflicts with ETF-first design and current fixture is synthetic | ETF lifecycle has replay and Paper evidence |
+| `DEF-003` | 0DTE and same-day expiration | Extreme gamma/theta and operational risk | Dedicated strategy, execution, and expiry controls exist |
+| `DEF-004` | Naked, credit, calendar, condor, or volatility-neutral structures | Larger policy and lifecycle surface | Debit-spread system is stable and independently validated |
+| `DEF-005` | Autonomous threshold, prompt, or policy mutation | Undermines auditability during a short contest | Offline governance and promotion workflow exists |
+| `DEF-006` | Large free-form multi-agent debate | Adds correlated narratives and latency without new evidence | A measured evaluation demonstrates value |
+| `DEF-007` | High-frequency operation | Alpaca and the strategy are not designed as HFT | Entire market-data and execution architecture is redesigned |
+| `DEF-008` | Multi-account and multi-tenant support | Not needed for one team submission | Product requirements justify identity, isolation, and billing work |
+
+## 12. Milestone release gates
+
+| Gate | Requirements that must be complete | Evidence package |
+|---|---|---|
+| `G0 H0 cut and authority frozen` | Public portions of `HK-001` to `HK-008`; remaining eligibility/authority decisions explicitly closed; H0 scope recorded | Event/dashboard evidence, SPY/one-setup cut, Paper-only authority, tagged baseline |
+| `G1 Frozen decision pair` | H0 subsets of `AI-002` to `AI-010`, `DATA-001` to `DATA-016`, `RISK-001` to `RISK-013` | One qualified SPY case, one refusal, deterministic baseline, bounded-model ablation, no order writes |
+| `G2 Execution firewall` | `RISK-014` to `RISK-022`, H0 subsets of `OPS-001` to `OPS-005`, `OPS-012`, `OPS-013`, `QA-004`, `QA-009`, `QA-010` | Exact-request hash, one Paper open/close, one ambiguous-write/restart recovery, halt-state proof |
+| `G3 Hosted five-view demo` | `HK-009` to `HK-018`, H0 subsets of `OPS-006` to `OPS-010`, `QA-012` to `QA-016` | Hosted app, clean-session smoke, rubric-mapped narrative, limitations, fallback recording |
+| `G4 Submission` | All H0 outcomes in Section 2.2 | Public repository at `github.com/GinoLlerena/voltaic-alpha`, application URL, video, deck, cover, final form, and released evidence package |
+
+No gate may be passed with an unexplained broker-state mismatch, a failing P0 test, a secret finding, or a disabled risk check.
+
+Registered team name: Voltaic Alpha. The repository is named for the team; the product is named Options Alpha throughout this document set. `G0`'s tagged baseline is `baseline-pre-event`, recording the work that existed before the 28 August 2026 window opened. Repository visibility at submission time depends on `DEC-001`.
+
+## 13. Evidence log
+
+Append release and verification events here. Do not include secrets, account numbers, raw authorization headers, or private URLs.
+
+| Date | Evidence ID | Requirements | Result | Artifact or command |
+|---|---|---|---|---|
+| 2026-08-19 | `EV-001` | `QA-001`, `RISK-002` to `RISK-005` | Pass: 21 deterministic tests | `PYTHONPATH=src python3 -m unittest discover -s tests -v` |
+| 2026-08-19 | `EV-002` | `AI-001`, `QA-002`, `QA-003`, `HK-016` | Pass: Terra/OpenAI plus read-only Alpaca integration | `RUN_LIVE_API_TESTS=1 PYTHONPATH=src python3 -m unittest discover -s tests -p 'test_live_integration.py' -v` |
+| 2026-08-19 | `EV-003` | `OPS-013`, `RISK-015`, `RISK-016` | Partial: credential presence and owner-only file behavior pass; the status command prints expected Paper/trading values as constants and is not resolved-endpoint or loaded-value proof | `python3 scripts/configure_secrets.py --check` plus offline secret tests; follow-up required under `RISK-015` and `RISK-016` |
+| 2026-08-20 | `EV-004` | `CLR-005`, `AI-004`, `AI-005`, `AI-008`, `DATA-004`, `RISK-001`, `QA-001`, `QA-006` | Pass: 36 deterministic tests; 15 cover the production architecture boundary | `PYTHONPATH=src python3 -m unittest discover -s tests -v` |
+| 2026-08-26 | `EV-005` | `ASK-001` to `ASK-005`, `RISK-014` to `RISK-021`, `OPS-013`, `QA-007`, `QA-009`, `QA-010` | Pass: official Alpaca Trading API skills reviewed against project architecture and current Alpaca docs; dispositions recorded without installing a runtime skill or enabling writes | Documentation review at Alpaca skills commit `62891ec`; offline suite: 36 passed, 1 opt-in live test skipped |
+| 2026-08-27 | `EV-006` | `HK-001`, `HK-004` to `HK-006`, `HK-016`, `HK-017`, `CLR-001` to `CLR-004`, `CLR-010`, `CLR-013`, `CLR-016`, `CLR-018`, `AI-010`, `QA-005`, `QA-007`, `QA-008` | Pass: adversarial plan review incorporated; event facts re-verified; P&L/alpha claims downgraded; circular gate removed; H0 cut to one SPY vertical slice with a no-LLM ablation | Documentation-only change on 27 August 2026; offline suite 36 passed and 1 opt-in live test skipped; no skill installed and no broker write enabled |
+
+## 14. Open decisions
+
+| Decision ID | Question | Related clarification | Needed by | Owner | Status |
+|---|---|---|---|---|---|
+| `DEC-001` | What are the exact event dates, deadline, timezone, and code-eligibility rules? | `CLR-001`, `CLR-002` | `G0` | Product | Partial: dates/window public; exact cutoff/timezone/code rules remain |
+| `DEC-002` | Is Alpaca MCP mandatory, and must orders flow through it? | `CLR-018` | `G0` | Product, Backend | Open |
+| `DEC-003` | What account, starting equity, reset policy, and any separate P&L leaderboard determine eligibility? | `CLR-001`, `CLR-007`, `CLR-012`, `CLR-013` | `G0` | Product, Trading | Partial: published judging criteria do not list P&L; account and any separate leaderboard remain open |
+| `DEC-004` | Is autonomous paper execution required, optional, or subject to human approval? | `CLR-019` | `G0` | Product, Trading | Open |
+| `DEC-005` | Which hosting credits/provider are available and is an always-on worker permitted? | `CLR-001` | `G1` | DevOps | Open |
+| `DEC-006` | Does the team have OPRA access, or must P0 rely on the indicative option feed? | `CLR-015` | `G1` | Trading, Backend | Open |
+| `DEC-007` | What reasoning effort meets the thesis quality and latency budget on the eval set? | `CLR-008` | `G2` | AI, QA | Open |
+| `DEC-008` | What exact H0 trend/retest, DTE, option-quality, conservative loss-cap, lifecycle, and close parameters will be frozen before the one Paper write? | `CLR-011`, `CLR-012`, `CLR-014` to `CLR-016`, `CLR-020` | `G2` | Trading | Open |
+| `DEC-009` | What review horizons, sample sufficiency rules, approver roles, and shadow/promotion criteria apply after H0? | `LEARN-002`, `LEARN-003`, `LEARN-007`, `LEARN-008`, `LEARN-011` | Post-H0 | Product, Trading, QA | Deferred from H0 |
+
+## 15. Completion rule
+
+The project is ready for submission only when:
+
+- `G0` through `G4` are passed.
+- Every H0 outcome in Section 2.2 is supported by named evidence; product P0 rows outside H0 remain visible backlog and are not misrepresented as implemented.
+- Every clarification that can invalidate eligibility, H0 behavior, or Paper-write safety is complete before the affected gate; post-H0 clarifications cannot silently leak into H0 defaults.
+- No H0 row is `BLOCKED` without a tested fallback.
+- No event-specific assumption, calibrated-confidence claim, or alpha claim remains hidden in code or presentation.
+- The implementation plan, this matrix, the README, the dashboard, and the pitch use the same SPY/one-setup scope, model role, risk parameters, and limitations.

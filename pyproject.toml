@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "options-alpha-agent-lab"
+version = "0.1.0"
+description = "Auditable AI execution firewall for a bounded SPY options strategy"
+requires-python = ">=3.11"
+
+# Runtime dependencies for the H0 path only, per implementation plan section 5.1.
+# Anything not required by an H0 outcome stays out until a phase needs it.
+dependencies = [
+    "pydantic>=2.9",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2",
+    "apscheduler>=3.11",
+    "alpaca-py>=0.33",
+    "openai>=1.55",
+    "jinja2>=3.1",
+    "plotly>=5.24",
+    "python-json-logger>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "coverage>=7.6",
+    "pip-audit>=2.7",
+    "detect-secrets>=1.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Live tests reach real providers and cost money; they are opt-in.
+markers = [
+    "live: requires network and provider credentials (deselected by default)",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+# S101 (assert) is expected in tests; the suite is unittest/pytest based.
+ignore = ["S101"]
+
+# Baseline files predate this lint config and are exempted per rule, not wholesale,
+# so every new file is fully linted. Clearing these is a Phase 1 cleanup task:
+# UP042 migrates (str, Enum) to StrEnum, I001 is a safe `ruff check --fix`.
+# S310 is a deliberate design choice — the offline lab calls provider HTTPS
+# endpoints through stdlib urllib and adds no HTTP dependency.
+[tool.ruff.lint.per-file-ignores]
+"scripts/configure_secrets.py" = ["I001"]
+"src/options_alpha_lab/architecture/contracts.py" = ["UP042"]
+"src/options_alpha_lab/models.py" = ["UP042"]
+"src/options_alpha_lab/risk.py" = ["I001"]
+"src/options_alpha_lab/secrets_setup.py" = ["I001", "UP035"]
+"tests/test_architecture.py" = ["I001", "UP017"]
+"tests/test_contracts.py" = ["I001"]
+"tests/test_lab.py" = ["I001"]
+"tests/test_live_integration.py" = ["I001", "S310"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["options_alpha_lab"]
+strict = true
+# Financial arithmetic must stay exact; catch implicit float coercion early.
+disallow_any_generics = true
+
+# Baseline exemption, narrowed to one check in one module rather than relaxing
+# strict mode. `_jsonable` is an untyped recursive serializer; giving it a real
+# return type is a Phase 1 cleanup task.
+[[tool.mypy.overrides]]
+module = "options_alpha_lab.models"
+warn_return_any = false
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.setuptools.package-data]
+"options_alpha_lab" = ["py.typed"]
