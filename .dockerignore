@@ -1,0 +1,22 @@
+# Nothing that could carry a credential, and nothing the read-only dashboard needs.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.git
+.github
+.venv
+build
+dist
+*.egg-info
+__pycache__
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.playwright-mcp
+tests
+docs
+fixtures/h0/frozen
+htmlcov
+.coverage

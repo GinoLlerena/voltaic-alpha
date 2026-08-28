@@ -10,7 +10,11 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir uv && uv pip install --system --no-cache .
+# Remove the build tree after installing: it is a by-product, and shipping it
+# puts a second copy of the source in the image.
+RUN pip install --no-cache-dir uv \
+ && uv pip install --system --no-cache . \
+ && rm -rf build *.egg-info
 
 COPY app.py ./
 COPY demo ./demo
