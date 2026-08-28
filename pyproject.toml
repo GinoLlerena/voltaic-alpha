@@ -69,6 +69,8 @@ ignore = ["S101"]
 # everywhere else in this repo. Pinning an absolute path would be less portable,
 # not more secure.
 "scripts/freeze_release.py" = ["S607"]
+# Same reason: the packaging test shells out to uv by name.
+"tests/test_packaging.py" = ["S607"]
 "scripts/configure_secrets.py" = ["I001"]
 "src/options_alpha_lab/architecture/contracts.py" = ["UP042"]
 "src/options_alpha_lab/models.py" = ["UP042"]

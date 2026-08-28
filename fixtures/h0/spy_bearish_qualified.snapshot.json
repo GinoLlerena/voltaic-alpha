@@ -1,0 +1,162 @@
+{
+  "schema_version": "decision_snapshot.v1",
+  "snapshot_id": "spy-bearish-qualified-2026-08-27",
+  "as_of": "2026-08-27T19:45:00+00:00",
+  "symbol": "SPY",
+  "underlying_price": "617.40",
+  "account": {
+    "account_id": "PA3WZR22ITRR",
+    "as_of": "2026-08-27T19:44:30+00:00",
+    "equity": "120000.00",
+    "options_buying_power": "60000.00",
+    "is_paper": true
+  },
+  "signals": [
+    {
+      "signal_id": "sig-structure-trend-retest",
+      "family": "structure",
+      "direction": "bearish",
+      "strength": "0.74",
+      "as_of": "2026-08-27T19:45:00+00:00",
+      "source": "synthetic:daily_ema_stack",
+      "summary": "Price holds below a falling 20/50 EMA stack and has retested the 20 EMA from beneath without closing above it."
+    },
+    {
+      "signal_id": "sig-participation-breadth",
+      "family": "participation",
+      "direction": "bearish",
+      "strength": "0.63",
+      "as_of": "2026-08-27T19:45:00+00:00",
+      "source": "synthetic:advance_decline",
+      "summary": "Declining issues outpace advancing issues on the retest session, a different family from price structure."
+    },
+    {
+      "signal_id": "sig-volatility-term",
+      "family": "volatility_options",
+      "direction": "bullish",
+      "strength": "0.31",
+      "as_of": "2026-08-27T19:45:00+00:00",
+      "source": "synthetic:term_structure",
+      "summary": "Front-month implied volatility is easing, which argues mildly against continued downside but is below the veto threshold."
+    }
+  ],
+  "option_chain": [
+    {
+      "contract_symbol": "SPY260918P00620000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "620.00",
+      "bid": "14.80",
+      "ask": "15.00",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.66",
+      "implied_volatility": "0.1580",
+      "open_interest": 10422,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 2210
+    },
+    {
+      "contract_symbol": "SPY260918P00615000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "615.00",
+      "bid": "12.05",
+      "ask": "12.25",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.52",
+      "implied_volatility": "0.1561",
+      "open_interest": 13880,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 3105
+    },
+    {
+      "contract_symbol": "SPY260918P00610000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "610.00",
+      "bid": "9.60",
+      "ask": "9.80",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.38",
+      "implied_volatility": "0.1602",
+      "open_interest": 9140,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 1877
+    },
+    {
+      "contract_symbol": "SPY260918P00605000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "605.00",
+      "bid": "7.60",
+      "ask": "7.80",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.27",
+      "implied_volatility": "0.1633",
+      "open_interest": 6702,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 1340
+    },
+    {
+      "contract_symbol": "SPY260918P00600000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "600.00",
+      "bid": "5.90",
+      "ask": "6.10",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.18",
+      "implied_volatility": "0.1671",
+      "open_interest": 5511,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 980
+    },
+    {
+      "contract_symbol": "SPY260918C00620000",
+      "option_type": "call",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "620.00",
+      "bid": "11.20",
+      "ask": "11.45",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "0.58",
+      "implied_volatility": "0.1494",
+      "open_interest": 8830,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 1602
+    },
+    {
+      "contract_symbol": "SPY261016P00620000",
+      "option_type": "put",
+      "expiration": "2026-10-16",
+      "dte": 50,
+      "strike": "620.00",
+      "bid": "21.40",
+      "ask": "21.70",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.62",
+      "implied_volatility": "0.1602",
+      "open_interest": 3410,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 442
+    }
+  ],
+  "data_quality": {
+    "missing_fields": [],
+    "stale_fields": [],
+    "provider_errors": []
+  }
+}

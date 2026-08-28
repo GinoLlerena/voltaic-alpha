@@ -33,6 +33,7 @@ from options_alpha_lab.replay import replay_paths  # noqa: E402
 DEFAULT_OUTPUT = Path("demo/h0_demo.db")
 FIXTURES = [
     Path("fixtures/h0/spy_qualified.snapshot.json"),
+    Path("fixtures/h0/spy_bearish_qualified.snapshot.json"),
     Path("fixtures/h0/spy_refusal.snapshot.json"),
 ]
 RECEIPT = Path("artifacts/h0_paper_lifecycle.json")

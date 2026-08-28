@@ -43,6 +43,7 @@ from options_alpha_lab.snapshot_io import (
 FIXTURES = Path("fixtures/h0")
 QUALIFIED = FIXTURES / "spy_qualified.snapshot.json"
 REFUSAL = FIXTURES / "spy_refusal.snapshot.json"
+BEARISH = FIXTURES / "spy_bearish_qualified.snapshot.json"
 
 
 def settings_for(db_path: Path) -> Settings:
@@ -309,6 +310,84 @@ class ForeignKeyIntegrityTests(unittest.TestCase):
             with build_engine(settings).connect() as connection:
                 violations = connection.execute(text("PRAGMA foreign_key_check")).fetchall()
         self.assertEqual(violations, [])
+
+
+class BearishMirrorTests(unittest.TestCase):
+    """The mirrored path: no other fixture produces a bear put spread."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.settings = settings_for(Path(self._tmp.name) / "bear.db")
+        self.result = replay_paths([BEARISH], self.settings)[0]
+        self.oracle = load_oracle(FIXTURES / "spy_bearish_qualified.oracle.json")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_matches_its_oracle(self) -> None:
+        outcome = self.result.outcome
+        self.assertEqual(outcome.action.value, self.oracle["expected_action"])
+        self.assertEqual(outcome.direction.value, self.oracle["expected_direction"])
+        assert outcome.spread is not None
+        self.assertEqual(outcome.spread.strategy.value, self.oracle["expected_strategy"])
+        self.assertEqual(
+            outcome.spread.long_contract_symbol, self.oracle["expected_long_contract_symbol"]
+        )
+        self.assertEqual(
+            outcome.spread.short_contract_symbol, self.oracle["expected_short_contract_symbol"]
+        )
+        self.assertEqual(
+            outcome.spread.estimated_debit, Decimal(self.oracle["expected_estimated_debit"])
+        )
+        assert outcome.risk is not None
+        self.assertTrue(outcome.risk.approved)
+        self.assertEqual(
+            outcome.risk.calculated_max_loss,
+            Decimal(self.oracle["expected_calculated_max_loss"]),
+        )
+
+    def test_short_strike_sits_below_the_long_strike(self) -> None:
+        # A bear put spread inverts the bull call relationship. Getting this
+        # backwards would still produce a valid-looking spread with inverted risk.
+        snapshot = load_snapshot(BEARISH)
+        by_symbol = {q.contract_symbol: q for q in snapshot.option_chain}
+        spread = self.result.outcome.spread
+        assert spread is not None
+        self.assertLess(
+            by_symbol[spread.short_contract_symbol].strike,
+            by_symbol[spread.long_contract_symbol].strike,
+        )
+
+    def test_only_puts_are_considered_for_a_bearish_thesis(self) -> None:
+        snapshot = load_snapshot(BEARISH)
+        by_symbol = {q.contract_symbol: q for q in snapshot.option_chain}
+        spread = self.result.outcome.spread
+        assert spread is not None
+        for symbol in (spread.long_contract_symbol, spread.short_contract_symbol):
+            self.assertEqual(by_symbol[symbol].option_type.value, "put")
+        # The 620 call has a long-band delta of 0.58 and must still be ignored.
+        self.assertNotIn("SPY260918C00620000", (spread.long_contract_symbol,
+                                                spread.short_contract_symbol))
+
+    def test_delta_gap_contract_is_excluded_from_both_legs(self) -> None:
+        # The 615 put at 0.52 falls between the short band (0.25-0.40) and the
+        # long band (0.55-0.70), so it belongs to neither leg.
+        spread = self.result.outcome.spread
+        assert spread is not None
+        self.assertNotIn(
+            "SPY260918P00615000",
+            (spread.long_contract_symbol, spread.short_contract_symbol),
+        )
+
+    def test_both_directions_reach_a_position(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            results = replay_paths(
+                [QUALIFIED, BEARISH], settings_for(Path(tmp) / "both.db")
+            )
+        strategies = {r.outcome.spread.strategy.value for r in results if r.outcome.spread}
+        self.assertEqual(
+            strategies, {"bull_call_debit_spread", "bear_put_debit_spread"}
+        )
 
 
 if __name__ == "__main__":

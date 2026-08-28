@@ -29,6 +29,7 @@ from .snapshot_io import load_snapshot
 
 DEFAULT_FIXTURES = (
     "fixtures/h0/spy_qualified.snapshot.json",
+    "fixtures/h0/spy_bearish_qualified.snapshot.json",
     "fixtures/h0/spy_refusal.snapshot.json",
 )
 

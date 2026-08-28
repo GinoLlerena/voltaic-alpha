@@ -16,8 +16,24 @@ from streamlit.testing.v1 import AppTest
 # AppTest resolves a relative path against the *calling* file, which would
 # look for tests/app.py. Resolve from the repository root instead.
 APP = (Path(__file__).resolve().parents[1] / "app.py").resolve()
-DECISIONS = 4
 TABS = 5
+
+
+def decisions_in_evidence() -> int:
+    """Read the count from the evidence database rather than hard-coding it.
+
+    A magic number here fails every time a fixture is added, which trains people
+    to edit the test instead of reading it.
+    """
+    from sqlalchemy import create_engine, func, select
+    from sqlalchemy.orm import Session
+
+    from options_alpha_lab.persistence.models import Decision
+
+    db = Path(__file__).resolve().parents[1] / "demo" / "h0_demo.db"
+    engine = create_engine(f"sqlite+pysqlite:///{db}", future=True)
+    with Session(engine) as session:
+        return int(session.scalar(select(func.count()).select_from(Decision)) or 0)
 
 
 def run_app() -> AppTest:
@@ -34,7 +50,8 @@ class DashboardRenderTests(unittest.TestCase):
         # exercises a different path through every view.
         app = run_app()
         options = app.radio[0].options
-        self.assertEqual(len(options), DECISIONS)
+        self.assertEqual(len(options), decisions_in_evidence())
+        self.assertGreaterEqual(len(options), 3, "need bullish, bearish, and refused cases")
         for option in options:
             with self.subTest(decision=option):
                 run = AppTest.from_file(str(APP), default_timeout=90)
@@ -65,6 +82,20 @@ class DashboardBoundaryTests(unittest.TestCase):
         }
         for forbidden in ("submit", "ExecutionGateway", "AlpacaBroker", "TradingClient"):
             self.assertNotIn(forbidden, names, f"dashboard must not reference {forbidden}")
+
+    def test_evidence_covers_both_directions_and_a_refusal(self) -> None:
+        # A demo that only ever shows one direction hides half the mirrored path.
+        from sqlalchemy import create_engine, select
+        from sqlalchemy.orm import Session
+
+        from options_alpha_lab.persistence.models import SpreadCandidateRecord
+
+        db = Path(__file__).resolve().parents[1] / "demo" / "h0_demo.db"
+        engine = create_engine(f"sqlite+pysqlite:///{db}", future=True)
+        with Session(engine) as session:
+            strategies = set(session.scalars(select(SpreadCandidateRecord.strategy)).all())
+        self.assertIn("bull_call_debit_spread", strategies)
+        self.assertIn("bear_put_debit_spread", strategies)
 
     def test_evidence_database_is_committed_and_readable(self) -> None:
         from sqlalchemy import create_engine, func, select
