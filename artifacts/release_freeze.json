@@ -55,6 +55,8 @@
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.snapshot.json": "sha256:539315f147b2e20485f393e407264a7fb8a2e891d6e87b7042dd023d08af6625",
       "fixtures/h0/frozen/spy-live-20260828T153310Z.manifest.json": "sha256:b6c78a041173ae637a723c7eccb23451a48a110629ca01d8d06d98c2b5c3f925",
       "fixtures/h0/frozen/spy-live-20260828T153310Z.snapshot.json": "sha256:7453471674256714e31fc5f01c98c4e2972c8671f48393c75c4d83994560a077",
+      "fixtures/h0/spy_bearish_qualified.oracle.json": "sha256:af03ff233e2b7390d986038d9252a1502a52d1192fe7e76dc839b4257545c7c8",
+      "fixtures/h0/spy_bearish_qualified.snapshot.json": "sha256:acaab74708f04bf0b9c4ea62adef5116bbc3c59776e1399f3e10021bb414037f",
       "fixtures/h0/spy_qualified.oracle.json": "sha256:3d8f552d81866c9388b603d350e3159b8518f86bb5b66530a4d6f6d157e5483c",
       "fixtures/h0/spy_qualified.snapshot.json": "sha256:c4993b7b8dc25bef569059bde3e19f632594d6970f5ac73d4e8a81568b277226",
       "fixtures/h0/spy_refusal.oracle.json": "sha256:1b9a61a13922e1b322dab0ffe9473d5052e377e3acdbe939ebddac17d4dddcc5",
@@ -70,8 +72,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:e9b8f5695b60ff8456554787bc59fd675f50c5c91f014359cf551b60e5aa0529"
     }
   },
-  "commit": "git:79be0a864b2e1824f55de0408dad5b98723fc668",
-  "freeze_digest": "sha256:d7ec6eb31ae638e4050c6ad58694df05b57e1db694706c27888cd35774a284bc",
-  "frozen_at": "2026-08-28T17:20:23.526980+00:00",
+  "commit": "git:67e07555c651b5d5ce7028e76e643b97d9492693",
+  "freeze_digest": "sha256:96ea56ac7f9fad343625810302838dbdf1b41ae4c0dc7764d0c9bd44dee896d8",
+  "frozen_at": "2026-08-28T17:24:20.341833+00:00",
   "manifest_version": "release_freeze.v1"
 }

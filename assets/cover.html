@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1920px;height:1080px;background:#0B0E14;color:#E6EAF2;
+     font-family:Inter,system-ui,sans-serif;overflow:hidden;position:relative}
+.glow{position:absolute;width:1100px;height:1100px;border-radius:50%;
+      background:radial-gradient(circle,rgba(56,189,248,.13) 0%,transparent 62%);
+      top:-380px;right:-260px}
+.glow2{position:absolute;width:900px;height:900px;border-radius:50%;
+      background:radial-gradient(circle,rgba(52,211,153,.09) 0%,transparent 62%);
+      bottom:-420px;left:-240px}
+.wrap{position:relative;padding:96px 110px;height:100%;display:flex;flex-direction:column}
+.team{font:600 22px/1 'JetBrains Mono',monospace;letter-spacing:.22em;
+      color:#7DD3FC;text-transform:uppercase}
+h1{font-size:132px;font-weight:800;letter-spacing:-.045em;margin-top:26px;line-height:.95}
+h2{font-size:46px;font-weight:600;color:#9FB0C8;margin-top:22px;letter-spacing:-.02em}
+.rule{height:3px;width:190px;margin-top:36px;
+      background:linear-gradient(90deg,#38BDF8,#34D399)}
+.proof{display:flex;gap:26px;margin-top:56px}
+.card{flex:1;padding:30px 32px;border:1px solid #1E2937;border-radius:16px;
+      background:linear-gradient(180deg,#0F1521 0%,#0C111B 100%)}
+.card .k{font:600 19px/1 'JetBrains Mono',monospace;letter-spacing:.14em;
+      text-transform:uppercase;color:#5C6B80}
+.card .v{font-size:52px;font-weight:800;letter-spacing:-.03em;margin-top:16px;color:#E6EAF2}
+.card .v.amber{color:#FBBF24}
+.card .v.green{color:#6EE7B7}
+.card .d{font:400 22px/1.4 Inter,sans-serif;color:#8FA0B8;margin-top:14px}
+.flow{display:flex;align-items:center;gap:16px;margin-top:auto;margin-bottom:30px;flex-wrap:nowrap}
+.node{padding:20px 26px;border:2px solid #24303F;border-radius:14px;background:#111825;
+      font:600 25px/1 Inter,sans-serif;white-space:nowrap;color:#C7D3E4}
+.node.model{border-color:#F59E0B;background:rgba(245,158,11,.09);color:#FBBF24;position:relative}
+.node.exec{border-color:#34D399;background:rgba(52,211,153,.09);color:#6EE7B7}
+.arrow{color:#3A4759;font-size:30px;font-weight:700}
+.tag{position:absolute;top:-38px;left:0;font:600 17px/1 'JetBrains Mono',monospace;
+     color:#F59E0B;letter-spacing:.06em;white-space:nowrap}
+.foot{display:flex;gap:56px;align-items:baseline}
+.foot div{font:400 27px/1.35 Inter,sans-serif;color:#8FA0B8}
+.foot b{color:#E6EAF2;font-weight:600}
+.mono{font-family:'JetBrains Mono',monospace;font-size:23px;color:#5C6B80}
+</style></head><body>
+<div class="glow"></div><div class="glow2"></div>
+<div class="wrap">
+  <div class="team">Voltaic Alpha · Alpaca AI Trading Agents</div>
+  <h1>Options Alpha</h1>
+  <h2>An auditable AI execution firewall</h2>
+  <div class="rule"></div>
+
+  <div class="proof">
+    <div class="card">
+      <div class="k">Paper lifecycle</div>
+      <div class="v">&minus;7.10</div>
+      <div class="d">One MLeg open and close, filled and reconciled to flat. The friction is published, not hidden.</div>
+    </div>
+    <div class="card">
+      <div class="k">Model ablation</div>
+      <div class="v amber">0</div>
+      <div class="d">Decisions the model changed across five frozen cases. Reported as the result.</div>
+    </div>
+    <div class="card">
+      <div class="k">Write surface</div>
+      <div class="v green">1 file</div>
+      <div class="d">The only file that can express a broker write, enforced by a CI check that parses the AST.</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="node">Evidence</div><div class="arrow">→</div>
+    <div class="node">Setup</div><div class="arrow">→</div>
+    <div class="node model"><span class="tag">the model touches only this box</span>Memo</div>
+    <div class="arrow">→</div>
+    <div class="node">Risk</div><div class="arrow">→</div>
+    <div class="node">Intent</div><div class="arrow">→</div>
+    <div class="node">Request</div><div class="arrow">→</div>
+    <div class="node exec">Broker</div>
+  </div>
+
+  <div class="foot">
+    <div><b>It cannot</b> pick direction · move the stop · size risk · choose contracts</div>
+    <div class="mono">hash-linked · Paper only · no alpha claimed</div>
+  </div>
+</div></body></html>
+<!--
+Regenerate:
+  python3 -m http.server 8777        # from this directory
+  then screenshot http://localhost:8777/cover.html at exactly 1920x1080
+Submission requires PNG or JPG at 16:9. assets/cover.png is 1920x1080.
+-->

@@ -57,10 +57,10 @@ zero decisions. Both results are reported as they happened. No alpha is claimed.
 | Artifact | Requirement | Status |
 |---|---|---|
 | Public GitHub repository | **Mandatory**; private "may lower your overall score" | Repository created private. **Must be flipped public before submitting** |
-| Application URL | Streamlit, Replit, or Vercel only | Streamlit app builds and runs locally; deploy and record the URL |
+| Application URL | Streamlit, Replit, or Vercel only | App verified three ways: locally, inside the Docker image, and from a clean-room install using `requirements.txt`. **Deploy and record the URL.** |
 | Video | MP4, **5 minutes maximum** | Beats drafted in the narrative §8; not yet recorded |
 | Slide deck | PDF | Ten-slide outline in the narrative §7; not yet exported |
-| Cover image | PNG or JPG, 16:9 | Not yet produced |
+| Cover image | PNG or JPG, 16:9 | **Done.** `assets/cover.png`, 1920x1080. Source and regeneration steps in `assets/cover.html` |
 | Title, descriptions, tags | See §1 | Drafted above, within limits |
 
 ## 3. Rehearsal script
@@ -84,7 +84,6 @@ Run in this order; each has a known-good answer.
 - [ ] Flip `github.com/GinoLlerena/voltaic-alpha` to **public** (`F-J`).
 - [ ] Deploy the Streamlit app and record the URL.
 - [ ] Record the MP4 (≤ 5 min) and export the deck PDF.
-- [ ] Produce the 16:9 cover image.
 - [ ] Ask the organizers whether the Submission Guidelines' "IBM Bob Report"
       clause applies to this event. It reads as carried-over copy from another
       sponsor but is marked mandatory.
