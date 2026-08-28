@@ -2,7 +2,10 @@
 # it reads the committed evidence database at demo/h0_demo.db.
 [server]
 headless = true
-enableCORS = false
+# enableCORS = false makes Streamlit send Access-Control-Allow-Origin: * and
+# does not actually restrict WebSocket origins, so it weakens the app for no
+# benefit. The dashboard is read-only and serves no cross-origin caller.
+enableCORS = true
 enableXsrfProtection = true
 
 [browser]

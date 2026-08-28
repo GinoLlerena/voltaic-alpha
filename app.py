@@ -33,8 +33,11 @@ from options_alpha_lab.persistence.models import (
     ThesisRecord,
 )
 
-DB = Path("demo/h0_demo.db")
-RECEIPT = Path("artifacts/h0_paper_lifecycle.json")
+# Resolved against this file, not the working directory: the hosting platform
+# chooses the working directory and it is not always the repository root.
+ROOT = Path(__file__).resolve().parent
+DB = ROOT / "demo" / "h0_demo.db"
+RECEIPT = ROOT / "artifacts" / "h0_paper_lifecycle.json"
 
 st.set_page_config(page_title="Options Alpha", page_icon="🔒", layout="wide")
 
@@ -172,7 +175,7 @@ with tabs[1]:
             }
             for s in signals
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -264,7 +267,7 @@ with tabs[3]:
         c2.metric("Max loss", str(risk.calculated_max_loss))
         c3.metric("Budget", str(risk.risk_budget))
         if risk.checks:
-            st.dataframe(risk.checks, use_container_width=True, hide_index=True)
+            st.dataframe(risk.checks, width="stretch", hide_index=True)
         if risk.reason_codes:
             st.error("Rejected: " + ", ".join(risk.reason_codes))
 
@@ -329,7 +332,7 @@ with tabs[4]:
                         {"leg": f.leg_symbol, "qty": f.quantity, "price": str(f.price)}
                         for f in fills
                     ],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -360,6 +363,6 @@ with tabs[4]:
             }
             for e in events
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
