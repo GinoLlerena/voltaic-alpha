@@ -6,7 +6,7 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1.6 |
+| Version | 0.1.7 |
 | Date | 28 August 2026 |
 | Status | Active hackathon vertical-slice plan; adversarial scope review incorporated |
 | Trading environment | Alpaca Paper only during the hackathon |
@@ -129,13 +129,13 @@ The following values were useful enough to retain for evaluation, but none is an
 
 | Candidate area | External-review proposal | Acceptance evidence required |
 |---|---|---|
-| Entry cadence | Finalized 15-minute bars only; compute the signal after bar `t` closes; the earliest eligible entry uses the first observable quote or bar in `t+1`; entries 09:45-15:15 ET; monitor every 5 minutes | Replay across normal, open, close, early-close, and volatile sessions; prove that same-bar fills and forming-bar inputs are rejected; API budget and scheduler tests |
+| Entry cadence | Finalized 15-minute bars only; compute the signal after bar `t` closes; the earliest eligible entry uses the first observable quote or bar in `t+1`; candidate entries 09:45-15:15 ET; monitor every 5 minutes | Freeze an owner-approved calendar-derived window before implementation; replay normal, open, close, early-close, holiday, and volatile sessions; reject same-bar fills, forming-bar inputs, and entries after the earlier of the fixed cutoff or session-relative close buffer |
 | Freshness | Account 30 s, clock 60 s, bar 90 s after close, OPRA option 30 s, indicative option 120 s, evidence 5 min, approval 90 s | Provider timestamp mapping, delayed-data tests, and measured Paper latency |
 | Signals/setups | Daily EMA20/EMA50, 5/20-session returns, 15-minute ATR14; ATR/volume-based retest, breakout confirmation, and extension veto | Formula specification, no-look-ahead unit tests, replay sensitivity, and comparison against simpler baselines |
 | Options | Hard 14-45 DTE, preferred 21-35; long delta 0.55-0.70; short delta 0.25-0.40; spread and debit/width limits | Chain coverage study by Tier-1 ETF/feed, rejection-rate report, payoff checks, and boundary tests |
 | Liquidity | Open interest >= 500; prior-session volume >= 50 when available | Verified source/observation timestamp for each field; no fail-open substitution when unavailable |
 | Risk | 0.50% transition, 0.75% standard, 1.00% exceptional; 3% total; 1.5% cluster; 2% daily stop; three positions | Replay/stress loss distribution, contest account/scoring confirmation, pending-order reservation, and policy-owner approval |
-| Entry lifecycle | Midpoint start, bounded movement toward natural, 20-second replace interval, three attempts, 90-second TTL | Paper fill experiment, idempotency/reconciliation tests, and adverse-price bound |
+| Entry lifecycle | Midpoint start, bounded movement toward natural, 20-second replace interval, three attempts, 90-second post-submission deadline | `INTENT_TTL` is only pre-submission authority expiry and does not satisfy this proposal. Require durable submitted/partial/filled/canceled/rejected/expired states, actual-fill economics, cancel-only fallback, Paper fill experiment, idempotency/reconciliation tests, and adverse-price bound before replacements are enabled |
 | Exits | 50% debit loss, staged 60%/75% profit capture, time/conviction/event/DTE exits | Historical/replay sensitivity study, precedence matrix, conservative liquidation marking, and lifecycle tests |
 | Event safety | T-60 through T+30 minute blackout and two completed bars after an event | Reviewed event-source contract, timezone tests, missing-calendar fail-closed behavior, and replay cases |
 
@@ -351,16 +351,17 @@ Provider adapters may be asynchronous, but the domain contracts must remain prov
 
 ### 7.3 Order lifecycle
 
-1. Generate `client_order_id` from strategy, decision ID, and attempt number.
-2. Serialize the exact native-MLeg request, validate it against the approved intent, persist its hash, and pass a dry-run mapper test before submission is enabled.
+1. Derive `client_order_id` deterministically from the immutable intent hash so the same authority cannot create a second strategy on retry.
+2. Serialize the exact native-MLeg request, validate it against the approved intent, persist the intent, request, hash, and `ENTRY_SUBMITTED` state atomically **before** broker submission, and pass a dry-run mapper test before submission is enabled.
 3. Re-prove the resolved Paper endpoint, `paper_execute` mode, trading enablement, intent TTL/hash, options level, and durable execution state immediately before the write.
 4. Submit only once for a given idempotency key.
 5. If the result is ambiguous, query by `client_order_id`; do not retry until broker and local state prove the original request was not accepted.
-6. Poll or stream order updates and persist every parent-order, leg, and filled-strategy-quantity transition.
-7. Do not chase indefinitely. Use a bounded replace policy with a maximum attempt count and price limit derived from current quotes.
-8. Cancel stale unfilled entries before the entry window closes.
+6. Treat broker acknowledgement as submitted rather than filled. Poll or stream order updates and persist every parent-order, leg, actual net debit, and filled-strategy-quantity transition.
+7. Distinguish the pre-submission intent TTL from the post-submission order deadline. At minimum, cancel at the approved deadline; enable replacement only after its attempt, time, and adverse-price bounds pass.
+8. Cancel stale unfilled entries before the calendar-derived entry window closes and reconcile cancel, reject, expiry, zero fill, partial fill, and late fill without creating a phantom position.
 9. Enter `NO_NEW_RISK` when broker state is ambiguous; keep cancellation and reconciled risk-reducing exits available.
 10. Reconcile filled strategy units into position records before monitoring begins. Never infer two independent leg orders from a native MLeg parent.
+11. Reconcile at startup, before every new-risk write, after every mutation or ambiguous response, and periodically while any order or exposure exists. Startup reconciliation alone is not sufficient.
 
 ### 7.4 Position and exit lifecycle
 
@@ -456,12 +457,14 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 - Persist and review the prepared-request hash; cross-check one request with a pinned CLI dry run without allowing CLI submission.
 - Submit one minimal Paper open/close lifecycle through `alpaca-py` only after dry-run review.
 - Test client-ID lookup and reconciliation after one simulated ambiguous response or restart.
+- Persist pending/partial/open/closing/flat state and actual fills; reconstruct it from broker and database state before the worker can enter its decision loop.
+- Add a post-submission deadline with terminal cancel/reject/expiry/late-fill handling, plus a calendar-derived entry window.
 
-**Execution-transport sub-gate:** exact MLeg mapping, write-time Paper/authority guards, deterministic client IDs, ambiguous-submit lookup, and one manually reconciled Paper open/close lifecycle are demonstrated.
+**Execution-transport sub-gate:** exact MLeg mapping, write-time Paper/authority guards, deterministic client IDs, ambiguous-submit lookup, and one watched Paper lifecycle with observed open/close fills and a broker-flat result are demonstrated.
 
 **Autonomous position-lifecycle sub-gate:** an entry becomes open only from reconciled fills; actual fill quantity and net debit become the exit basis; pending, partial, open, closing, and flat states are durable; restart reconstructs broker exposure; a close remains owned until fills reconcile; and trigger/precedence tests cover missing data, sessions, events, and bounded close replacement.
 
-**Status: `PARTIAL`, 28 August 2026.** The execution-transport sub-gate is complete: one manual Paper MLeg lifecycle filled and reconciled to flat; see `artifacts/h0_paper_lifecycle.md`. The autonomous sub-gate is not complete. `TradingAgent` currently turns an unreconciled accepted entry into `POSITION_OPENED`, stores estimated rather than filled debit in process memory, and turns an accepted close into `POSITION_CLOSED` before fill reconciliation. Restart reconstruction is absent. Numerical exit evaluation and tests exist, but those do not establish durable position ownership. Remediation and acceptance evidence are defined in the [exit review](./options_alpha_exit_policy_review_v0_1.md).
+**Status: `PARTIAL`, 28 August 2026.** The execution-transport sub-gate is complete: one watched Paper MLeg lifecycle produced observed fills and a broker-flat result; see `artifacts/h0_paper_lifecycle.md`. The command does not persist fills/positions or apply its printed reconciliation to durable lifecycle records, so this is not local-reconciliation evidence. The autonomous sub-gate is not complete. `TradingAgent` currently turns an unreconciled accepted entry into `POSITION_OPENED`, stores estimated rather than filled debit in process memory, and turns an accepted close into `POSITION_CLOSED` before fill reconciliation. Restart reconstruction, periodic reconciliation, post-submission order handling, and the entry window are absent. Remediation and acceptance evidence are defined in the [exit review](./options_alpha_exit_policy_review_v0_1.md).
 
 ### Phase 5: Five-view judge experience - 1 day
 
@@ -488,7 +491,7 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** the hosted demo works in a clean session and the narrative makes no unsupported alpha, data-quality, or live-performance claim.
 
-**Status: `PARTIAL`, 28 August 2026.** Validation, containerization, business case, rubric mapping, deck outline, and video beats are done; `scripts/run_h0_validation.sh` passes nine gates. Outstanding and owned by the team: publishing the hosted URL, recording the MP4, and exporting the deck PDF.
+**Status: `PARTIAL`, 28 August 2026.** Validation, containerization, business case, rubric mapping, deck outline, and video beats are done; `scripts/run_h0_validation.sh` passes nine gates. Alibaba ECS hosts only the credential-free read-only dashboard. No autonomous worker, protected Paper secrets, hosted durable database, worker lease, startup reconciliation, monitoring, backup, or rollback proof is deployed. Outstanding and owned by the team: the compliant hosted URL, worker-hosting decision if autonomous operation remains in scope, MP4, and deck PDF.
 
 ### Phase 7: Integration buffer and submission - 0.75 day
 
@@ -608,6 +611,7 @@ Required controls:
 | `FREEZE_ALL_WRITES` | Blocked | Blocked | Blocked | Blocked | Exceptional adapter, credential, or endpoint integrity incident requiring operator intervention |
 
 - Every execution method checks the durable state. `FREEZE_ALL_WRITES` must raise an incident because it can temporarily prevent risk reduction.
+- The current gateway execution state is process-local. It is implementation evidence for guard semantics, not proof of a durable halt or incident workflow.
 - An allowlist limits underlyings and structures.
 - Policy, prompt, model, and code version are attached to every decision.
 - Secrets are supplied by the deployment secret store, never committed or displayed.
@@ -711,6 +715,9 @@ Record changes to architecture or scope here and mirror requirement changes in t
 | 2026-08-28 | Resolve an ambiguous submit by client-id lookup and never by re-submitting | Re-submitting is how duplicates are created. If the lookup finds nothing, the gateway refuses rather than assuming the order was lost | `RISK-020`, `RISK-021`, `OPS-005`, `QA-010` |
 | 2026-08-28 | Treat broker acceptance as submitted, never as opened or closed | Acceptance does not establish filled strategy quantity or economic basis. Entry and exit state transitions must be derived from reconciled fills and broker positions | `RISK-020`, `RISK-021`, `OPS-002`, `OPS-003`, `OPS-005`, `QA-010` |
 | 2026-08-28 | Reconstruct every managed strategy from durable records and broker state before the autonomous cycle may open risk | A process-local object disappears on restart and can leave a real Paper position unmanaged even when the broker correctly blocks a second entry | `RISK-017`, `RISK-021`, `OPS-001` to `OPS-005`, `QA-010` |
+| 2026-08-28 | Treat intent TTL and broker-order deadline as separate controls | The 90-second intent TTL prevents stale authority from being submitted; it does not cancel or reconcile an accepted order. Conflating them leaves unfilled, partial, expired, and late-filled orders unmanaged | `RISK-018`, `RISK-020`, `OPS-003`, `QA-010` |
+| 2026-08-28 | Reconcile periodically as well as at startup and around every write | Startup proves only one instant. Orders can fill, expire, reject, or change after it, so broker/local agreement must be maintained while any order or exposure exists | `RISK-017`, `RISK-021`, `OPS-001` to `OPS-005`, `QA-010` |
+| 2026-08-28 | Keep the judge dashboard credential-free and deploy any autonomous worker as a separate security boundary | The current Alibaba host intentionally serves static evidence only. Adding provider secrets, a worker, and lifecycle storage is a new operational authority decision, not a dashboard redeploy | `DEC-005`, `OPS-004`, `OPS-013`, `QA-014` |
 | 2026-08-28 | Verify the Paper endpoint from the client about to be used, not from the environment variable that configured it | Those two can disagree, and only one of them is what the bytes will actually reach | `RISK-015`, `RISK-016` |
 | 2026-08-28 | Never show the model the invalidation conditions, rather than validating that it preserved them | A check can be removed; an absence cannot be bypassed. The model has no field for invalidation and never sees the text, so there is no path by which a memo could soften a stop | `CLR-008`, `AI-005`, `RISK-003` |
 | 2026-08-28 | Coerce a direction reversal to abstention and record it, rather than rejecting the call | An abstention is a safe, meaningful outcome and keeps the trace intact; a hard rejection would discard the evidence that the model tried | `CLR-008`, `AI-008`, `AI-010` |
@@ -724,10 +731,12 @@ Record changes to architecture or scope here and mirror requirement changes in t
 
 ## 17. Immediate next actions
 
-1. Keep autonomous Paper entry disabled until `EXIT-AC-01` through `EXIT-AC-13` in the [exit review](./options_alpha_exit_policy_review_v0_1.md) are disposed and the applicable H0 evidence passes.
+1. Keep autonomous Paper entry disabled until `EXIT-AC-01` through `EXIT-AC-16` in the [exit review](./options_alpha_exit_policy_review_v0_1.md) are disposed and the applicable H0 evidence passes.
 2. Implement durable pending/open/closing/flat strategy state from reconciled broker fills and positions; reconstruct it before the first post-restart decision.
 3. Replace free-text invalidation extraction and the DTE time stop with typed completed-session rules; ensure missing premium data cannot suppress independent exits.
-4. Add bounded close submit/replace/cancel/reconcile behavior and retain responsibility for every remaining filled unit until Alpaca confirms flat.
-5. Run threshold replay/sensitivity analysis, record the Trading owner's decision, and close `DEC-008` only if the evidence supports the selected provisional values.
-6. Re-run the full validation and one autonomous Paper lifecycle with a forced restart before representing `CLR-020`, `OPS-005`, Phase 4, or `G2` as complete.
-7. Keep the valid manual MLeg transport evidence and submission artifacts; do not broaden H0 strategy scope while lifecycle remediation is open.
+4. Add a post-submission entry-order deadline, terminal/partial/late-fill handling, and bounded close submit/replace/cancel/reconcile behavior; retain responsibility for every filled unit until Alpaca confirms flat.
+5. Freeze and test the calendar-derived entry window, including final-minute and early-close cases.
+6. Run threshold replay/sensitivity analysis, record the Trading owner's decision, and close `DEC-008` only if the evidence supports the selected provisional values.
+7. Decide whether autonomous hosting remains H0 scope. If yes, deploy a separate credentialed worker with protected Paper secrets, durable storage, lease, health/alerting, backup, and rollback; never add credentials to the public dashboard service.
+8. Re-run the full validation and one autonomous Paper lifecycle with unfilled, partial-fill, late-fill, and forced-restart cases before representing `CLR-020`, `OPS-005`, Phase 4, or `G2` as complete.
+9. Keep the valid manual MLeg transport evidence and submission artifacts; do not broaden H0 strategy scope while lifecycle remediation is open.

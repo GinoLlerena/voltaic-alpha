@@ -51,18 +51,18 @@
       "uv.lock": "sha256:986e6503c0d66997cc5a5453352b8b5ecd9ce190079eecc39d5d56b988663110"
     },
     "demo_data": {
-      "artifacts/h0_paper_lifecycle.json": "sha256:c249819185ff00a9576197636b21ad71ce4940be73e2d1349a50488d5d4ddbef",
-      "demo/h0_demo.db": "sha256:5f5610c12a89b520b1d2cacee919014c6137b2fc06a8e5b1ebc5e2dc4bbdda53",
-      "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.manifest.json": "sha256:85e8caabc8db2d429cec58b1b5d0ac215d34c039bba639a9c8a30d5dfe5851e4",
-      "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.snapshot.json": "sha256:539315f147b2e20485f393e407264a7fb8a2e891d6e87b7042dd023d08af6625",
-      "fixtures/h0/frozen/spy-live-20260828T153310Z.manifest.json": "sha256:b6c78a041173ae637a723c7eccb23451a48a110629ca01d8d06d98c2b5c3f925",
-      "fixtures/h0/frozen/spy-live-20260828T153310Z.snapshot.json": "sha256:7453471674256714e31fc5f01c98c4e2972c8671f48393c75c4d83994560a077",
+      "artifacts/h0_paper_lifecycle.json": "sha256:a09aea77c418e7d53d12ba2db1b6e77274cdfd58d01654245f73c8336713bf4c",
+      "demo/h0_demo.db": "sha256:15414c2cdb42931b2d360455e23e80826d0bf6a0fde470d118266e6a66c17448",
+      "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.manifest.json": "sha256:2710b9e3104a605b6ce6a9e13176500f123940d08564d4d61f37580eae6227c7",
+      "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.snapshot.json": "sha256:ef9595f0454f73dde9099e537530492ff484f4e5509fd135e34298094e729206",
+      "fixtures/h0/frozen/spy-live-20260828T153310Z.manifest.json": "sha256:ce436fa73460f9e96a9993a58ef644b8a80b1205eed1f463796e29f699a32cdd",
+      "fixtures/h0/frozen/spy-live-20260828T153310Z.snapshot.json": "sha256:c086ac54602bb3dcaccd6487182185ceeeb90c4c63e64f94820e5a168287b462",
       "fixtures/h0/spy_bearish_qualified.oracle.json": "sha256:af03ff233e2b7390d986038d9252a1502a52d1192fe7e76dc839b4257545c7c8",
-      "fixtures/h0/spy_bearish_qualified.snapshot.json": "sha256:acaab74708f04bf0b9c4ea62adef5116bbc3c59776e1399f3e10021bb414037f",
+      "fixtures/h0/spy_bearish_qualified.snapshot.json": "sha256:fa005d07c391896abd91cd806181a4fb4801b6a740af55566006459684088066",
       "fixtures/h0/spy_qualified.oracle.json": "sha256:3d8f552d81866c9388b603d350e3159b8518f86bb5b66530a4d6f6d157e5483c",
-      "fixtures/h0/spy_qualified.snapshot.json": "sha256:c4993b7b8dc25bef569059bde3e19f632594d6970f5ac73d4e8a81568b277226",
+      "fixtures/h0/spy_qualified.snapshot.json": "sha256:0c4cf0ce461315429f5163488a2577501b9b62f0c400f794102a8184588061b8",
       "fixtures/h0/spy_refusal.oracle.json": "sha256:1b9a61a13922e1b322dab0ffe9473d5052e377e3acdbe939ebddac17d4dddcc5",
-      "fixtures/h0/spy_refusal.snapshot.json": "sha256:0ce80077fcbdeebfe76c36523fe4d6db9aa529345742ac82d56e4ca7684810d9",
+      "fixtures/h0/spy_refusal.snapshot.json": "sha256:de1fa35201e727d86fcf396141283b5b914e708e489b0380cb024f126ccdb994",
       "fixtures/nvda_earnings_bearish.json": "sha256:0cb13eeab2dec55fc74337c0142e7fbe0b73ab80250b91ad1829d028651d6e7f"
     },
     "policy": {
@@ -74,8 +74,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:eb36000394fd5da65bcca6e2f0a9909c67c0c7517d22e497130595030c94d8a8"
     }
   },
-  "commit": "git:66e6a17ba1d4358adffa81d96c2db1d5d68f0ec2",
-  "freeze_digest": "sha256:0ddf046046f69cf6fdca9fec67c7adac13afdd1b049f59944b66a1bb7df8d2fb",
-  "frozen_at": "2026-08-28T19:31:42.059359+00:00",
+  "commit": "git:9b17d84205e19f92f37ff37ec0d39a715e6f4ac0",
+  "freeze_digest": "sha256:c55db4e413696ec6917d3e13768d336ebc2204674fe36650e5dd77db50ac7b9e",
+  "frozen_at": "2026-08-28T19:51:25.727079+00:00",
   "manifest_version": "release_freeze.v1"
 }

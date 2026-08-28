@@ -72,7 +72,7 @@ class FakeClient:
 
     def account(self) -> ProviderRead:
         return read({
-            "account_number": "PA3WZR22ITRR", "status": "ACTIVE",
+            "account_number": "PA-TEST-REDACTED", "status": "ACTIVE",
             "equity": "100000", "options_buying_power": "50000",
         })
 

@@ -244,8 +244,9 @@ trades.
 
 ## Results, including the unflattering ones
 
-One Paper MLeg lifecycle on account `PA3WZR22ITRR`: open filled at 3.13 against a
-3.39 limit, close at 3.06, reconciled to zero open positions. The round trip
+One Paper MLeg lifecycle on a verified, redacted Paper account: open filled at
+3.13 against a 3.39 limit, close at 3.06, and the broker was later observed with
+zero open positions. The round trip
 realized **-7.10** — the cost of crossing the spread twice on one contract.
 
 The model ablation over three frozen cases changed **zero** decisions.

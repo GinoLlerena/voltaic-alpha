@@ -6,7 +6,7 @@
 
 | **Document**          | **Value**                                                          |
 |-----------------------|--------------------------------------------------------------------|
-| Version               | 0.1.3 — exit lifecycle review incorporated                        |
+| Version               | 0.1.4 — durable lifecycle and entry-window review incorporated    |
 | Date                  | 28 August 2026                                                     |
 | Target category       | Options Alpha Agents                                               |
 | Operating environment | Alpaca paper trading during the hackathon                          |
@@ -411,6 +411,8 @@ The signed directional score is evaluated independently from options quality and
 
 - Setup family explicitly recognized and invalidation level known before entry.
 
+- Entry occurs only inside an owner-approved, market-calendar-derived window. The 09:45-15:15 ET proposal is provisional; early-close sessions use the earlier approved session-relative cutoff. Entry permission never disables monitoring, cancellation, or risk reduction.
+
 | **No-trade is first class:** A neutral decision is not a failure of the agent. A system that can explain why it refused a tempting but low-quality trade is more credible than one that must always act. |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
@@ -478,6 +480,10 @@ For H0, the candidate policy separates broker integrity from economic exits. Rec
 The provisional values—7-DTE expiry guard, 50% of filled debit loss threshold, three completed trading sessions, and 60% of maximum spread gain—are candidate H0 parameters. They are not optimized values and remain subject to Trading-owner approval and replay/sensitivity evidence. Conviction decay remains diagnostic rather than an automatic H0 broker trigger until a deterministic maintenance score is defined and validated.
 
 An order may be described as opened or closed only after filled strategy quantity and broker position reconcile. Broker acceptance alone is `SUBMITTED`; process-local state alone is not position ownership. Autonomous entry stays disabled until the exit review's acceptance matrix is satisfied.
+
+The pre-submission intent TTL and the post-submission order deadline are separate controls. Expired authority must not be submitted; an accepted order must remain durably pending until filled, canceled, rejected, expired, or reconciled otherwise. Startup reconciliation is followed by reconciliation before new risk, after every order mutation or ambiguity, and periodically while any order or position exists.
+
+The public dashboard remains credential-free. Any autonomous worker is a separate deployment authority with protected Paper secrets, durable lifecycle storage, a single-worker lease, health/incident monitoring, restart reconciliation, backup, and rollback evidence.
 
 # 16. Agent responsibilities
 

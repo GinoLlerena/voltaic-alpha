@@ -6,11 +6,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1.0 |
+| Version | 0.1.1 |
 | Date | 28 August 2026 |
 | Status | Required remediation; candidate policy values remain provisional |
-| Scope | `src/options_alpha_lab/exits.py`, `src/options_alpha_lab/agent.py`, execution gateway, related tests, trading design, implementation plan, and traceability matrix |
-| Governing requirements | `CLR-020`, `RISK-017`, `RISK-020`, `RISK-021`, `OPS-002`, `OPS-003`, `OPS-005`, `QA-009`, `QA-010` |
+| Scope | Exit evaluation, autonomous agent, execution gateway, persistence models/repository, manual lifecycle artifact, related tests, entry timing, and deployed worker boundary |
+| Governing requirements | `CLR-020`, `RISK-017` to `RISK-021`, `OPS-001` to `OPS-005`, `QA-009`, `QA-010`, `QA-014` |
 
 ## 1. Strongest argument against enabling autonomous entry
 
@@ -33,7 +33,7 @@ For an autonomous trading agent, losing the mapping between broker exposure and 
 
 **Conclusion:** the hypothesis is not validated. Deterministic exit evaluation and close-intent construction now exist, which is useful progress. The autonomous position lifecycle is still unsafe to call complete because order acceptance is treated as a fill, position state is process-local, the entry basis is estimated rather than filled, and a submitted close is treated as a closed position before reconciliation. The code can therefore lose responsibility for real Paper exposure even while reporting `POSITION_OPENED` or `POSITION_CLOSED`.
 
-This conclusion does not invalidate the separate manual Paper MLeg transport proof. It limits what that proof establishes: request mapping, guarded submission, and explicit lifecycle reconciliation work in the manual path. It does not prove that the autonomous agent owns a durable, fill-reconciled position lifecycle.
+This conclusion does not invalidate the separate manual Paper MLeg transport proof. It limits what that proof establishes: exact request mapping, guarded submission, observed broker fills, and an observed broker-flat result. The current command does not persist fills or positions, does not apply its printed reconciliation result to durable lifecycle records, and does not reconcile the close before returning. It therefore does not prove local durable reconciliation or autonomous position ownership.
 
 ## 3. Facts, reasonable inferences, and speculation
 
@@ -45,6 +45,11 @@ This conclusion does not invalidate the separate manual Paper MLeg transport pro
 - The agent creates `OpenPosition` immediately after submission and labels the tick `POSITION_OPENED`; it uses the selected spread's `estimated_debit` rather than a broker fill price.
 - The agent clears `open_position` immediately after close submission and labels the tick `POSITION_CLOSED`.
 - `open_position` and tick history are held in process memory. Startup does not reconstruct managed positions from Alpaca or the repository.
+- `Position` and `Fill` tables are declared but are not read or written by the repository or agent. The manual lifecycle persists an intent, prepared request, and initial broker-order row with `filled_quantity=0`; it prints one open-order lookup but does not persist that result, any fills, a position, or a reconciled close.
+- The normal observation cycle does not query open orders, fills, activities, or positions. The gateway counts open orders and positions only when a new-risk request reaches preflight; that guard can refuse a second strategy but cannot restore management of the first.
+- The 90-second `INTENT_TTL` expires authority before submission. It is not a post-submission order deadline. Submitted orders use `day` time-in-force, but the gateway has no cancel, replace, partial-fill, rejected-order, or day-expiry lifecycle.
+- Entry timing checks only whether Alpaca reports the market open. The 09:45-15:15 ET window in the implementation plan is a provisional candidate and is not implemented or owner-approved.
+- The Alibaba ECS deployment runs only the credential-free dashboard. It deliberately omits the decision worker, execution gateway, provider credentials, and a hosted durable lifecycle database.
 - The implemented time stop is `DTE <= 10`; the trading design states an intended 1–3 session horizon.
 - Invalidation is recovered from free-form text by parsing a decimal and is evaluated against the current underlying snapshot, not a typed completed-session rule.
 - If spread value is unavailable above the expiry-guard range, `UNMEASURABLE` returns `should_close=False` before invalidation is evaluated. The agent reports `POSITION_REVIEW`, but the path does not create a durable incident or change the gateway halt state.
@@ -58,6 +63,8 @@ This conclusion does not invalidate the separate manual Paper MLeg transport pro
 - Because the entry basis is estimated, profit and loss thresholds can diverge from actual economics even when the order later fills completely.
 - A broker count that blocks a second entry reduces duplicate exposure, but it is not a position manager and does not restore exit responsibility after restart.
 - Reporting broker acceptance as opened or closed can mislead both operators and the judge interface about actual exposure.
+- After restart, a qualifying new entry produces `ENTRY_REFUSED` while Alpaca still reports an order or position, but that refusal is console/in-memory state rather than a durable reconciliation incident. Calling the failure entirely silent is too strong; calling the exposure unmanaged is accurate.
+- A `day` order will not remain at the broker indefinitely, but the same-process agent can retain a phantom `OpenPosition` after the order is canceled, rejected, or expires because no terminal broker state is consumed.
 
 ### 3.3 Speculation that is not established
 
@@ -65,6 +72,7 @@ This conclusion does not invalidate the separate manual Paper MLeg transport pro
 - A 10% price concession may improve fill probability, but no current evidence shows it is an acceptable or sufficient close algorithm across spread widths and market states.
 - Conviction-decay exits may add value, but the current project has no validated maintenance score. Adding a narrative score now could create churn rather than safety.
 - Paper fill behavior does not establish live execution quality, assignment handling, or real-world slippage.
+- The estimate that durable state, reconciliation, and actual-fill economics require half a day is unsupported. It may describe a mock-backed skeleton, not production-worthy unattended behavior; implementation duration depends on partial-fill semantics, database changes, failure tests, and access to market-hour Paper validation.
 
 ## 4. Finding register
 
@@ -77,9 +85,12 @@ This conclusion does not invalidate the separate manual Paper MLeg transport pro
 | `EXIT-005` | High | Invalidation is parsed from free text and evaluated on an unspecified instantaneous price. | Persist a typed invalidation rule, direction, level, observation source, and evaluation cadence before entry. |
 | `EXIT-006` | High | Close pricing has no bounded submit/replace/cancel/reconcile lifecycle. | Define limit stages, timing, maximum concession, attempt budget, cancel handling, ambiguous-write recovery, and terminal escalation. |
 | `EXIT-007` | Medium | Scheduled-event, unexpected-exposure, early-close/calendar, and assignment-risk paths are absent. | Add explicit policy dispositions or explicitly exclude them with a fail-closed operational rule. |
-| `EXIT-008` | High | Documentation marks `CLR-020` and Phase 4 complete while thresholds remain provisional and lifecycle acceptance is unmet. | Mark the policy/lifecycle evidence partial and keep `DEC-008` open until owner approval and the acceptance suite below are complete. |
+| `EXIT-008` | High | Prior documentation marked `CLR-020` and Phase 4 complete while thresholds remained provisional and lifecycle acceptance was unmet. | The status correction is applied; keep the policy/lifecycle evidence partial and `DEC-008` open until owner approval and the acceptance suite below are complete. |
 | `EXIT-009` | Medium | `observe()` uses the host date rather than the injected clock and market calendar. | Derive dates and session counts from the authoritative market clock/calendar so replay and production use the same temporal semantics. |
 | `EXIT-010` | High | The stale/unusable-data helper is tested but is not shown governing the gateway state in the autonomous cycle. | Wire data-quality and reconciliation state into a durable execution-state transition and prove that entries halt while reconciled risk-reducing actions remain available. |
+| `EXIT-011` | Critical | Intent expiry exists, but accepted entry orders have no post-submission fill/cancel/replace/expiry lifecycle. | Persist `ENTRY_SUBMITTED`, reconcile until terminal, manage partial fills, and apply an owner-approved deadline with cancel-only behavior before any bounded replacement policy is enabled. |
+| `EXIT-012` | High | An open market is treated as an eligible entry window, including the final minute and early-close edge cases. | Freeze an entry-window policy and derive it from the authoritative market calendar. Reject entries after the earlier of the approved cutoff and the session-relative close buffer. |
+| `EXIT-013` | High | No credentialed autonomous worker or durable hosted lifecycle store is deployed. | Make worker hosting a separate release gate covering secrets, database durability, lease, startup reconciliation, monitoring, restart, backup, and rollback. Do not add credentials to the public dashboard service. |
 
 ## 5. Candidate H0 exit policy
 
@@ -116,7 +127,16 @@ If these facts cannot be established, the system must not invent a position stat
 
 Conviction decay is not an H0 automatic exit trigger. Until a deterministic, independently validated maintenance score exists, it may be displayed as diagnostic evidence but must not create or suppress a broker write.
 
-### 5.3 Close lifecycle
+### 5.3 Entry-order lifecycle
+
+1. Persist the approved intent, exact prepared request, and `ENTRY_SUBMITTED` state atomically **before** sending the request.
+2. Treat broker acknowledgement as submitted, not filled. Reconcile by deterministic client order ID and broker order ID until a terminal status is known.
+3. Persist actual filled strategy quantity, per-leg fills, average net debit, and first/last fill times. A partial fill creates managed exposure for only the filled quantity and keeps the remainder pending or canceled by policy.
+4. Apply an owner-approved post-submission deadline. The plan's 90-second/three-attempt replacement proposal remains provisional; the minimum safe H0 policy is cancel-only at the deadline unless bounded replacement economics and tests are approved.
+5. On cancel, reject, expiry, or zero fill, record the terminal state and create no `OpenPosition`. On ambiguity or local/broker mismatch, enter `NO_NEW_RISK`, retain responsibility, and continue reconciliation.
+6. Reconcile at startup, before every new-risk write, after every order mutation or ambiguous response, and periodically while any order or exposure exists.
+
+### 5.4 Close lifecycle
 
 1. Freeze the governing exit decision and create one idempotent close intent for the currently reconciled filled quantity.
 2. Submit once and persist the prepared request, intent hash, client order ID, broker response, and state `CLOSE_SUBMITTED`.
@@ -142,16 +162,21 @@ Conviction decay is not an H0 automatic exit trigger. Until a deterministic, ind
 | `EXIT-AC-11` | Expiry, early-close, and assignment-risk calendar cases | Policy produces a safe explicit disposition for each boundary. |
 | `EXIT-AC-12` | Threshold replay and sensitivity report | 50% loss, three sessions, 60% gain, and 7 DTE are labelled provisional or approved with named evidence and owner. |
 | `EXIT-AC-13` | End-to-end autonomous Paper lifecycle | Entry and close are both fill-reconciled, durable across restart, and reconstructable from one audit query. |
+| `EXIT-AC-14` | Unfilled, rejected, canceled, expired, late-filled, and partially filled entry orders | Every state is durable; no phantom position is created; the post-submission deadline cancels safely; a late fill is detected and managed. |
+| `EXIT-AC-15` | Normal session, final minute, early close, holiday, and timezone cases | Entry is permitted only inside the owner-approved calendar-derived window; monitoring and risk reduction remain available outside it. |
+| `EXIT-AC-16` | Credentialed worker deployment and forced restart | Dashboard remains credential-free; worker uses protected Paper secrets and a durable database; one active lease exists; startup reconciliation completes before entries; health, alert, backup, and rollback evidence pass. |
 
-Passing unit tests for trigger arithmetic is necessary but insufficient. `CLR-020`, `OPS-005`, and the autonomous portion of `G2` remain `PARTIAL` until the applicable evidence above exists.
+Passing unit tests for trigger arithmetic is necessary but insufficient. `CLR-020`, `RISK-017`, `RISK-020`, `RISK-021`, `OPS-001` to `OPS-005`, `QA-010`, `QA-014`, and the autonomous portion of `G2` remain incomplete until the applicable evidence above exists.
 
 ## 7. Document disposition
 
 - Keep the trading design's exit categories and 1–3 session intent, but identify the table in Section 5 as the candidate H0 operational interpretation.
 - Keep the manual Paper MLeg lifecycle as valid execution-transport evidence.
+- Describe the lifecycle artifact as observed broker transport/fills/flat state, not durable local reconciliation.
 - Split Phase 4 into a completed transport proof and an incomplete autonomous position-lifecycle proof.
 - Mark `CLR-020` and `OPS-005` `PARTIAL`; keep `DEC-008` open.
 - Treat the current `exits.py` values as provisional implementation evidence, not as frozen policy approval.
+- Keep the dashboard host credential-free and add a separate worker/deployment acceptance gate rather than treating worker enablement as a copy step.
 
 ## 8. External constraint
 

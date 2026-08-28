@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Version | v0.1 |
+| Version | v0.1.1 |
 | Provider | Alibaba Cloud ECS, region `ap-southeast-1` (Singapore) |
 | Application URL | `http://47.84.108.130:8501` |
 | Instance | `i-t4n88bkfwsq0lhzmfjii`, name `options-alpha-demo`, `ecs.e-c1m2.large` (2 vCPU / 4 GB), Ubuntu 24.04 |
@@ -24,6 +24,32 @@ included even by accident.
 
 The decision worker, the execution gateway, and the freeze tooling are **not**
 deployed. Nothing on this host can place an order.
+
+### 1.1 Autonomous-worker gate
+
+The dashboard deployment is not an autonomous-agent deployment. Do not add
+Alpaca/OpenAI credentials or start `options_alpha_lab.agent` on this service as
+a convenience change. That would expand the host from public evidence viewer to
+broker authority and invalidate its current security claim.
+
+If autonomous Paper operation remains in scope, deploy a separate worker
+boundary and require all of the following before enabling entry:
+
+1. protected Paper-only provider secrets with no live fallback;
+2. a durable hosted database and migrations for intents, orders, fills,
+   positions, execution state, and incidents;
+3. one database-backed worker lease and an authoritative market calendar;
+4. startup reconciliation before the decision loop plus periodic reconciliation
+   while any order or exposure exists;
+5. durable pending/partial/open/closing/flat states based on actual fills;
+6. health checks and alerts for broker/local mismatch, stale reconciliation,
+   database failure, worker death, and an unmanaged position;
+7. backup, restore, forced-restart, credential-rotation, and rollback evidence.
+
+The public dashboard may read redacted evidence exported by that worker, but it
+must not share broker-write credentials or expose control actions. Until this
+gate passes, the hosted system demonstrates the judge experience only, not
+unattended trading.
 
 ## 2. Platform caveat
 
