@@ -28,6 +28,7 @@ from .models import (
     Decision,
     EvidencePack,
     MarketSnapshot,
+    ModelCall,
     RiskDecisionRecord,
     Run,
     SignalRecord,
@@ -112,6 +113,7 @@ class DecisionRecorder:
         risk_checks: Sequence[dict[str, Any]] = (),
         classifier_name: str = "unknown",
         synthesizer_name: str = "unknown",
+        model_call: Any = None,
     ) -> RecordedDecision:
         snapshot_payload = snapshot_to_dict(snapshot)
         input_hash = payload_hash(snapshot_payload)
@@ -191,12 +193,31 @@ class DecisionRecorder:
                 )
             )
 
+            model_call_id: str | None = None
+            if model_call is not None:
+                model_call_id = _new_id()
+                session.add(
+                    ModelCall(
+                        id=model_call_id,
+                        run_id=run_id,
+                        provider=model_call.provider,
+                        model=model_call.model,
+                        prompt_version=model_call.prompt_version,
+                        output_schema_version=model_call.output_schema_version,
+                        status=model_call.status,
+                        latency_ms=model_call.latency_ms,
+                        input_tokens=model_call.input_tokens,
+                        output_tokens=model_call.output_tokens,
+                        input_hash=model_call.input_hash,
+                    )
+                )
+
             if outcome.thesis is not None:
                 session.add(
                     ThesisRecord(
                         id=_new_id(),
                         decision_id=decision_id,
-                        model_call_id=None,
+                        model_call_id=model_call_id,
                         synthesizer_name=synthesizer_name,
                         direction=outcome.thesis.direction.value,
                         confidence=outcome.thesis.confidence,

@@ -23,7 +23,7 @@ from .components import (
     DeterministicSetupClassifier,
     DeterministicSpreadSelector,
 )
-from .config import ConfigurationError, Settings, load_settings
+from .config import ConfigurationError, Settings, load_env_file, load_settings
 from .persistence.repository import DecisionRecorder, RecordedDecision, build_engine, create_schema
 from .snapshot_io import load_snapshot
 
@@ -41,10 +41,12 @@ class ReplayResult:
     recorded: RecordedDecision
 
 
-def build_workflow(governor: DeterministicRiskGovernor) -> DecisionWorkflow:
+def build_workflow(
+    governor: DeterministicRiskGovernor, synthesizer: Any = None
+) -> DecisionWorkflow:
     return DecisionWorkflow(
         setup_classifier=DeterministicSetupClassifier(),
-        thesis_synthesizer=DeterministicBaselineThesis(),
+        thesis_synthesizer=synthesizer or DeterministicBaselineThesis(),
         options_selector=DeterministicSpreadSelector(),
         risk_governor=governor,
     )
@@ -55,6 +57,7 @@ def replay_paths(
     settings: Settings,
     *,
     create: bool = True,
+    synthesizer: Any = None,
 ) -> list[ReplayResult]:
     """Replay each snapshot and persist its trace. Returns one result per path."""
     engine = build_engine(settings)
@@ -71,7 +74,9 @@ def replay_paths(
             settings.require_allowed_underlying(snapshot.symbol)
 
             governor = DeterministicRiskGovernor(settings.policy_version)
-            workflow = build_workflow(governor)
+            if synthesizer is not None:
+                synthesizer.last_call = None
+            workflow = build_workflow(governor, synthesizer)
             outcome = workflow.evaluate(snapshot)
 
             if outcome.spread is not None:
@@ -83,7 +88,10 @@ def replay_paths(
                 outcome=outcome,
                 risk_checks=[dict(check) for check in governor.last_checks],
                 classifier_name=DeterministicSetupClassifier.name,
-                synthesizer_name=DeterministicBaselineThesis.name,
+                synthesizer_name=(
+                    getattr(synthesizer, "name", None) or DeterministicBaselineThesis.name
+                ),
+                model_call=getattr(synthesizer, "last_call", None),
             )
             results.append(ReplayResult(str(path), snapshot, outcome, recorded))
     except Exception:
@@ -131,6 +139,12 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
         help="Snapshot JSON paths (default: both H0 fixtures)",
     )
     parser.add_argument(
+        "--arm",
+        choices=("baseline", "model"),
+        default="baseline",
+        help="baseline runs the deterministic no-LLM thesis; model runs the bounded memo",
+    )
+    parser.add_argument(
         "--database-url",
         default=None,
         help="Override DATABASE_URL, for example sqlite+pysqlite:///replay.db",
@@ -158,7 +172,21 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
         )
         return 2
 
-    results = replay_paths(args.snapshots, settings)
+    synthesizer = None
+    if args.arm == "model":
+        from .providers.openai_thesis import BoundedThesisSynthesizer, OpenAIResponsesTransport
+
+        env = load_env_file(".env")
+        api_key = env.get("OPENAI_API_KEY", "")
+        if not api_key:
+            print("OPENAI_API_KEY is not set; cannot run the model arm", file=sys.stderr)
+            return 2
+        synthesizer = BoundedThesisSynthesizer(
+            OpenAIResponsesTransport(api_key),
+            model=env.get("OPENAI_MODEL", "gpt-5.6-terra"),
+        )
+
+    results = replay_paths(args.snapshots, settings, synthesizer=synthesizer)
     for result in results:
         print(format_result(result))
         print()

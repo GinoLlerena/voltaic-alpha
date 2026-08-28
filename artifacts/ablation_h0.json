@@ -1,0 +1,152 @@
+{
+  "cases": 3,
+  "generated_at": "2026-08-28T15:42:22.156500+00:00",
+  "metrics": {
+    "action_agreement": "3/3",
+    "cases_compared": 3,
+    "constrained_calls": 0,
+    "counter_evidence_detected": "1/3",
+    "decisions_changed_by_model": 0,
+    "direction_reversal_attempts": 0,
+    "evidence_fidelity": "all cited ids resolve to supplied signals",
+    "interpretation": "This is a mechanism check on a tiny sample, not evidence about returns. The null hypothesis that the model does not improve decisions is not rejected by this report and is not testable at this sample size.",
+    "latency_ms": {
+      "max": 3179,
+      "min": 2484
+    },
+    "malformed_or_failed_calls": 0,
+    "model_abstentions": 0,
+    "tokens": {
+      "input": 1036,
+      "output": 257
+    }
+  },
+  "results": [
+    {
+      "action": "OPTIONS_POSITION",
+      "arm": "baseline",
+      "confidence": "0.6650",
+      "counter_evidence_ids": [
+        "sig-volatility-term"
+      ],
+      "direction": "bullish",
+      "evidence_ids": [
+        "sig-participation-breadth",
+        "sig-structure-trend-retest"
+      ],
+      "max_loss": "300.00",
+      "model_call": null,
+      "reason_codes": [],
+      "snapshot_id": "spy-qualified-2026-08-27",
+      "spread": "SPY260918C00640000/SPY260918C00645000",
+      "thesis_direction": "bullish"
+    },
+    {
+      "action": "OPTIONS_POSITION",
+      "arm": "model",
+      "confidence": "0.68",
+      "counter_evidence_ids": [
+        "sig-volatility-term"
+      ],
+      "direction": "bullish",
+      "evidence_ids": [
+        "sig-structure-trend-retest",
+        "sig-participation-breadth"
+      ],
+      "max_loss": "300.00",
+      "model_call": {
+        "input_hash": "sha256:d46df5019f65a2339bd4dc7504ddcf96c39c0702c6701ebe443d5a20e744340f",
+        "input_tokens": 528,
+        "latency_ms": 2484,
+        "model": "gpt-5.6-terra",
+        "output_schema_version": "thesis_memo.v1",
+        "output_tokens": 128,
+        "prompt_version": "thesis.v1",
+        "provider": "openai",
+        "reason_codes": [],
+        "status": "ok"
+      },
+      "reason_codes": [],
+      "snapshot_id": "spy-qualified-2026-08-27",
+      "spread": "SPY260918C00640000/SPY260918C00645000",
+      "thesis_direction": "bullish"
+    },
+    {
+      "action": "NO_TRADE",
+      "arm": "baseline",
+      "confidence": null,
+      "counter_evidence_ids": [],
+      "direction": "neutral",
+      "evidence_ids": [],
+      "max_loss": null,
+      "model_call": null,
+      "reason_codes": [
+        "no_qualified_setup"
+      ],
+      "snapshot_id": "spy-refusal-2026-08-27",
+      "spread": null,
+      "thesis_direction": null
+    },
+    {
+      "action": "NO_TRADE",
+      "arm": "model",
+      "confidence": null,
+      "counter_evidence_ids": [],
+      "direction": "neutral",
+      "evidence_ids": [],
+      "max_loss": null,
+      "model_call": null,
+      "reason_codes": [
+        "no_qualified_setup"
+      ],
+      "snapshot_id": "spy-refusal-2026-08-27",
+      "spread": null,
+      "thesis_direction": null
+    },
+    {
+      "action": "OPTIONS_POSITION",
+      "arm": "baseline",
+      "confidence": "0.7050",
+      "counter_evidence_ids": [],
+      "direction": "bullish",
+      "evidence_ids": [
+        "sig-structure-trend-retest",
+        "sig-volatility-regime"
+      ],
+      "max_loss": "343.00",
+      "model_call": null,
+      "reason_codes": [],
+      "snapshot_id": "spy-live-20260828T153310Z",
+      "spread": "SPY260911C00774000/SPY260911C00780000",
+      "thesis_direction": "bullish"
+    },
+    {
+      "action": "OPTIONS_POSITION",
+      "arm": "model",
+      "confidence": "0.69",
+      "counter_evidence_ids": [],
+      "direction": "bullish",
+      "evidence_ids": [
+        "sig-structure-trend-retest",
+        "sig-volatility-regime"
+      ],
+      "max_loss": "343.00",
+      "model_call": {
+        "input_hash": "sha256:f513d25532a5c28b61abfbbb9428b38f5d89f45f90efc74b84fbf363815851c5",
+        "input_tokens": 508,
+        "latency_ms": 3179,
+        "model": "gpt-5.6-terra",
+        "output_schema_version": "thesis_memo.v1",
+        "output_tokens": 129,
+        "prompt_version": "thesis.v1",
+        "provider": "openai",
+        "reason_codes": [],
+        "status": "ok"
+      },
+      "reason_codes": [],
+      "snapshot_id": "spy-live-20260828T153310Z",
+      "spread": "SPY260911C00774000/SPY260911C00780000",
+      "thesis_direction": "bullish"
+    }
+  ]
+}
