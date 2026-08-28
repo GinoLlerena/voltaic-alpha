@@ -72,8 +72,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:e9b8f5695b60ff8456554787bc59fd675f50c5c91f014359cf551b60e5aa0529"
     }
   },
-  "commit": "git:67e07555c651b5d5ce7028e76e643b97d9492693",
+  "commit": "git:16bac7589c76271d148a7b84f6884c9083bbe8bd",
   "freeze_digest": "sha256:96ea56ac7f9fad343625810302838dbdf1b41ae4c0dc7764d0c9bd44dee896d8",
-  "frozen_at": "2026-08-28T17:24:20.341833+00:00",
+  "frozen_at": "2026-08-28T17:51:23.791501+00:00",
   "manifest_version": "release_freeze.v1"
 }
