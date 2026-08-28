@@ -13,6 +13,14 @@ that. H0 runs on Alpaca Paper only, and no claim is made that the strategy has
 alpha or that the model improves decisions — a `NO_TRADE` refusal and a
 deterministic baseline beating the model are both valid results.
 
+## Try it
+
+```bash
+uv sync
+bash scripts/run_h0_validation.sh          # nine gates, clean checkout
+uv run streamlit run app.py                # the five judge views
+```
+
 ## Quick start
 
 ```bash
@@ -190,6 +198,32 @@ so they remain free and deterministic.
 - Whether one bounded revision is enough or creates unstable loops
 - What must be persisted for auditability
 - Which Alpaca fields will later be needed in the live-read adapter
+
+## The judge dashboard
+
+`app.py` serves five read-only views over the committed evidence in
+`demo/h0_demo.db`: mode and health with a live `NO_NEW_RISK` demonstration,
+evidence and the deterministic qualification, the bounded model memo, the
+approval and request hash lineage including the exact bytes sent to the broker,
+and the reconciled outcome or refusal.
+
+The dashboard has no control actions. It cannot start a run, approve an intent,
+or reach a broker, and a test parses `app.py` and fails if it so much as
+references the gateway. The surface a judge browses is not the surface that
+trades.
+
+## Results, including the unflattering ones
+
+One Paper MLeg lifecycle on account `PA3WZR22ITRR`: open filled at 3.13 against a
+3.39 limit, close at 3.06, reconciled to zero open positions. The round trip
+realized **-7.10** — the cost of crossing the spread twice on one contract.
+
+The model ablation over three frozen cases changed **zero** decisions.
+
+Both numbers are published rather than buried. The friction figure is the bar any
+real edge would have to clear, and an ablation that cannot return "no difference"
+is not measuring anything. See [`artifacts/h0_paper_lifecycle.md`](artifacts/h0_paper_lifecycle.md)
+and [`artifacts/ablation_h0.json`](artifacts/ablation_h0.json).
 
 ## Hackathon H0 direction
 

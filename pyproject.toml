@@ -65,6 +65,10 @@ ignore = ["S101"]
 # S310 is a deliberate design choice — the offline lab calls provider HTTPS
 # endpoints through stdlib urllib and adds no HTTP dependency.
 [tool.ruff.lint.per-file-ignores]
+# Release tooling shells out to git by name, which is how git is invoked
+# everywhere else in this repo. Pinning an absolute path would be less portable,
+# not more secure.
+"scripts/freeze_release.py" = ["S607"]
 "scripts/configure_secrets.py" = ["I001"]
 "src/options_alpha_lab/architecture/contracts.py" = ["UP042"]
 "src/options_alpha_lab/models.py" = ["UP042"]
