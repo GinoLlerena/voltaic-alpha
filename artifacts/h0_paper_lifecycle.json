@@ -1,0 +1,43 @@
+{
+  "recorded_at": "2026-08-28T15:50:00+00:00",
+  "account_number": "PA3WZR22ITRR",
+  "environment": "paper",
+  "snapshot_id": "spy-lifecycle-20260828T154747Z",
+  "decision_hash": "sha256:c418fac02a1464f6979e96666d1d4efc648c007260f7d1c340394cf0d54f1517",
+  "open": {
+    "intent_hash": "sha256:82f1b3334159eb8b9ab8689cd93356f0ef1123faa8fa210b2ad067ddeb28b20d",
+    "request_hash": "sha256:bf2e48de34539a20dbe76a651a9365331e23f51b7a1609d9408ec3c3c7fbb31f",
+    "client_order_id": "oa-82f1b3334159eb8b9ab8689cd933",
+    "broker_order_id": "reconciled",
+    "order_class": "mleg",
+    "status": "filled",
+    "qty": 1,
+    "limit_price": "3.39",
+    "filled_avg_price": "3.13",
+    "legs": [
+      {"symbol": "SPY260911C00772000", "side": "buy", "position_intent": "buy_to_open", "filled_qty": 1, "filled_avg_price": "6.90"},
+      {"symbol": "SPY260911C00778000", "side": "sell", "position_intent": "sell_to_open", "filled_qty": 1, "filled_avg_price": "3.77"}
+    ]
+  },
+  "close": {
+    "intent_hash": "sha256:82e515d1aa4f6fd6494f91e26a9b5cac2eaeb4f723734568db1d5bdd19cb57e9",
+    "request_hash": "sha256:e04d7181b35fb7ee6f9a8ca9cbe197fa785c7a90761f5c94bce3541be6ca31a1",
+    "client_order_id": "oa-82e515d1aa4f6fd6494f91e26a9b",
+    "order_class": "mleg",
+    "status": "filled",
+    "qty": 1,
+    "limit_price": "3.05",
+    "filled_avg_price": "3.06",
+    "legs": [
+      {"symbol": "SPY260911C00772000", "side": "sell", "position_intent": "sell_to_close", "filled_qty": 1, "filled_avg_price": "6.87"},
+      {"symbol": "SPY260911C00778000", "side": "buy", "position_intent": "buy_to_close", "filled_qty": 1, "filled_avg_price": "3.81"}
+    ]
+  },
+  "final_state": {
+    "open_positions": 0,
+    "equity_before": "100000.00",
+    "equity_after": "99992.90",
+    "realized": "-7.10",
+    "note": "Round-trip cost of crossing the spread twice on one contract. Not evidence of edge in either direction."
+  }
+}

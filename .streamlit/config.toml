@@ -1,0 +1,12 @@
+# Judge-facing deployment. The dashboard is read-only and holds no secrets:
+# it reads the committed evidence database at demo/h0_demo.db.
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
