@@ -58,7 +58,8 @@ step "6. Replay determinism"
 check "identical decision hashes across runs" deterministic_replay
 
 step "7. Evidence database"
-check "judge evidence database builds" quiet uv run python scripts/build_demo_db.py
+check "judge evidence database builds" \
+  quiet uv run python scripts/build_demo_db.py /tmp/oa_demo_check.db
 
 step "8. Secret scan"
 check "no secret in version control" secret_scan

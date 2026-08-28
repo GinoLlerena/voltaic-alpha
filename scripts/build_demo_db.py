@@ -30,7 +30,7 @@ from options_alpha_lab.persistence.models import (  # noqa: E402
 from options_alpha_lab.persistence.repository import build_engine, create_schema  # noqa: E402
 from options_alpha_lab.replay import replay_paths  # noqa: E402
 
-OUTPUT = Path("demo/h0_demo.db")
+DEFAULT_OUTPUT = Path("demo/h0_demo.db")
 FIXTURES = [
     Path("fixtures/h0/spy_qualified.snapshot.json"),
     Path("fixtures/h0/spy_refusal.snapshot.json"),
@@ -39,16 +39,20 @@ RECEIPT = Path("artifacts/h0_paper_lifecycle.json")
 
 
 def main() -> int:
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    if OUTPUT.exists():
-        OUTPUT.unlink()
+    # Validation must not rewrite the committed artifact: the rebuilt file
+    # differs by row ids and timestamps every run, which would leave the working
+    # tree permanently dirty and make the release freeze digest unstable.
+    output = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_OUTPUT
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        output.unlink()
 
     settings = load_settings(
         {
             "BOT_MODE": "observe",
             "ALPACA_PAPER_TRADE": "true",
             "ALPACA_TRADING_ENABLED": "false",
-            "DATABASE_URL": f"sqlite+pysqlite:///{OUTPUT}",
+            "DATABASE_URL": f"sqlite+pysqlite:///{output}",
         }
     )
     frozen = sorted(Path("fixtures/h0/frozen").glob("*.snapshot.json"))
@@ -147,7 +151,7 @@ def main() -> int:
                 )
         session.commit()
 
-    print(f"wrote {OUTPUT} ({OUTPUT.stat().st_size} bytes)")
+    print(f"wrote {output} ({output.stat().st_size} bytes)")
     return 0
 
 
