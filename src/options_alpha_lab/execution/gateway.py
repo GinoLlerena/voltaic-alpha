@@ -54,7 +54,7 @@ class SubmissionResult:
 
 
 class BrokerPort:
-    """The narrow surface the gateway needs. Implemented by alpaca-py in prod."""
+    """The narrow surface the gateway and reconciler need."""
 
     def submit(self, body: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
@@ -66,6 +66,15 @@ class BrokerPort:
         raise NotImplementedError
 
     def open_strategy_count(self) -> int:
+        raise NotImplementedError
+
+    # -- reconciliation reads ---------------------------------------------
+    def list_open_orders(self) -> list[dict[str, Any]]:
+        """Every order still working at the broker."""
+        raise NotImplementedError
+
+    def list_positions(self) -> list[dict[str, Any]]:
+        """Every position the broker believes we hold."""
         raise NotImplementedError
 
 
@@ -226,12 +235,19 @@ class AlpacaBroker(BrokerPort):
         return _as_dict(order) if order is not None else None
 
     def open_strategy_count(self) -> int:
+        return len(self.list_open_orders()) + len(self.list_positions())
+
+    def list_open_orders(self) -> list[dict[str, Any]]:
         from alpaca.trading.enums import QueryOrderStatus
         from alpaca.trading.requests import GetOrdersRequest
 
-        orders = self._client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN))
-        positions = self._client.get_all_positions()
-        return len(list(orders)) + len(list(positions))
+        orders = self._client.get_orders(
+            GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True)
+        )
+        return [_as_dict(order) for order in orders]
+
+    def list_positions(self) -> list[dict[str, Any]]:
+        return [_as_dict(position) for position in self._client.get_all_positions()]
 
 
 def _as_dict(obj: Any) -> dict[str, Any]:

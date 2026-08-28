@@ -271,5 +271,80 @@ class HelperTests(unittest.TestCase):
         self.assertIs(halt_state_for(stale), ExecutionState.NO_NEW_RISK)
 
 
+
+
+class ReconciliationHookTests(unittest.TestCase):
+    """Item 2: the agent reconciles at startup and on every tick."""
+
+    def build(self, broker_positions: list[dict[str, Any]] | None = None,
+              raises: Exception | None = None):
+        import tempfile
+        from pathlib import Path
+
+        from options_alpha_lab.execution.lifecycle import LifecycleStore
+        from options_alpha_lab.execution.reconcile import Reconciler
+        from options_alpha_lab.persistence.repository import build_engine, create_schema
+        from options_alpha_lab.replay import replay_paths
+        from test_reconcile import FakeBroker as ReconBroker
+
+        self._tmp = tempfile.TemporaryDirectory()
+        db = Path(self._tmp.name) / "a.db"
+        settings = load_settings(dict(WRITE_ENV, DATABASE_URL=f"sqlite+pysqlite:///{db}"))
+        engine = build_engine(settings)
+        create_schema(engine)
+        replay_paths([Path("fixtures/h0/spy_qualified.snapshot.json")], settings, create=False)
+        store = LifecycleStore(engine)
+        recon_broker = ReconBroker(positions=broker_positions or [], raises=raises)
+        exec_broker = FakeBroker()
+        gw = ExecutionGateway(exec_broker, settings, clock=lambda: NOW)
+        a = TradingAgent(
+            settings, client=FakeClient(), gateway=gw,  # type: ignore[arg-type]
+            reconciler=Reconciler(recon_broker, store),
+            clock=lambda: NOW, operator_approval="operator:test",
+        )
+        return a, exec_broker, store
+
+    def tearDown(self) -> None:
+        if hasattr(self, "_tmp"):
+            self._tmp.cleanup()
+
+    def test_startup_reconciles_before_any_entry(self) -> None:
+        agent_, _, _ = self.build()
+        report = agent_.startup()
+        assert report is not None
+        self.assertTrue(report.clean)
+        self.assertEqual(agent_.history[-1].action, "STARTUP_RECONCILE")
+
+    def test_unclaimed_broker_exposure_halts_entries(self) -> None:
+        agent_, broker, _ = self.build(
+            broker_positions=[{"symbol": "SPY260918P00600000", "qty": "-1"}]
+        )
+        result = agent_.tick()
+        self.assertEqual(result.action, "ENTRY_HALTED")
+        self.assertEqual(broker.submits, [], "no order may be placed while unreconciled")
+        self.assertIs(agent_.execution_state, ExecutionState.NO_NEW_RISK)
+
+    def test_an_unreachable_broker_halts_entries(self) -> None:
+        # Not knowing what we hold is not the same as holding nothing.
+        agent_, broker, _ = self.build(raises=ConnectionError("network down"))
+        result = agent_.tick()
+        self.assertEqual(result.action, "ENTRY_HALTED")
+        self.assertEqual(broker.submits, [])
+
+    def test_the_halt_reaches_the_gateway_not_just_the_agent(self) -> None:
+        agent_, _, _ = self.build(
+            broker_positions=[{"symbol": "SPY260918P00600000", "qty": "-1"}]
+        )
+        agent_.tick()
+        assert agent_.gateway is not None
+        self.assertIs(agent_.gateway.execution_state, ExecutionState.NO_NEW_RISK)
+
+    def test_a_clean_reconciliation_permits_an_entry(self) -> None:
+        agent_, broker, _ = self.build()
+        result = agent_.tick()
+        self.assertEqual(result.action, "POSITION_OPENED")
+        self.assertEqual(len(broker.submits), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -500,6 +500,12 @@ class LifecycleStore:
             row = session.get(Position, position_id)
             return self._to_managed(row) if row is not None else None
 
+    def client_order_id_for(self, order_id: str) -> str | None:
+        """The deterministic id an order was submitted under, for broker lookup."""
+        with self._session() as session:
+            order = session.get(BrokerOrder, order_id)
+            return order.client_order_id if order is not None else None
+
     def order_state(self, order_id: str) -> tuple[OrderState, int, Decimal | None]:
         with self._session() as session:
             order = session.get(BrokerOrder, order_id)

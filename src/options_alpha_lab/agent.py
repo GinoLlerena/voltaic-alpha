@@ -39,6 +39,7 @@ from .config import Settings
 from .evidence import build_snapshot, parse_occ_symbol
 from .execution.gateway import ExecutionGateway, ExecutionRefused
 from .execution.intent import OrderIntent, build_close_intent, build_open_intent
+from .execution.reconcile import Reconciler, ReconciliationReport
 from .execution.request import prepare_mleg_request
 from .exits import ExitDecision, ExitTrigger, PositionState, evaluate_exit
 from .providers.alpaca_readonly import ProviderError, ReadOnlyAlpacaClient
@@ -112,6 +113,7 @@ class TradingAgent:
         gateway: ExecutionGateway | None = None,
         synthesizer: Any = None,
         recorder: Any = None,
+        reconciler: Reconciler | None = None,
         symbol: str = "SPY",
         clock: Callable[[], datetime] | None = None,
         operator_approval: str | None = None,
@@ -121,12 +123,47 @@ class TradingAgent:
         self.gateway = gateway
         self.synthesizer = synthesizer
         self.recorder = recorder
+        self.reconciler = reconciler
         self.symbol = symbol
         self.operator_approval = operator_approval
         self._clock = clock or (lambda: datetime.now(UTC))
         self.open_position: OpenPosition | None = None
         self.history: list[TickResult] = []
         self.run_id: str | None = None
+        self.last_reconciliation: ReconciliationReport | None = None
+        #: Set by reconciliation. Entries are refused while this is not NORMAL.
+        self.execution_state: ExecutionState = ExecutionState.NORMAL
+
+    # -- reconciliation ----------------------------------------------------
+    def reconcile(self) -> ReconciliationReport | None:
+        """Compare durable records with the broker. Mismatches halt new risk.
+
+        Runs at startup and on every tick. A failure to *read* the broker halts
+        new risk too: not knowing what we hold is not the same as holding
+        nothing.
+        """
+        if self.reconciler is None:
+            return None
+        report = self.reconciler.reconcile(run_id=self.run_id, now=self._clock())
+        self.last_reconciliation = report
+        self.execution_state = report.execution_state
+        if self.gateway is not None:
+            # The gateway is the thing that must actually refuse.
+            self.gateway.execution_state = report.execution_state
+        return report
+
+    def startup(self) -> ReconciliationReport | None:
+        """Reconcile before the agent is allowed to consider any new risk."""
+        report = self.reconcile()
+        if report is not None:
+            self._record(
+                TickResult(
+                    self._clock(),
+                    "STARTUP_RECONCILE" if report.clean else "STARTUP_HALTED",
+                    report.summary(),
+                )
+            )
+        return report
 
     # -- observation -------------------------------------------------------
     def observe(self) -> tuple[DecisionSnapshot, bool]:
@@ -179,9 +216,36 @@ class TradingAgent:
         if not market_open:
             return self._record(TickResult(now, "MARKET_CLOSED", "no action taken"))
 
+        # Reconcile before deciding anything. Stale beliefs about what we hold
+        # are the failure this whole cycle exists to prevent.
+        report = self.reconcile()
+
         # Exits before entries, always.
         if self.open_position is not None:
             return self._record(self._manage_open_position(snapshot, now))
+
+        if report is not None and not report.clean:
+            # New risk is halted, but management above still ran: a mismatch
+            # must not also stop us managing what we may still own.
+            return self._record(
+                TickResult(now, "ENTRY_HALTED", report.summary(), snapshot.snapshot_id)
+            )
+
+        # Data quality governs the halt state too (EXIT-010).
+        data_state = halt_state_for(snapshot)
+        if data_state is not ExecutionState.NORMAL:
+            self.execution_state = data_state
+            if self.gateway is not None:
+                self.gateway.execution_state = data_state
+            return self._record(
+                TickResult(
+                    now,
+                    "ENTRY_HALTED",
+                    "unusable observation: "
+                    + ", ".join(snapshot.data_quality.reason_codes[:3]),
+                    snapshot.snapshot_id,
+                )
+            )
 
         return self._record(self._consider_entry(snapshot, now))
 
