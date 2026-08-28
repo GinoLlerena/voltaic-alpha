@@ -5,6 +5,7 @@
       "scripts/build_demo_db.py": "sha256:ee9402137a67745bdf9c9dd0c80b517cceb5c7de2fa359d643935c713a4ca59a",
       "scripts/check_no_write_path.py": "sha256:68b793642499883e7014a50f089a46dfa777988164ebef63fe8c92fe28aa968b",
       "scripts/configure_secrets.py": "sha256:6c70749aa83394d9d2260226948629cd6e1ed450771c275e37a035dd287af4e5",
+      "scripts/freeze_release.py": "sha256:965beafc2fb7d99de2f9ace5e475ab017745ba4b7fabd83a3b8bd14c3d0cc7e1",
       "scripts/run_h0_validation.sh": "sha256:81fa5392aed5d663662d9eb0a74e8b5f6c2e882de949c6fd067aca0ffc58c304",
       "src/options_alpha_lab/__init__.py": "sha256:dbcf1d6180ae5bd78b04786746c7f7735dd043e738aaab2bef618392a30d2e67",
       "src/options_alpha_lab/ablation.py": "sha256:4cfd94544f0e0b6a56210c6f6adeba1c7efa749c52bd41b10f1ef760cb95482d",
@@ -49,7 +50,7 @@
     },
     "demo_data": {
       "artifacts/h0_paper_lifecycle.json": "sha256:c249819185ff00a9576197636b21ad71ce4940be73e2d1349a50488d5d4ddbef",
-      "demo/h0_demo.db": "sha256:1ca59e03ed3ffa6110583cf21d7e06d92fb43a656e9f3ce9023e5b61928de58c",
+      "demo/h0_demo.db": "sha256:e648032b08dbabf66f7ded8298b2b2ef612336e69a081b0d308c7f40e108637e",
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.manifest.json": "sha256:85e8caabc8db2d429cec58b1b5d0ac215d34c039bba639a9c8a30d5dfe5851e4",
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.snapshot.json": "sha256:539315f147b2e20485f393e407264a7fb8a2e891d6e87b7042dd023d08af6625",
       "fixtures/h0/frozen/spy-live-20260828T153310Z.manifest.json": "sha256:b6c78a041173ae637a723c7eccb23451a48a110629ca01d8d06d98c2b5c3f925",
@@ -69,8 +70,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:e9b8f5695b60ff8456554787bc59fd675f50c5c91f014359cf551b60e5aa0529"
     }
   },
-  "commit": "1bf6acd6ea8e949e37ee0ee138ad8700d2f9d76e",
-  "freeze_digest": "sha256:0a182e6d490f7fb1240b3cacc614ad08810845fe9b35108cc32b441d91a1bfad",
-  "frozen_at": "2026-08-28T15:57:27.316900+00:00",
+  "commit": "bbf4597f6034e23d304335bc0ea7e67cad9f7bfe",
+  "freeze_digest": "sha256:ace887458fcfd83666e0d00474be23f88ffd686d573a75e69864d4cf85ab384b",
+  "frozen_at": "2026-08-28T15:59:18.663843+00:00",
   "manifest_version": "release_freeze.v1"
 }
