@@ -53,7 +53,11 @@ def main() -> int:
     manifest: dict[str, object] = {
         "manifest_version": "release_freeze.v1",
         "frozen_at": datetime.now(UTC).isoformat(),
-        "commit": subprocess.run(
+        # Prefixed, like every digest in this file. A bare 40-character hex
+        # string reads as a high-entropy secret to a scanner, and since it
+        # changes on every freeze it would fail the scan forever.
+        "commit": "git:"
+        + subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
         ).stdout.strip(),
         "categories": {},
