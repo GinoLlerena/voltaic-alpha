@@ -53,7 +53,8 @@ DEVELOPER_INSTRUCTIONS = (
     "supplied signal ids. Never invent an id, a number, or a fact that is not in "
     "the supplied evidence.\n"
     "3. Identify genuine counter-evidence. A memo that lists only supporting "
-    "evidence is a worse memo, not a more confident one.\n"
+    "evidence is a worse memo, not a more confident one. A signal id must not "
+    "appear in both evidence_ids and counter_evidence_ids: decide which it is.\n"
     "4. confidence is your assessment of the evidence, between 0 and 1. It is not "
     "a probability of profit and it does not size anything.\n"
     "5. Do not give investment advice, price targets, or recommendations."
@@ -237,6 +238,18 @@ class BoundedThesisSynthesizer:
             direction = Direction.NEUTRAL
             evidence = tuple(x for x in evidence if x in known_ids)
             counter = tuple(x for x in counter if x in known_ids)
+
+        # A signal cannot be both aligned evidence and counter-evidence. Observed
+        # live: the model cited the structure signal as support and then listed
+        # "the separation is modest" against it. Defensible as prose, incoherent
+        # as structured data, and it renders as the same id in both columns of
+        # the judge's view. The overlap is stripped from counter-evidence, since
+        # the deterministic setup already qualified on that signal, and recorded
+        # so the ablation can count how often it happens.
+        overlap = tuple(sorted(set(evidence) & set(counter)))
+        if overlap:
+            reasons.append("evidence_and_counter_evidence_overlap")
+            counter = tuple(x for x in counter if x not in set(evidence))
 
         try:
             confidence = Decimal(str(generated.get("confidence", 0)))

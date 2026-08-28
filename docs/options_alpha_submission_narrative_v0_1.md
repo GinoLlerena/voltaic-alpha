@@ -37,7 +37,7 @@ tests still pass; an absence cannot be bypassed at all.
 
 ## 3. What actually ran
 
-- Live read path against Alpaca Paper `PA3WZR22ITRR`: account, clock, 277 `sip`
+- Live read path against a verified, redacted Alpaca Paper account: account, clock, 277 `sip`
   daily bars, a 5-page option chain, each with provider, feed, source time,
   receipt time, page count, and payload hash.
 - One qualified SPY case and one refusal, replayed to identical decision hashes.

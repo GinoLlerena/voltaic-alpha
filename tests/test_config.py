@@ -91,5 +91,44 @@ class ConfigurationTests(unittest.TestCase):
             settings.require_allowed_strategy(strategy)
 
 
+
+
+class EnvPrecedenceTests(unittest.TestCase):
+    """The process environment must override .env, or an override silently no-ops."""
+
+    def test_process_environment_wins_over_the_file(self) -> None:
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from options_alpha_lab.config import load_env_file, resolved_env
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env"
+            path.write_text('OPENAI_MODEL="from-file"\nONLY_IN_FILE=yes\n', encoding="utf-8")
+            self.assertEqual(load_env_file(path)["OPENAI_MODEL"], "from-file")
+
+            os.environ["OPENAI_MODEL"] = "from-process"
+            try:
+                merged = resolved_env(path)
+                self.assertEqual(merged["OPENAI_MODEL"], "from-process")
+                # Values only present in the file still come through.
+                self.assertEqual(merged["ONLY_IN_FILE"], "yes")
+            finally:
+                del os.environ["OPENAI_MODEL"]
+
+    def test_quotes_are_stripped_from_file_values(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from options_alpha_lab.config import load_env_file
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ".env"
+            path.write_text("A=\"quoted\"\nB='single'\nC=bare\n", encoding="utf-8")
+            values = load_env_file(path)
+        self.assertEqual(values, {"A": "quoted", "B": "single", "C": "bare"})
+
+
 if __name__ == "__main__":
     unittest.main()

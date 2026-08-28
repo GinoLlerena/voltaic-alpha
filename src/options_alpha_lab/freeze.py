@@ -17,7 +17,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from .config import load_env_file
+from .config import resolved_env
 from .evidence import EvidenceError, build_snapshot
 from .hashing import payload_hash
 from .providers.alpaca_readonly import ProviderError, ProviderRead, ReadOnlyAlpacaClient
@@ -60,7 +60,7 @@ def freeze(
     label: str | None = None,
     env_path: str = ".env",
 ) -> tuple[Path, Path]:
-    env = load_env_file(env_path)
+    env = resolved_env(env_path)
     api_key = env.get("ALPACA_API_KEY", "")
     secret_key = env.get("ALPACA_SECRET_KEY", "")
 

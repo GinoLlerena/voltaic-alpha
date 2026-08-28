@@ -6,8 +6,8 @@
 
 | **Document**          | **Value**                                                          |
 |-----------------------|--------------------------------------------------------------------|
-| Version               | 0.1.2 — adversarial scope review incorporated                      |
-| Date                  | 27 August 2026                                                     |
+| Version               | 0.1.3 — exit lifecycle review incorporated                        |
+| Date                  | 28 August 2026                                                     |
 | Target category       | Options Alpha Agents                                               |
 | Operating environment | Alpaca paper trading during the hackathon                          |
 | Primary horizon       | Directional swing trades held intraday to ~3 sessions              |
@@ -468,6 +468,16 @@ Entry is only half of the system. Each open trade retains the original thesis, i
 - Use a time stop around the intended 1–3 session horizon.
 
 - Avoid carrying very short-dated spreads into expiration merely to seek the final few percentage points of maximum profit.
+
+## 15.2 H0 operational disposition
+
+The current code implements provisional trigger arithmetic, but it does **not** yet validate the complete autonomous position lifecycle. The governing adversarial assessment is the [Exit Policy and Position-Lifecycle Review v0.1](./options_alpha_exit_policy_review_v0_1.md).
+
+For H0, the candidate policy separates broker integrity from economic exits. Reconciliation mismatch, unexpected or partial exposure, and ambiguous close state are handled first as incidents; the agent retains responsibility until Alpaca confirms the remaining filled quantity or flat state. Economic precedence is then expiry/calendar safety, scheduled-event control, typed completed-session thesis invalidation, a loss cap calculated from actual filled debit, a three-completed-session time stop, and profit capture calculated from actual fill. Missing option value is an integrity condition that halts new risk, not `HOLD` and not a reason to suppress independent exit rules.
+
+The provisional values—7-DTE expiry guard, 50% of filled debit loss threshold, three completed trading sessions, and 60% of maximum spread gain—are candidate H0 parameters. They are not optimized values and remain subject to Trading-owner approval and replay/sensitivity evidence. Conviction decay remains diagnostic rather than an automatic H0 broker trigger until a deterministic maintenance score is defined and validated.
+
+An order may be described as opened or closed only after filled strategy quantity and broker position reconcile. Broker acceptance alone is `SUBMITTED`; process-local state alone is not position ownership. Autonomous entry stays disabled until the exit review's acceptance matrix is satisfied.
 
 # 16. Agent responsibilities
 

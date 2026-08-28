@@ -23,7 +23,7 @@ from .components import (
     DeterministicSetupClassifier,
     DeterministicSpreadSelector,
 )
-from .config import ConfigurationError, Settings, load_env_file, load_settings
+from .config import ConfigurationError, Settings, load_settings, resolved_env
 from .persistence.repository import DecisionRecorder, RecordedDecision, build_engine, create_schema
 from .snapshot_io import load_snapshot
 
@@ -177,7 +177,7 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
     if args.arm == "model":
         from .providers.openai_thesis import BoundedThesisSynthesizer, OpenAIResponsesTransport
 
-        env = load_env_file(".env")
+        env = resolved_env()
         api_key = env.get("OPENAI_API_KEY", "")
         if not api_key:
             print("OPENAI_API_KEY is not set; cannot run the model arm", file=sys.stderr)

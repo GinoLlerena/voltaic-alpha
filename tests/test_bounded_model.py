@@ -226,10 +226,41 @@ class BoundedOutputTests(unittest.TestCase):
         )
         self.assertIs(thesis.direction, Direction.NEUTRAL)
 
-    def test_counter_evidence_is_preserved(self) -> None:
+    def test_a_signal_cannot_be_both_evidence_and_counter_evidence(self) -> None:
+        # Observed live: the model cited the structure signal as support and as a
+        # contradiction in the same memo.
+        snap = snapshot()
+        synth = self.synth(
+            ScriptedTransport(
+                good_memo(
+                    evidence_ids=["sig-structure", "sig-vol"],
+                    counter_evidence_ids=["sig-structure"],
+                )
+            )
+        )
+        thesis = synth.synthesize(snap, setup_for(snap))
+        self.assertEqual(thesis.counter_evidence_ids, ())
+        self.assertEqual(thesis.evidence_ids, ("sig-structure", "sig-vol"))
+        assert synth.last_call is not None
+        self.assertIn("evidence_and_counter_evidence_overlap", synth.last_call.reason_codes)
+
+    def test_genuine_counter_evidence_survives_the_overlap_check(self) -> None:
         snap = snapshot()
         thesis = self.synth(
-            ScriptedTransport(good_memo(counter_evidence_ids=["sig-vol"]))
+            ScriptedTransport(
+                good_memo(evidence_ids=["sig-structure"], counter_evidence_ids=["sig-vol"])
+            )
+        ).synthesize(snap, setup_for(snap))
+        self.assertEqual(thesis.counter_evidence_ids, ("sig-vol",))
+
+    def test_counter_evidence_is_preserved(self) -> None:
+        # Non-overlapping ids: this fixture previously listed sig-vol as both
+        # evidence and counter-evidence, which the coherence rule now rejects.
+        snap = snapshot()
+        thesis = self.synth(
+            ScriptedTransport(
+                good_memo(evidence_ids=["sig-structure"], counter_evidence_ids=["sig-vol"])
+            )
         ).synthesize(snap, setup_for(snap))
         self.assertEqual(thesis.counter_evidence_ids, ("sig-vol",))
 

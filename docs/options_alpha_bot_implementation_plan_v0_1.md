@@ -6,14 +6,15 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.1.5 |
-| Date | 27 August 2026 |
+| Version | 0.1.6 |
+| Date | 28 August 2026 |
 | Status | Active hackathon vertical-slice plan; adversarial scope review incorporated |
 | Trading environment | Alpaca Paper only during the hackathon |
 | Default LLM | `gpt-5.6-terra` through the OpenAI Responses API |
 | Primary design | [Trading System Design Specification](./options_alpha_trading_design_v0_1.md) |
 | Requirement tracker | [Requirements Traceability Matrix](./options_alpha_requirements_traceability_v0_1.md) |
 | Executable architecture | [Architecture Slice v0.1](./options_alpha_architecture_slice_v0_1.md) |
+| Exit review | [Exit Policy and Position-Lifecycle Review v0.1](./options_alpha_exit_policy_review_v0_1.md) |
 | External review | Claims are preserved in Section 3.2 as advisory dispositions; the named source artifact is not present in this repository and cannot serve as release evidence |
 | Alpaca skill review | [Alpaca Trading API skills](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api), advisory patterns only; no runtime skill installed |
 
@@ -456,9 +457,11 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 - Submit one minimal Paper open/close lifecycle through `alpaca-py` only after dry-run review.
 - Test client-ID lookup and reconciliation after one simulated ambiguous response or restart.
 
-**Exit gate:** duplicate or ambiguous requests cannot create a second strategy, and local state reconciles with Alpaca before another entry is possible.
+**Execution-transport sub-gate:** exact MLeg mapping, write-time Paper/authority guards, deterministic client IDs, ambiguous-submit lookup, and one manually reconciled Paper open/close lifecycle are demonstrated.
 
-**Status: `COMPLETE`, 28 August 2026.** One Paper MLeg lifecycle filled and reconciled to flat; see `artifacts/h0_paper_lifecycle.md`. Six guards run immediately before every write rather than at startup, because the interesting failures develop between the two. The Paper-endpoint guard proved itself in practice by refusing a real submission when `resolved_endpoint` returned an enum member name instead of a URL.
+**Autonomous position-lifecycle sub-gate:** an entry becomes open only from reconciled fills; actual fill quantity and net debit become the exit basis; pending, partial, open, closing, and flat states are durable; restart reconstructs broker exposure; a close remains owned until fills reconcile; and trigger/precedence tests cover missing data, sessions, events, and bounded close replacement.
+
+**Status: `PARTIAL`, 28 August 2026.** The execution-transport sub-gate is complete: one manual Paper MLeg lifecycle filled and reconciled to flat; see `artifacts/h0_paper_lifecycle.md`. The autonomous sub-gate is not complete. `TradingAgent` currently turns an unreconciled accepted entry into `POSITION_OPENED`, stores estimated rather than filled debit in process memory, and turns an accepted close into `POSITION_CLOSED` before fill reconciliation. Restart reconstruction is absent. Numerical exit evaluation and tests exist, but those do not establish durable position ownership. Remediation and acceptance evidence are defined in the [exit review](./options_alpha_exit_policy_review_v0_1.md).
 
 ### Phase 5: Five-view judge experience - 1 day
 
@@ -699,11 +702,15 @@ Record changes to architecture or scope here and mirror requirement changes in t
 | 2026-08-28 | Execute through the Alpaca Trading API and drop MCP from the H0 runtime | No published event material makes any Alpaca interface mandatory. A deterministic `alpaca-py` gateway is the project's central claim: execution authority stays in code that no model-reachable tool can touch. MCP remains available as a local read-only testing aid that contributes no decision input | `HK-006`, `CLR-018`, `DEC-002`, `RISK-014`, `RISK-019` |
 | 2026-08-28 | Retire fallback `F-01` on the confirmed deadline of 4 September 2026 15:00 UTC | The live dashboard states the cutoff verbatim; the conservative fallback returned 3 September as a full build day, and the six-hour manual-submission window stays an emergency backstop rather than schedule | `HK-001`, `CLR-002` |
 | 2026-08-28 | Treat the demo host as a constrained decision (`D-01`) rather than an open one | The platform mandates Streamlit, Replit, or Vercel, and none hosts an always-on Python worker well; the judge views and the decision worker can no longer be assumed to share a runtime | `HK-009`, `HK-011`, `DEC-005`, `OPS-004`, `SRC-UI` |
+| 2026-08-28 | Treat a signal cited as both evidence and counter-evidence as a constraint violation | Observed live. It is defensible as prose and incoherent as structured data, and it renders the same id in both columns of the judge's view. Stripped from counter-evidence and recorded, rather than abstaining, because it is a coherence fault and not a safety one: counter-evidence reaches no decision | `AI-005`, `CLR-008`, `QA-005` |
+| 2026-08-28 | Let the process environment override .env | Reading the file alone meant `OPENAI_MODEL=... command` silently did nothing, which looks like the override was applied. An override that no-ops is worse than one that is unavailable | `OPS-013`, `QA-002` |
 | 2026-08-28 | Freeze exit rules before enabling any autonomous entry | Without them an agent opens positions it has no logic to close, and a stuck position also blocks every future entry through the one-open-strategy guard. That is a worse failure than never opening one | `CLR-020`, `RISK-022`, `OPS-008` |
-| 2026-08-28 | Rank "value could not be measured" above the profit and loss rules | Not knowing what a position is worth is a reason to raise it for review, not a reason to hold. "We could not measure it" and "it is fine" are different answers and must not share a code path | `CLR-020`, `DATA-011`, `RISK-004` |
+| 2026-08-28 | Treat "value could not be measured" as an integrity incident, not an economic exit or hold decision | Missing option value must be visible and halt new risk, but it must not suppress independent expiry, event, structural-invalidation, or broker-exposure checks. "We could not measure it" and "it is fine" are different answers | `CLR-020`, `DATA-011`, `RISK-004`, `OPS-005` |
 | 2026-08-28 | Exempt risk-reducing closes from the approval, halt, and one-strategy guards | Those guards exist to stop new risk. Applied to a close they would trap exposure: a sleeping operator, a halt raised by stale data, or the position's own strategy slot would each prevent an exit. `FREEZE_ALL_WRITES` still blocks everything, which is why it raises an incident | `RISK-017`, `RISK-022`, `OPS-008` |
 | 2026-08-28 | Derive the client order id from the intent hash instead of generating one | Idempotency has to be a property of the approved intent, not of a retry helper. The same intent can only ever produce the same id, so a duplicate submit collides at the broker instead of opening a second strategy | `RISK-018`, `RISK-020`, `QA-009` |
 | 2026-08-28 | Resolve an ambiguous submit by client-id lookup and never by re-submitting | Re-submitting is how duplicates are created. If the lookup finds nothing, the gateway refuses rather than assuming the order was lost | `RISK-020`, `RISK-021`, `OPS-005`, `QA-010` |
+| 2026-08-28 | Treat broker acceptance as submitted, never as opened or closed | Acceptance does not establish filled strategy quantity or economic basis. Entry and exit state transitions must be derived from reconciled fills and broker positions | `RISK-020`, `RISK-021`, `OPS-002`, `OPS-003`, `OPS-005`, `QA-010` |
+| 2026-08-28 | Reconstruct every managed strategy from durable records and broker state before the autonomous cycle may open risk | A process-local object disappears on restart and can leave a real Paper position unmanaged even when the broker correctly blocks a second entry | `RISK-017`, `RISK-021`, `OPS-001` to `OPS-005`, `QA-010` |
 | 2026-08-28 | Verify the Paper endpoint from the client about to be used, not from the environment variable that configured it | Those two can disagree, and only one of them is what the bytes will actually reach | `RISK-015`, `RISK-016` |
 | 2026-08-28 | Never show the model the invalidation conditions, rather than validating that it preserved them | A check can be removed; an absence cannot be bypassed. The model has no field for invalidation and never sees the text, so there is no path by which a memo could soften a stop | `CLR-008`, `AI-005`, `RISK-003` |
 | 2026-08-28 | Coerce a direction reversal to abstention and record it, rather than rejecting the call | An abstention is a safe, meaningful outcome and keeps the trace intact; a hard rejection would discard the evidence that the model tried | `CLR-008`, `AI-008`, `AI-010` |
@@ -717,10 +724,10 @@ Record changes to architecture or scope here and mirror requirement changes in t
 
 ## 17. Immediate next actions
 
-1. Record the newly verified public event facts and confirm only the remaining account, code-eligibility, autonomy, exact-deadline, and sponsor-interface questions.
-2. Freeze the H0 SPY trend/retest and vertical-debit-spread cut line before adding capability.
-3. Add one SPY qualified fixture and one refusal fixture with separate oracles, then make both persist through the production workflow.
-4. Implement the read-only SPY data path and deterministic baseline before the production LLM adapter.
-5. Run the deterministic-versus-LLM ablation before claiming that the model adds decision value.
-6. Correct configuration verification, define the confidential export boundary, and complete exact-request/idempotency/reconciliation proof before enabling any Paper write.
-7. Stop adding scope when the H0 hosted demo and submission artifacts need integration time.
+1. Keep autonomous Paper entry disabled until `EXIT-AC-01` through `EXIT-AC-13` in the [exit review](./options_alpha_exit_policy_review_v0_1.md) are disposed and the applicable H0 evidence passes.
+2. Implement durable pending/open/closing/flat strategy state from reconciled broker fills and positions; reconstruct it before the first post-restart decision.
+3. Replace free-text invalidation extraction and the DTE time stop with typed completed-session rules; ensure missing premium data cannot suppress independent exits.
+4. Add bounded close submit/replace/cancel/reconcile behavior and retain responsibility for every remaining filled unit until Alpaca confirms flat.
+5. Run threshold replay/sensitivity analysis, record the Trading owner's decision, and close `DEC-008` only if the evidence supports the selected provisional values.
+6. Re-run the full validation and one autonomous Paper lifecycle with a forced restart before representing `CLR-020`, `OPS-005`, Phase 4, or `G2` as complete.
+7. Keep the valid manual MLeg transport evidence and submission artifacts; do not broaden H0 strategy scope while lifecycle remediation is open.

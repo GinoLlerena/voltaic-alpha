@@ -16,7 +16,7 @@ from decimal import Decimal
 from typing import Any
 
 from .architecture.contracts import DecisionAction
-from .config import ConfigurationError, load_env_file, load_settings
+from .config import ConfigurationError, load_settings, resolved_env
 from .execution.gateway import AlpacaBroker, ExecutionGateway, ExecutionRefused
 from .execution.intent import build_close_intent, build_open_intent
 from .execution.request import prepare_mleg_request
@@ -50,7 +50,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--database-url", default=None)
     args = parser.parse_args(argv)
 
-    env = dict(load_env_file(".env"))
+    env = dict(resolved_env())
     env.setdefault("DATABASE_URL", "sqlite+pysqlite:///lifecycle.db")
     env["BOT_MODE"] = "paper_execute" if args.submit else "observe"
     if args.submit:

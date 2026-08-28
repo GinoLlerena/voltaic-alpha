@@ -374,7 +374,7 @@ def main(argv: Any = None) -> int:
     import argparse
     import sys
 
-    from .config import ConfigurationError, load_env_file, load_settings
+    from .config import ConfigurationError, load_settings, resolved_env
     from .persistence.repository import DecisionRecorder, build_engine, create_schema
 
     parser = argparse.ArgumentParser(
@@ -396,7 +396,7 @@ def main(argv: Any = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    env = dict(load_env_file(".env"))
+    env = dict(resolved_env())
     env["BOT_MODE"] = args.mode
     if args.mode != BotMode.PAPER_EXECUTE.value:
         # Write authority cannot exist outside paper_execute; make that explicit

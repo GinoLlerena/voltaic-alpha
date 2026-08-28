@@ -106,6 +106,19 @@ def load_env_file(path: str | Path = ".env") -> dict[str, str]:
     return values
 
 
+def resolved_env(path: str | Path = ".env") -> dict[str, str]:
+    """`.env` values overlaid by the process environment.
+
+    The process environment wins, which is the conventional dotenv precedence and
+    the only way an operator can override a value for one run without editing a
+    file. Reading the file alone silently ignored `OPENAI_MODEL=... command`,
+    which looked like the override had been applied when it had not.
+    """
+    merged = load_env_file(path)
+    merged.update({key: value for key, value in os.environ.items() if value})
+    return merged
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Build settings from the environment, refusing every unsafe combination."""
     source: Mapping[str, str] = os.environ if env is None else env

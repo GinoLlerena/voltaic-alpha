@@ -205,9 +205,8 @@ so they remain free and deterministic.
 # Full decision cycle against live data, writes disabled
 uv run python -m options_alpha_lab.agent --mode recommend --ticks 1
 
-# Paper writes, still refused without an explicit operator approval
-uv run python -m options_alpha_lab.agent --mode paper_execute --ticks 1
-uv run python -m options_alpha_lab.agent --mode paper_execute --ticks 0 --approve "operator:you"
+# Paper-write configuration exists, but autonomous entry is not release-approved.
+# Do not enable it until the exit-lifecycle acceptance matrix passes.
 ```
 
 Each tick observes, then **manages the open position before considering a new
@@ -219,9 +218,16 @@ an explicit `--approve` token whenever `REQUIRE_OPERATOR_APPROVAL` is set. Close
 are deliberately exempt: blocking an exit traps exposure at the moment it most
 needs reducing.
 
-Exit rules and their precedence are frozen in `exits.py` — expiry guard, then
-unmeasurable-value review, then stop loss, invalidation breach, profit capture,
-and time stop. The precedence is declared as data so a test can assert it.
+**Current safety status:** keep autonomous Paper entry disabled. The manual MLeg
+transport lifecycle is valid evidence, but the agent currently treats broker
+acceptance as opened or closed before fill reconciliation and keeps its managed
+position only in process memory. A restart can therefore lose exit ownership.
+
+`exits.py` contains provisional expiry, missing-value, stop-loss, invalidation,
+profit-capture, and DTE rules with testable precedence. Those rules are not yet
+an approved exit policy. The required lifecycle remediation and acceptance
+tests are in the
+[Exit Policy and Position-Lifecycle Review](docs/options_alpha_exit_policy_review_v0_1.md).
 
 ## The judge dashboard
 

@@ -1,6 +1,6 @@
 {
   "cases": 5,
-  "generated_at": "2026-08-28T17:19:01.813290+00:00",
+  "generated_at": "2026-08-28T19:29:58.948978+00:00",
   "metrics": {
     "action_agreement": "5/5",
     "cases_compared": 5,
@@ -11,14 +11,14 @@
     "evidence_fidelity": "all cited ids resolve to supplied signals",
     "interpretation": "This is a mechanism check on a tiny sample, not evidence about returns. The null hypothesis that the model does not improve decisions is not rejected by this report and is not testable at this sample size.",
     "latency_ms": {
-      "max": 5764,
-      "min": 2371
+      "max": 3553,
+      "min": 2198
     },
     "malformed_or_failed_calls": 0,
     "model_abstentions": 0,
     "tokens": {
-      "input": 2074,
-      "output": 506
+      "input": 2158,
+      "output": 511
     }
   },
   "results": [
@@ -44,7 +44,7 @@
     {
       "action": "OPTIONS_POSITION",
       "arm": "model",
-      "confidence": "0.69",
+      "confidence": "0.68",
       "counter_evidence_ids": [
         "sig-volatility-term"
       ],
@@ -56,11 +56,11 @@
       "max_loss": "300.00",
       "model_call": {
         "input_hash": "sha256:d46df5019f65a2339bd4dc7504ddcf96c39c0702c6701ebe443d5a20e744340f",
-        "input_tokens": 528,
-        "latency_ms": 5764,
+        "input_tokens": 549,
+        "latency_ms": 3553,
         "model": "gpt-5.6-terra",
         "output_schema_version": "thesis_memo.v1",
-        "output_tokens": 127,
+        "output_tokens": 128,
         "prompt_version": "thesis.v1",
         "provider": "openai",
         "reason_codes": [],
@@ -105,11 +105,11 @@
       "max_loss": "540.00",
       "model_call": {
         "input_hash": "sha256:55e087f06441df4acc4f510855289cb4ff80f27f58bc1585a2ac6863ca4ba843",
-        "input_tokens": 530,
-        "latency_ms": 3206,
+        "input_tokens": 551,
+        "latency_ms": 2689,
         "model": "gpt-5.6-terra",
         "output_schema_version": "thesis_memo.v1",
-        "output_tokens": 138,
+        "output_tokens": 139,
         "prompt_version": "thesis.v1",
         "provider": "openai",
         "reason_codes": [],
@@ -182,11 +182,11 @@
       "max_loss": "339.00",
       "model_call": {
         "input_hash": "sha256:aa8853baebea84d31d3c8298412c05d30602eab90e210a27bda1ecafda64ebec",
-        "input_tokens": 508,
-        "latency_ms": 3174,
+        "input_tokens": 529,
+        "latency_ms": 2967,
         "model": "gpt-5.6-terra",
         "output_schema_version": "thesis_memo.v1",
-        "output_tokens": 121,
+        "output_tokens": 124,
         "prompt_version": "thesis.v1",
         "provider": "openai",
         "reason_codes": [],
@@ -227,8 +227,8 @@
       "max_loss": "343.00",
       "model_call": {
         "input_hash": "sha256:f513d25532a5c28b61abfbbb9428b38f5d89f45f90efc74b84fbf363815851c5",
-        "input_tokens": 508,
-        "latency_ms": 2371,
+        "input_tokens": 529,
+        "latency_ms": 2198,
         "model": "gpt-5.6-terra",
         "output_schema_version": "thesis_memo.v1",
         "output_tokens": 120,

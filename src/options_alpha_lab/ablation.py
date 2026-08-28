@@ -28,7 +28,7 @@ from .components import (
     DeterministicSetupClassifier,
     DeterministicSpreadSelector,
 )
-from .config import load_env_file
+from .config import resolved_env
 from .providers.openai_thesis import (
     BoundedThesisSynthesizer,
     ModelCall,
@@ -222,7 +222,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--output", default=None, type=Path, help="Write the JSON report here")
     args = parser.parse_args(argv)
 
-    env = load_env_file(".env")
+    env = resolved_env()
     api_key = env.get("OPENAI_API_KEY", "")
     if not api_key:
         print("OPENAI_API_KEY is not set; cannot run the model arm", file=sys.stderr)
