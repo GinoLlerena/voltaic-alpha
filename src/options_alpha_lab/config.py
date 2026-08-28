@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from .architecture.contracts import BotMode, SpreadStrategy
 
@@ -80,6 +81,29 @@ class Settings:
     def require_allowed_strategy(self, strategy: SpreadStrategy) -> None:
         if strategy not in self.allowed_strategies:
             raise ConfigurationError(f"{strategy.value} is outside the H0 structure allowlist")
+
+
+def load_env_file(path: str | Path = ".env") -> dict[str, str]:
+    """Parse a ``.env`` file into a mapping.
+
+    Values may be quote-wrapped by ``scripts/configure_secrets.py``. The quotes
+    are not part of the value: a quoted API key authenticates as a 401, and the
+    failure looks like an expired credential rather than a parsing bug.
+    """
+    values: dict[str, str] = {}
+    file_path = Path(path)
+    if not file_path.exists():
+        return values
+    for line in file_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, _, raw = stripped.partition("=")
+        value = raw.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        values[key.strip()] = value
+    return values
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:

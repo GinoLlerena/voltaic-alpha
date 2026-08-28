@@ -36,6 +36,10 @@ CONTRADICTION_VETO_STRENGTH = Decimal("0.70")
 MIN_DTE = 14
 MAX_DTE = 45
 MAX_RELATIVE_QUOTE_SPREAD = Decimal("0.25")
+LONG_DELTA_BAND = (Decimal("0.55"), Decimal("0.70"))
+SHORT_DELTA_BAND = (Decimal("0.25"), Decimal("0.40"))
+MAX_DEBIT_TO_WIDTH = Decimal("0.60")
+MIN_WIDTH_FRACTION_OF_SPOT = Decimal("0.005")
 RISK_FRACTION_OF_EQUITY = Decimal("0.005")
 CONTRACT_MULTIPLIER = Decimal("100")
 
@@ -46,6 +50,14 @@ _STRUCTURE_FAMILIES = frozenset({SignalFamily.STRUCTURE})
 
 def _opposite(direction: Direction) -> Direction:
     return Direction.BEARISH if direction is Direction.BULLISH else Direction.BULLISH
+
+
+def _delta_in(quote: OptionQuoteSnapshot, band: tuple[Decimal, Decimal]) -> bool:
+    """Delta must be present and inside the band. Missing delta fails closed."""
+    if quote.delta is None:
+        return False
+    magnitude = abs(quote.delta)
+    return band[0] <= magnitude <= band[1]
 
 
 class DeterministicSetupClassifier:
@@ -190,24 +202,46 @@ class DeterministicSpreadSelector:
             return None
 
         price = snapshot.underlying_price
-        long_leg = min(legs, key=lambda quote: (abs(quote.strike - price), quote.strike))
-        if bullish:
-            candidates = [quote for quote in legs if quote.strike > long_leg.strike]
-        else:
-            candidates = [quote for quote in legs if quote.strike < long_leg.strike]
-        if not candidates:
-            return None
-        short_leg = min(
-            candidates, key=lambda quote: (abs(quote.strike - long_leg.strike), quote.strike)
-        )
+        min_width = price * MIN_WIDTH_FRACTION_OF_SPOT
 
-        # Conservative: pay the ask on the long leg, receive the bid on the short.
-        debit = long_leg.ask - short_leg.bid
-        if debit <= 0:
+        # Delta is required, not optional. A missing Greek is a reason to decline
+        # the contract, never a reason to fall back on strike distance.
+        longs = [q for q in legs if _delta_in(q, LONG_DELTA_BAND)]
+        shorts = [q for q in legs if _delta_in(q, SHORT_DELTA_BAND)]
+
+        best: tuple[tuple[Decimal, Decimal, Decimal], OptionQuoteSnapshot, OptionQuoteSnapshot,
+                    Decimal, Decimal] | None = None
+        for long_leg in longs:
+            for short_leg in shorts:
+                beyond = (
+                    short_leg.strike > long_leg.strike
+                    if bullish
+                    else short_leg.strike < long_leg.strike
+                )
+                if not beyond:
+                    continue
+                width = abs(long_leg.strike - short_leg.strike)
+                if width < min_width:
+                    # A one-dollar wing on a 771-dollar underlying is noise, not
+                    # a structure: the debit swamps the achievable gain.
+                    continue
+                # Conservative: pay the ask on the long leg, take the bid on the short.
+                debit = long_leg.ask - short_leg.bid
+                if debit <= 0 or debit >= width:
+                    continue
+                ratio = (debit / width).quantize(Decimal("0.0001"))
+                if ratio > MAX_DEBIT_TO_WIDTH:
+                    continue
+                # Deterministic ordering: narrowest eligible width first, because
+                # it carries the smallest maximum loss; then the best price paid
+                # per unit of width; then strike, so ties cannot vary by chain order.
+                key = (width, ratio, long_leg.strike)
+                if best is None or key < best[0]:
+                    best = (key, long_leg, short_leg, debit, width)
+
+        if best is None:
             return None
-        width = abs(long_leg.strike - short_leg.strike)
-        if debit >= width:
-            return None
+        _, long_leg, short_leg, debit, width = best
 
         return SpreadCandidate(
             candidate_id=f"{setup.setup_id}-vertical",

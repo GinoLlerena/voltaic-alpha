@@ -67,15 +67,10 @@ jobs:
         run: uv run python -m options_alpha_lab.replay
 
       - name: Assert no broker write path exists
-        # A grep is the right shape here: this must fail on the commit that adds
-        # order submission outside the deterministic gateway, not on the run
-        # where a test happens to exercise it.
-        run: |
-          if git grep -nE '\b(submit_order|place_order|close_position|cancel_order|replace_order|TradingClient)\b' -- src/; then
-            echo "::error::broker write path found in src/ during Phase 1"
-            exit 1
-          fi
-          echo "no order-submission code in src/"
+        # Parses Python rather than grepping it: a docstring explaining why we
+        # never call submit_order must not count as calling it, or the guard
+        # gets deleted the first time it punishes documentation.
+        run: uv run python scripts/check_no_write_path.py src
 
       - name: Dependency audit
         run: uv run pip-audit

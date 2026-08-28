@@ -7,8 +7,8 @@ exists at this commit.
 
 from __future__ import annotations
 
+import importlib.util
 import json
-import re
 import tempfile
 import unittest
 from decimal import Decimal
@@ -243,30 +243,44 @@ class OracleIsolationTests(unittest.TestCase):
             snapshot_from_dict(payload)
 
 
+def _load_guard():
+    """Import the standalone guard script without making scripts/ a package."""
+    spec = importlib.util.spec_from_file_location(
+        "check_no_write_path", Path("scripts/check_no_write_path.py")
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class NoBrokerWritePathTests(unittest.TestCase):
     """The strongest Phase 1 claim: order submission does not exist yet."""
 
-    FORBIDDEN = (
-        r"\bsubmit_order\b",
-        r"\bplace_order\b",
-        r"\bclose_position\b",
-        r"\bcancel_order\b",
-        r"\breplace_order\b",
-        r"\bTradingClient\b",
-        r"\bMarketOrderRequest\b",
-        r"\bLimitOrderRequest\b",
-    )
+    def test_source_tree_cannot_express_a_broker_write(self) -> None:
+        # Parses Python rather than grepping it, so a docstring explaining why we
+        # never call submit_order does not count as calling it.
+        self.assertEqual(_load_guard().offenders(Path("src")), [])
 
-    def test_source_tree_contains_no_order_submission(self) -> None:
-        sources = sorted(Path("src").rglob("*.py"))
-        self.assertTrue(sources, "expected to find source files")
-        offenders: list[str] = []
-        for path in sources:
-            text = path.read_text(encoding="utf-8")
-            for pattern in self.FORBIDDEN:
-                if re.search(pattern, text):
-                    offenders.append(f"{path}: {pattern}")
-        self.assertEqual(offenders, [], f"broker write path found: {offenders}")
+    def test_the_guard_actually_catches_a_write(self) -> None:
+        # A guard nobody has seen fail is not a guard.
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "sneaky.py").write_text(
+                "def go(client):\n    return client.submit_order(qty=1)\n", encoding="utf-8"
+            )
+            found = _load_guard().offenders(Path(tmp))
+        self.assertEqual(len(found), 1)
+        self.assertIn("submit_order", found[0])
+
+    def test_the_guard_ignores_prose_that_names_a_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "documented.py").write_text(
+                '"""We never call submit_order or build a TradingClient."""\n'
+                "# cancel_order is out of scope for this module.\n"
+                "VALUE = 1\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(_load_guard().offenders(Path(tmp)), [])
 
 
 if __name__ == "__main__":

@@ -18,7 +18,9 @@
     "Participation is a different signal family at 0.61, so it is a non-duplicative confirmation rather than a restatement of price.",
     "The opposing volatility signal at 0.34 is below the 0.70 veto threshold, so it is recorded as counter-evidence rather than a refusal.",
     "The 8-DTE and 50-DTE expirations are outside the provisional 14-45 band; the 655 strike is excluded because its quote is too wide.",
-    "Long 640 is nearest the 641.25 underlying; short 645 is the next strike up in the direction of the thesis.",
-    "Debit is the conservative 12.60 ask minus the 9.60 bid = 3.00, so maximum loss is 300.00 against a 500.00 budget at 0.5% of 100000 equity."
-  ]
+    "Long 640 is the only contract with delta inside the 0.55-0.70 long band; 645 and 650 sit inside the 0.25-0.40 short band.",
+    "Width 5.00 clears the minimum width floor of 0.5% of spot (3.21). The 640/650 pair is also eligible but is wider, and the narrowest eligible width is preferred because it carries the smallest maximum loss.",
+    "Debit is the conservative 12.60 ask minus the 9.60 bid = 3.00, a debit/width ratio of 0.60 at the limit, so maximum loss is 300.00 against a 500.00 budget at 0.5% of 100000 equity."
+  ],
+  "expected_debit_to_width_ratio": "0.6000"
 }
