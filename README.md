@@ -13,10 +13,23 @@ that. H0 runs on Alpaca Paper only, and no claim is made that the strategy has
 alpha or that the model improves decisions — a `NO_TRADE` refusal and a
 deterministic baseline beating the model are both valid results.
 
+## Quick start
+
+```bash
+uv sync                      # locked dependencies and an editable install
+uv run pytest                # offline suite; no credentials, no network
+uv run python -m options_alpha_lab.replay --database-url sqlite+pysqlite:///replay.db
+```
+
+The replay command takes the two frozen H0 fixtures through the production
+contracts and writes a durable decision trace. It contacts no provider and
+submits no order.
+
 ## What exists at this commit
 
-No order submission. No broker write path, no database, no hosted interface.
-What is built today is two deliberately separate layers:
+No order submission and no broker write path. There is now a durable audit
+schema and a replayable decision path. There is no hosted interface yet.
+Underneath sit two deliberately separate layers:
 
 1. the original synthetic interaction lab, which tests spread and risk feedback;
 2. a production-facing architecture slice with timestamped contracts, provider
@@ -107,22 +120,44 @@ defines:
 The original `ExperimentCase` path remains available for compatibility. It is
 not the production input contract because it contains expected answers.
 
-## Run the sample
-
-From the project directory:
+## Replay the H0 decision path
 
 ```bash
-PYTHONPATH=src python3 -m options_alpha_lab.cli fixtures/nvda_earnings_bearish.json
+uv run python -m options_alpha_lab.replay --database-url sqlite+pysqlite:///replay.db
+```
+
+Two frozen SPY fixtures travel through `observe -> qualify -> thesis ->
+structure -> risk -> decide`:
+
+- `fixtures/h0/spy_qualified.snapshot.json` produces a bull call debit spread
+  with a recomputed maximum loss inside a deterministic risk budget.
+- `fixtures/h0/spy_refusal.snapshot.json` produces `NO_TRADE`. A contradicting
+  momentum signal clears the veto threshold, so the deterministic classifier
+  declines to produce a setup and the thesis step is never reached.
+
+Each run prints an input hash and a decision hash. The decision hash binds the
+outcome to the exact observation it came from, so replaying different inputs
+cannot produce the same decision.
+
+Expected answers live in separate `*.oracle.json` files that are never passed to
+the workflow. The loader rejects any snapshot document carrying an expected
+answer, so a fixture cannot leak its answer into the system under test.
+
+## Run the legacy interaction sample
+
+```bash
+uv run python -m options_alpha_lab.cli fixtures/nvda_earnings_bearish.json
 ```
 
 The sample deliberately starts with two contracts. The risk gate rejects that
 size, returns a suggested quantity of one, and the options agent revises the
-proposal once. The final output includes the full interaction trace.
+proposal once. The final output includes the full interaction trace. This is the
+original synthetic lab and is outside the frozen H0 scope.
 
 ## Run tests
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+uv run pytest
 ```
 
 The offline suite covers architecture boundaries, bullish and bearish vertical construction,
@@ -140,8 +175,7 @@ three read-only Alpaca requests: Paper account status, an NVDA stock snapshot,
 and an indicative NVDA option-chain snapshot. It has no order-submission code.
 
 ```bash
-RUN_LIVE_API_TESTS=1 PYTHONPATH=src python3 -m unittest discover \
-  -s tests -p 'test_live_integration.py' -v
+RUN_LIVE_API_TESTS=1 uv run pytest tests/test_live_integration.py
 ```
 
 The test defaults to `gpt-5.6-terra`. Set `OPENAI_MODEL` in the command

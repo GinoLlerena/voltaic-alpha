@@ -415,6 +415,8 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** a clean checkout replays both fixtures, persists their traces, and contains no broker write implementation.
 
+**Status: `COMPLETE`, 28 August 2026.** `uv run python -m options_alpha_lab.replay` takes `fixtures/h0/spy_qualified.snapshot.json` and `fixtures/h0/spy_refusal.snapshot.json` through the production workflow into `decisions`, `market_snapshots`, `signals`, `evidence_packs`, `theses`, `spread_candidates`, `risk_decisions`, and `audit_events`. Execution tables are created but asserted empty, and CI fails the build if order-submission symbols appear in `src/`. Deferred to Phase 2 with the read-only adapters: Alembic migrations, since the schema has no production data to migrate yet.
+
 ### Phase 2: Read-only SPY evidence and frozen replay - 1 day
 
 **Goal:** replace synthetic values needed by the demonstration without building a general signal platform.
@@ -687,6 +689,8 @@ Record changes to architecture or scope here and mirror requirement changes in t
 | 2026-08-28 | Execute through the Alpaca Trading API and drop MCP from the H0 runtime | No published event material makes any Alpaca interface mandatory. A deterministic `alpaca-py` gateway is the project's central claim: execution authority stays in code that no model-reachable tool can touch. MCP remains available as a local read-only testing aid that contributes no decision input | `HK-006`, `CLR-018`, `DEC-002`, `RISK-014`, `RISK-019` |
 | 2026-08-28 | Retire fallback `F-01` on the confirmed deadline of 4 September 2026 15:00 UTC | The live dashboard states the cutoff verbatim; the conservative fallback returned 3 September as a full build day, and the six-hour manual-submission window stays an emergency backstop rather than schedule | `HK-001`, `CLR-002` |
 | 2026-08-28 | Treat the demo host as a constrained decision (`D-01`) rather than an open one | The platform mandates Streamlit, Replit, or Vercel, and none hosts an always-on Python worker well; the judge views and the decision worker can no longer be assumed to share a runtime | `HK-009`, `HK-011`, `DEC-005`, `OPS-004`, `SRC-UI` |
+| 2026-08-28 | Bind every decision to its observation with an input hash and a decision hash | Reproducibility is the project's central claim, so the link between what was seen and what was decided must be mechanical rather than asserted. Canonical serialization refuses floats and naive datetimes so a digest cannot drift with binary rounding or machine timezone | `DATA-004`, `OPS-001`, `OPS-003`, `QA-006` |
+| 2026-08-28 | Keep the deterministic no-LLM thesis as a permanent component rather than a Phase 3 placeholder | It is the control arm of the ablation. If it is written as scaffolding it will be deleted when the model lands, and the comparison that makes the AI contribution measurable will disappear with it | `AI-010`, `QA-005` |
 | 2026-08-28 | Make the repository public before submission and treat the flip as a `G4` checklist item | A public GitHub repository is mandatory and a private one may lower the score, so visibility is a release step rather than a preference | `HK-010`, `DEC-001` |
 
 ## 17. Immediate next actions

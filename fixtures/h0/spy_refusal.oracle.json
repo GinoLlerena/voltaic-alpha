@@ -1,0 +1,17 @@
+{
+  "oracle_version": "h0.1",
+  "snapshot_id": "spy-refusal-2026-08-27",
+  "note": "Expected answers live here and are never passed to the workflow. Tests load this file separately and compare it to the produced decision (CLR-005).",
+  "expected_action": "NO_TRADE",
+  "expected_direction": "neutral",
+  "expected_reason_codes": ["no_qualified_setup"],
+  "expected_setup_family": null,
+  "expected_strategy": null,
+  "expected_risk_approved": null,
+  "why": [
+    "The bullish structure signal at 0.71 would qualify on its own, and a tradeable call spread is available in the chain, so this is a refusal on evidence rather than a refusal on missing data.",
+    "A bearish momentum signal at 0.78 clears the 0.70 contradiction veto, so the deterministic classifier declines to produce a setup at all.",
+    "Refusing before thesis synthesis is the intended behaviour: the model is never asked to adjudicate contradictory evidence, because it has no authority to resolve it.",
+    "This case must remain a refusal even after the Phase 3 model path is added; if the model can turn it into a trade, the firewall has failed."
+  ]
+}

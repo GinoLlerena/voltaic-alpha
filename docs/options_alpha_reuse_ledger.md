@@ -44,11 +44,16 @@ of the H0 path; only §3 does.
 
 ## 3. Reuse entries
 
-None yet. Phase 1 has not landed a module.
-
 | Date | Module reused | Baseline commit | What it contributes to an H0 outcome | Why not rewritten | Replacement cost if disallowed |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| 2026-08-28 | `src/options_alpha_lab/architecture/contracts.py` | `b3b88a7` | The timestamped `DecisionSnapshot`, `SetupCandidate`, `Thesis`, `SpreadCandidate`, `RiskDecision`, and `DecisionOutcome` types that every H0 outcome is expressed in | It is a data contract with validation, not behaviour. Retyping it would produce the same file with different whitespace and would lose the look-ahead and oracle-isolation invariants it already encodes | Low. Roughly 320 lines of dataclasses and validators, mechanical to re-derive |
+| 2026-08-28 | `src/options_alpha_lab/architecture/ports.py` | `b3b88a7` | The `Protocol` boundaries that keep the model behind a synthesizer interface and execution behind a port | 65 lines of interface declarations with no logic | Negligible |
+| 2026-08-28 | `src/options_alpha_lab/architecture/workflow.py` | `b3b88a7` | The bounded `observe -> qualify -> thesis -> structure -> risk -> decide` state machine, including the gates that stop a thesis reversing direction or altering invalidation | This is the firewall itself. It is covered by 15 pre-event tests, and rewriting the one component whose correctness the whole claim depends on, to satisfy a rule that may not exist, would trade real safety for speculative eligibility | Moderate. About 244 lines, and any rewrite must re-prove every gate |
+
+Not in the H0 path, and therefore not reused: `models.py`, `risk.py`,
+`orchestrator.py`, `agents.py`, and `cli.py`. Those remain the original
+synthetic lab. `fixtures/nvda_earnings_bearish.json` likewise stays outside H0;
+the H0 path uses `fixtures/h0/`, authored in-window.
 
 ## 4. Maintenance rule
 

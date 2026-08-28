@@ -1,0 +1,114 @@
+{
+  "schema_version": "decision_snapshot.v1",
+  "snapshot_id": "spy-refusal-2026-08-27",
+  "as_of": "2026-08-27T19:45:00+00:00",
+  "symbol": "SPY",
+  "underlying_price": "638.40",
+  "account": {
+    "account_id": "PA3WZR22ITRR",
+    "as_of": "2026-08-27T19:44:30+00:00",
+    "equity": "100000.00",
+    "options_buying_power": "50000.00",
+    "is_paper": true
+  },
+  "signals": [
+    {
+      "signal_id": "sig-structure-trend-retest",
+      "family": "structure",
+      "direction": "bullish",
+      "strength": "0.71",
+      "as_of": "2026-08-27T19:45:00+00:00",
+      "source": "synthetic:daily_ema_stack",
+      "summary": "Price is still above a rising 20/50 EMA stack and is retesting the 20 EMA."
+    },
+    {
+      "signal_id": "sig-participation-breadth",
+      "family": "participation",
+      "direction": "bullish",
+      "strength": "0.58",
+      "as_of": "2026-08-27T19:45:00+00:00",
+      "source": "synthetic:advance_decline",
+      "summary": "Breadth is mildly positive on the retest session."
+    },
+    {
+      "signal_id": "sig-momentum-divergence",
+      "family": "momentum",
+      "direction": "bearish",
+      "strength": "0.78",
+      "as_of": "2026-08-27T19:45:00+00:00",
+      "source": "synthetic:momentum_divergence",
+      "summary": "Momentum has diverged sharply from price and contradicts the continuation thesis above the veto threshold."
+    }
+  ],
+  "option_chain": [
+    {
+      "contract_symbol": "SPY260918C00635000",
+      "option_type": "call",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "635.00",
+      "bid": "13.10",
+      "ask": "13.35",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "0.56",
+      "implied_volatility": "0.1488",
+      "open_interest": 14220,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 2740
+    },
+    {
+      "contract_symbol": "SPY260918C00640000",
+      "option_type": "call",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "640.00",
+      "bid": "10.20",
+      "ask": "10.45",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "0.47",
+      "implied_volatility": "0.1461",
+      "open_interest": 11980,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 2201
+    },
+    {
+      "contract_symbol": "SPY260918P00635000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "635.00",
+      "bid": "9.05",
+      "ask": "9.25",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.44",
+      "implied_volatility": "0.1533",
+      "open_interest": 8830,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 1611
+    },
+    {
+      "contract_symbol": "SPY260918P00630000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "630.00",
+      "bid": "6.85",
+      "ask": "7.05",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.36",
+      "implied_volatility": "0.1571",
+      "open_interest": 7402,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 1188
+    }
+  ],
+  "data_quality": {
+    "missing_fields": [],
+    "stale_fields": [],
+    "provider_errors": []
+  }
+}

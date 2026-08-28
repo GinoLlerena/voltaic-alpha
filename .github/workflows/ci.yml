@@ -59,6 +59,24 @@ jobs:
       - name: Tests
         run: uv run pytest
 
+      - name: Replay H0 fixtures against PostgreSQL
+        # Phase 1 exit gate, proven on the real database rather than SQLite: a
+        # clean checkout replays both frozen fixtures into a durable trace.
+        env:
+          BOT_MODE: observe
+        run: uv run python -m options_alpha_lab.replay
+
+      - name: Assert no broker write path exists
+        # A grep is the right shape here: this must fail on the commit that adds
+        # order submission outside the deterministic gateway, not on the run
+        # where a test happens to exercise it.
+        run: |
+          if git grep -nE '\b(submit_order|place_order|close_position|cancel_order|replace_order|TradingClient)\b' -- src/; then
+            echo "::error::broker write path found in src/ during Phase 1"
+            exit 1
+          fi
+          echo "no order-submission code in src/"
+
       - name: Dependency audit
         run: uv run pip-audit
 

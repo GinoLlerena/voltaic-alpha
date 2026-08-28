@@ -1,0 +1,24 @@
+{
+  "oracle_version": "h0.1",
+  "snapshot_id": "spy-qualified-2026-08-27",
+  "note": "Expected answers live here and are never passed to the workflow. Tests load this file separately and compare it to the produced decision (CLR-005).",
+  "expected_action": "OPTIONS_POSITION",
+  "expected_direction": "bullish",
+  "expected_reason_codes": [],
+  "expected_setup_family": "trend_continuation_retest",
+  "expected_strategy": "bull_call_debit_spread",
+  "expected_long_contract_symbol": "SPY260918C00640000",
+  "expected_short_contract_symbol": "SPY260918C00645000",
+  "expected_estimated_debit": "3.00",
+  "expected_calculated_max_loss": "300.00",
+  "expected_risk_budget": "500.00",
+  "expected_risk_approved": true,
+  "why": [
+    "Structure signal at 0.72 clears the 0.60 provisional floor and sets a bullish envelope.",
+    "Participation is a different signal family at 0.61, so it is a non-duplicative confirmation rather than a restatement of price.",
+    "The opposing volatility signal at 0.34 is below the 0.70 veto threshold, so it is recorded as counter-evidence rather than a refusal.",
+    "The 8-DTE and 50-DTE expirations are outside the provisional 14-45 band; the 655 strike is excluded because its quote is too wide.",
+    "Long 640 is nearest the 641.25 underlying; short 645 is the next strike up in the direction of the thesis.",
+    "Debit is the conservative 12.60 ask minus the 9.60 bid = 3.00, so maximum loss is 300.00 against a 500.00 budget at 0.5% of 100000 equity."
+  ]
+}
