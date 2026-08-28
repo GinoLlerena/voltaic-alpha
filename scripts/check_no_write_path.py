@@ -7,8 +7,10 @@ it, and a guard that punishes documentation gets deleted the first time it is
 inconvenient. Only real identifier usage counts: attribute access, calls, names,
 and imported symbols.
 
-Phase 4 introduces the deterministic execution gateway. When it does, this check
-is narrowed to "no write outside the gateway", not deleted.
+Phase 4 introduced the deterministic execution gateway, so the check is now
+"no write outside the gateway" rather than "no write anywhere". The allowance is
+a single named file, not a directory or a pattern, so a second write path cannot
+appear by being placed next to the first one.
 """
 
 from __future__ import annotations
@@ -33,9 +35,15 @@ FORBIDDEN = {
 }
 
 
+#: The one file permitted to express a broker write. Everything else is checked.
+GATEWAY = Path("src/options_alpha_lab/execution/gateway.py")
+
+
 def offenders(root: Path) -> list[str]:
     found: list[str] = []
     for path in sorted(root.rglob("*.py")):
+        if path == GATEWAY or path.resolve() == GATEWAY.resolve():
+            continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         except SyntaxError as exc:  # pragma: no cover - a parse failure is a real failure

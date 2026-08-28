@@ -458,6 +458,8 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** duplicate or ambiguous requests cannot create a second strategy, and local state reconciles with Alpaca before another entry is possible.
 
+**Status: `COMPLETE`, 28 August 2026.** One Paper MLeg lifecycle filled and reconciled to flat; see `artifacts/h0_paper_lifecycle.md`. Six guards run immediately before every write rather than at startup, because the interesting failures develop between the two. The Paper-endpoint guard proved itself in practice by refusing a real submission when `resolved_endpoint` returned an enum member name instead of a URL.
+
 ### Phase 5: Five-view judge experience - 1 day
 
 **Goal:** make the core proof understandable without exposing internal logs or hidden reasoning.
@@ -693,6 +695,9 @@ Record changes to architecture or scope here and mirror requirement changes in t
 | 2026-08-28 | Execute through the Alpaca Trading API and drop MCP from the H0 runtime | No published event material makes any Alpaca interface mandatory. A deterministic `alpaca-py` gateway is the project's central claim: execution authority stays in code that no model-reachable tool can touch. MCP remains available as a local read-only testing aid that contributes no decision input | `HK-006`, `CLR-018`, `DEC-002`, `RISK-014`, `RISK-019` |
 | 2026-08-28 | Retire fallback `F-01` on the confirmed deadline of 4 September 2026 15:00 UTC | The live dashboard states the cutoff verbatim; the conservative fallback returned 3 September as a full build day, and the six-hour manual-submission window stays an emergency backstop rather than schedule | `HK-001`, `CLR-002` |
 | 2026-08-28 | Treat the demo host as a constrained decision (`D-01`) rather than an open one | The platform mandates Streamlit, Replit, or Vercel, and none hosts an always-on Python worker well; the judge views and the decision worker can no longer be assumed to share a runtime | `HK-009`, `HK-011`, `DEC-005`, `OPS-004`, `SRC-UI` |
+| 2026-08-28 | Derive the client order id from the intent hash instead of generating one | Idempotency has to be a property of the approved intent, not of a retry helper. The same intent can only ever produce the same id, so a duplicate submit collides at the broker instead of opening a second strategy | `RISK-018`, `RISK-020`, `QA-009` |
+| 2026-08-28 | Resolve an ambiguous submit by client-id lookup and never by re-submitting | Re-submitting is how duplicates are created. If the lookup finds nothing, the gateway refuses rather than assuming the order was lost | `RISK-020`, `RISK-021`, `OPS-005`, `QA-010` |
+| 2026-08-28 | Verify the Paper endpoint from the client about to be used, not from the environment variable that configured it | Those two can disagree, and only one of them is what the bytes will actually reach | `RISK-015`, `RISK-016` |
 | 2026-08-28 | Never show the model the invalidation conditions, rather than validating that it preserved them | A check can be removed; an absence cannot be bypassed. The model has no field for invalidation and never sees the text, so there is no path by which a memo could soften a stop | `CLR-008`, `AI-005`, `RISK-003` |
 | 2026-08-28 | Coerce a direction reversal to abstention and record it, rather than rejecting the call | An abstention is a safe, meaningful outcome and keeps the trace intact; a hard rejection would discard the evidence that the model tried | `CLR-008`, `AI-008`, `AI-010` |
 | 2026-08-28 | Report ablation cost in tokens rather than currency | Token counts are observed. A dollar figure would be an unverified constant presented as a measurement | `AI-007`, `QA-005` |

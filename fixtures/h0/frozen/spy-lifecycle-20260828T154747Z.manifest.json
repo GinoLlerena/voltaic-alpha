@@ -1,0 +1,50 @@
+{
+  "frozen_at": "2026-08-28T15:47:47.694074+00:00",
+  "frozen_chain_filter": {
+    "contracts_frozen": 1115,
+    "contracts_read": 4036,
+    "dte_high": 45,
+    "dte_low": 14,
+    "strike_window_fraction": "0.06"
+  },
+  "manifest_version": "h0.1",
+  "reads": {
+    "account": {
+      "endpoint": "/v2/account",
+      "feed": "paper-trading",
+      "pages": 1,
+      "payload_hash": "sha256:47178f8f8886f92a819828d755869a214fb3e3c012d14e35660ed6da0e654765",
+      "provider": "alpaca",
+      "received_time": "2026-08-28T15:47:44.306444+00:00",
+      "source_time": "2026-08-28T15:47:44.306444+00:00"
+    },
+    "bars": {
+      "endpoint": "/v2/stocks/SPY/bars",
+      "feed": "sip",
+      "pages": 1,
+      "payload_hash": "sha256:cbaf6a43a6ab13c18946f5a58b2ca7fb1dfbc7509b263931c14d2ba5b393be31",
+      "provider": "alpaca",
+      "received_time": "2026-08-28T15:47:45.178127+00:00",
+      "source_time": "2026-08-28T04:00:00+00:00"
+    },
+    "chain": {
+      "endpoint": "/v1beta1/options/snapshots/SPY",
+      "feed": "indicative",
+      "pages": 5,
+      "payload_hash": "sha256:13353ca7445b4209cc33701eebfb08a5e9c92f62c58bb5391c2f008bcf4c5c71",
+      "provider": "alpaca",
+      "received_time": "2026-08-28T15:47:45.483244+00:00",
+      "source_time": "2026-08-28T15:47:46.828986+00:00"
+    },
+    "clock": {
+      "endpoint": "/v2/clock",
+      "feed": "paper-trading",
+      "pages": 1,
+      "payload_hash": "sha256:d1f1e7aa552b7388860abe3e142abf14e4cca73ed2c17108e5fdb11a4740cae9",
+      "provider": "alpaca",
+      "received_time": "2026-08-28T15:47:45.000479+00:00",
+      "source_time": "2026-08-28T11:47:45.265540-04:00"
+    }
+  },
+  "snapshot_input_hash": "sha256:511e9707f95373bd075ef8e4df30db7caae3c55c91b3ae5f39d66cc0b56c8435"
+}
