@@ -24,6 +24,11 @@ htmlcov/
 # OS
 .DS_Store
 
+# Browser-automation scratch output; never part of the project
+.playwright-mcp/
+dash*.png
+*-page.txt
+
 # Derived confidential/redacted run exports (see implementation plan §5.2)
 run_packages/
 
