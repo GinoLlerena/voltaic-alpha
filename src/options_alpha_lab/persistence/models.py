@@ -267,17 +267,34 @@ class PreparedOrderRequest(Base):
 
 
 class BrokerOrder(Base):
+    """One order. `status` is the broker's word; `local_state` is ours.
+
+    They are separate columns on purpose. Conflating them is how acceptance gets
+    read as a fill.
+    """
+
     __tablename__ = "broker_orders"
 
     id: Mapped[str] = _pk()
     order_intent_id: Mapped[str] = mapped_column(ForeignKey("order_intents.id"), nullable=False)
     broker_order_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     client_order_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    #: "entry" or "close". A close must never be mistaken for new exposure.
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="entry")
+    #: Raw broker status, verbatim.
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: Our lifecycle state. See execution.lifecycle.OrderState.
+    local_state: Mapped[str] = mapped_column(String(32), nullable=False, default="PREPARED")
+    terminal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     strategy_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     filled_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Actual average net debit or credit, from fills. Never the limit price.
+    filled_avg_price: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    prepared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reconciled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     recorded_at: Mapped[datetime] = _recorded_at()
     schema_version: Mapped[str] = _schema_version()
 
@@ -296,15 +313,67 @@ class Fill(Base):
 
 
 class Position(Base):
+    """Durable managed exposure.
+
+    A row exists from the moment an entry is submitted, in `PENDING`, so a
+    restart can find an order that may or may not have filled. It becomes `OPEN`
+    only when reconciled fills establish a quantity and an actual debit.
+    """
+
     __tablename__ = "positions"
 
     id: Mapped[str] = _pk()
     decision_id: Mapped[str] = mapped_column(ForeignKey("decisions.id"), nullable=False)
+    entry_order_id: Mapped[str] = mapped_column(ForeignKey("broker_orders.id"), nullable=False)
+    close_order_id: Mapped[str | None] = mapped_column(
+        ForeignKey("broker_orders.id"), nullable=True
+    )
     strategy: Mapped[str] = mapped_column(String(48), nullable=False)
-    lifecycle_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: See execution.lifecycle.PositionState.
+    lifecycle_status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    long_symbol: Mapped[str] = mapped_column(String(48), nullable=False)
+    short_symbol: Mapped[str] = mapped_column(String(48), nullable=False)
+    expiration: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    width: Mapped[Any] = mapped_column(Numeric(18, 6), nullable=False)
+    #: Requested at submission; actual once reconciled.
+    requested_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    filled_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: The exit basis. Null until fills reconcile; never the estimated debit.
+    avg_entry_debit: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
     open_risk: Mapped[Any] = mapped_column(Numeric(18, 6), nullable=False)
+    #: Typed invalidation, not parsed from prose.
+    invalidation_level: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    invalidation_direction: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    invalidation_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_filled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    close_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
+class Incident(Base):
+    """A durable integrity incident.
+
+    `POSITION_REVIEW` printed to a console is not an incident: nothing survives
+    the process. Anything that halts new risk writes a row here.
+    """
+
+    __tablename__ = "incidents"
+
+    id: Mapped[str] = _pk()
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"), nullable=True)
+    position_id: Mapped[str | None] = mapped_column(ForeignKey("positions.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, nullable=False)
+    execution_state: Mapped[str] = mapped_column(String(32), nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     recorded_at: Mapped[datetime] = _recorded_at()
     schema_version: Mapped[str] = _schema_version()
 
@@ -327,7 +396,8 @@ class AuditEvent(Base):
     schema_version: Mapped[str] = _schema_version()
 
 
-#: Tables that Phase 1 must never write to. Enforced by test, not by convention.
+#: Tables written only once execution exists. Phase 1 asserted these were empty;
+#: they are now written by the durable lifecycle store.
 EXECUTION_TABLES: frozenset[str] = frozenset(
     {
         OrderIntent.__tablename__,

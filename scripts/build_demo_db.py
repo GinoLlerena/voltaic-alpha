@@ -25,6 +25,7 @@ from options_alpha_lab.persistence.models import (  # noqa: E402
     Decision,
     Fill,
     OrderIntent,
+    Position,
     PreparedOrderRequest,
 )
 from options_alpha_lab.persistence.repository import build_engine, create_schema  # noqa: E402
@@ -84,10 +85,16 @@ def main() -> int:
             print("no approved decision to attach execution evidence to", file=sys.stderr)
             return 1
 
+        # Execution evidence now carries the durable lifecycle: the broker's own
+        # status, our local state, and the actual filled price rather than the
+        # limit. The recorded run reconciled to flat, so the position is CLOSED.
+        entry_order_id = None
         for phase in ("open", "close"):
             leg_data = receipt[phase]
             intent_id = uuid.uuid4().hex
             order_id = uuid.uuid4().hex
+            if phase == "open":
+                entry_order_id = order_id
             session.add(
                 OrderIntent(
                     id=intent_id,
@@ -100,8 +107,6 @@ def main() -> int:
                     expires_at=datetime.fromisoformat(receipt["recorded_at"]),
                 )
             )
-            # Parent before children: prepared requests and broker orders both
-            # reference this intent, and the insert order is not inferable.
             session.flush()
             session.add(
                 PreparedOrderRequest(
@@ -131,9 +136,14 @@ def main() -> int:
                     order_intent_id=intent_id,
                     broker_order_id=leg_data.get("broker_order_id"),
                     client_order_id=leg_data["client_order_id"],
+                    role="entry" if phase == "open" else "close",
                     status=leg_data["status"],
+                    local_state="FILLED",
+                    terminal=True,
                     strategy_quantity=int(leg_data["qty"]),
                     filled_quantity=int(leg_data["qty"]),
+                    filled_avg_price=Decimal(leg_data["filled_avg_price"]),
+                    prepared_at=datetime.fromisoformat(receipt["recorded_at"]),
                     submitted_at=datetime.fromisoformat(receipt["recorded_at"]),
                     reconciled_at=datetime.now(UTC),
                 )
@@ -150,6 +160,31 @@ def main() -> int:
                         filled_at=datetime.fromisoformat(receipt["recorded_at"]),
                     )
                 )
+
+        legs = receipt["open"]["legs"]
+        session.add(
+            Position(
+                id=uuid.uuid4().hex,
+                decision_id=decision.id,
+                entry_order_id=entry_order_id,
+                close_order_id=None,
+                strategy="bull_call_debit_spread",
+                direction="bullish",
+                lifecycle_status="CLOSED",
+                long_symbol=legs[0]["symbol"],
+                short_symbol=legs[1]["symbol"],
+                expiration=datetime.fromisoformat(receipt["recorded_at"]),
+                width=Decimal("6.00"),
+                requested_quantity=1,
+                filled_quantity=0,
+                avg_entry_debit=Decimal(receipt["open"]["filled_avg_price"]),
+                open_risk=Decimal("339.00"),
+                entry_filled_at=datetime.fromisoformat(receipt["recorded_at"]),
+                opened_at=datetime.fromisoformat(receipt["recorded_at"]),
+                closed_at=datetime.fromisoformat(receipt["recorded_at"]),
+                close_reason="manual_demo_close",
+            )
+        )
         session.commit()
 
     print(f"wrote {output} ({output.stat().st_size} bytes)")
