@@ -471,6 +471,8 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** a judge can reconstruct the qualified or refused decision and see exactly where model authority ends.
 
+**Status: `COMPLETE`, 28 August 2026.** Five views over `demo/h0_demo.db`, with a live `NO_NEW_RISK` demonstration and the exact broker request shown alongside its hash. The dashboard has no control actions at all, which is enforced by a test rather than by convention.
+
 ### Phase 6: Validation, deployment, and narrative - 1 day
 
 **Goal:** deploy the smallest credible product and align it to the published rubric.
@@ -482,6 +484,8 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 - Demonstrate originality through hash-linked authority, reproducible refusal, recovery evidence, and the model ablation—not a generic “LLM plus guardrails” claim.
 
 **Exit gate:** the hosted demo works in a clean session and the narrative makes no unsupported alpha, data-quality, or live-performance claim.
+
+**Status: `PARTIAL`, 28 August 2026.** Validation, containerization, business case, rubric mapping, deck outline, and video beats are done; `scripts/run_h0_validation.sh` passes nine gates. Outstanding and owned by the team: publishing the hosted URL, recording the MP4, and exporting the deck PDF.
 
 ### Phase 7: Integration buffer and submission - 0.75 day
 
