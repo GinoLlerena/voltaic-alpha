@@ -10,8 +10,10 @@ from options_alpha_lab.architecture.contracts import Direction
 from options_alpha_lab.exits import (
     EXPIRY_GUARD_DTE,
     PRECEDENCE,
+    PREMIUM_INDEPENDENT,
+    SESSION_STOP,
+    ExitInputs,
     ExitTrigger,
-    PositionState,
     evaluate_exit,
     unrealized,
 )
@@ -19,7 +21,7 @@ from options_alpha_lab.exits import (
 TODAY = date(2026, 8, 28)
 
 
-def position(**overrides: object) -> PositionState:
+def position(**overrides: object) -> ExitInputs:
     base = dict(
         direction=Direction.BULLISH,
         entry_debit=Decimal("3.00"),
@@ -30,9 +32,10 @@ def position(**overrides: object) -> PositionState:
         invalidation_level=Decimal("631.63"),
         current_value=Decimal("3.10"),
         as_of=TODAY,
+        sessions_elapsed=0,
     )
     base.update(overrides)
-    return PositionState(**base)  # type: ignore[arg-type]
+    return ExitInputs(**base)  # type: ignore[arg-type]
 
 
 class PrecedenceTests(unittest.TestCase):
@@ -42,12 +45,22 @@ class PrecedenceTests(unittest.TestCase):
             PRECEDENCE,
             (
                 ExitTrigger.EXPIRY_GUARD,
-                ExitTrigger.UNMEASURABLE,
-                ExitTrigger.STOP_LOSS,
                 ExitTrigger.INVALIDATION_BREACHED,
+                ExitTrigger.STOP_LOSS,
+                ExitTrigger.SESSION_STOP,
                 ExitTrigger.PROFIT_CAPTURE,
-                ExitTrigger.TIME_STOP,
             ),
+        )
+
+    def test_premium_independent_triggers_are_declared(self) -> None:
+        # EXIT-004: these must remain evaluable with no option quote at all.
+        self.assertEqual(
+            PREMIUM_INDEPENDENT,
+            frozenset({
+                ExitTrigger.EXPIRY_GUARD,
+                ExitTrigger.INVALIDATION_BREACHED,
+                ExitTrigger.SESSION_STOP,
+            }),
         )
 
     def test_expiry_guard_beats_a_profitable_position(self) -> None:
@@ -87,9 +100,22 @@ class TriggerTests(unittest.TestCase):
             evaluate_exit(position(current_value=Decimal("4.19"))).trigger, ExitTrigger.HOLD
         )
 
-    def test_time_stop_fires_before_the_expiry_guard_range(self) -> None:
-        self.assertIs(evaluate_exit(position(dte=10)).trigger, ExitTrigger.TIME_STOP)
-        self.assertIs(evaluate_exit(position(dte=11)).trigger, ExitTrigger.HOLD)
+    def test_session_stop_implements_the_declared_horizon(self) -> None:
+        # EXIT-003: sessions, not DTE. A DTE rule on a 45-DTE entry would allow
+        # roughly 35 calendar days against a 1-3 session thesis.
+        self.assertIs(
+            evaluate_exit(position(sessions_elapsed=SESSION_STOP)).trigger,
+            ExitTrigger.SESSION_STOP,
+        )
+        self.assertIs(
+            evaluate_exit(position(sessions_elapsed=SESSION_STOP - 1)).trigger,
+            ExitTrigger.HOLD,
+        )
+
+    def test_a_long_dated_position_is_not_held_for_weeks(self) -> None:
+        held = evaluate_exit(position(dte=45, sessions_elapsed=3))
+        self.assertIs(held.trigger, ExitTrigger.SESSION_STOP)
+        self.assertTrue(held.should_close)
 
     def test_invalidation_breach_closes_a_bullish_position(self) -> None:
         decision = evaluate_exit(position(underlying_price=Decimal("631.00")))
@@ -119,17 +145,38 @@ class TriggerTests(unittest.TestCase):
 
 
 class UnmeasurableTests(unittest.TestCase):
-    def test_missing_value_flags_for_review_rather_than_assuming_health(self) -> None:
+    """EXIT-004: an integrity state, never a precedence winner."""
+
+    def test_missing_value_is_reported_not_treated_as_healthy(self) -> None:
         decision = evaluate_exit(position(current_value=None))
         self.assertIs(decision.trigger, ExitTrigger.UNMEASURABLE)
         self.assertFalse(decision.should_close)
-        self.assertIn("review", decision.reason)
+        self.assertTrue(decision.value_unmeasurable)
 
-    def test_expiry_guard_still_closes_even_when_unmeasurable(self) -> None:
-        # Not knowing the value is not a reason to hold into expiry.
+    def test_expiry_guard_still_closes_when_unmeasurable(self) -> None:
         decision = evaluate_exit(position(dte=2, current_value=None))
         self.assertIs(decision.trigger, ExitTrigger.EXPIRY_GUARD)
         self.assertTrue(decision.should_close)
+        self.assertTrue(decision.value_unmeasurable)
+
+    def test_invalidation_still_closes_when_unmeasurable(self) -> None:
+        # The regression the review found: a missing option quote must not
+        # suppress a rule that depends only on the underlying price.
+        decision = evaluate_exit(
+            position(current_value=None, underlying_price=Decimal("631.00"))
+        )
+        self.assertIs(decision.trigger, ExitTrigger.INVALIDATION_BREACHED)
+        self.assertTrue(decision.should_close)
+
+    def test_session_stop_still_closes_when_unmeasurable(self) -> None:
+        decision = evaluate_exit(position(current_value=None, sessions_elapsed=3))
+        self.assertIs(decision.trigger, ExitTrigger.SESSION_STOP)
+        self.assertTrue(decision.should_close)
+
+    def test_an_unmeasurable_close_suggests_no_limit(self) -> None:
+        # The caller must price the close from a fresh quote rather than guess.
+        decision = evaluate_exit(position(dte=2, current_value=None))
+        self.assertIsNone(decision.suggested_limit)
 
 
 class ArithmeticTests(unittest.TestCase):

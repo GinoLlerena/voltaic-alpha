@@ -9,10 +9,14 @@ Two properties matter more than the thresholds:
 * **Precedence is explicit and total.** When several conditions fire at once the
   most urgent wins, and the order is written down rather than emerging from the
   order of `if` statements.
-* **A missing input never means "hold".** If the current value of the spread
-  cannot be computed, the position is marked for review rather than silently
-  left open, because "we could not measure it" and "it is fine" are different
-  answers.
+* **`UNMEASURABLE` is an integrity state, not a precedence winner** (`EXIT-004`).
+  A missing option quote cannot suppress expiry, invalidation, or the session
+  stop, because none of those depend on the premium. It is recorded, it halts new
+  risk, and the rules that remain computable are still evaluated.
+* **The time stop counts completed trading sessions, not DTE** (`EXIT-003`). The
+  declared thesis horizon is one to three sessions; a `DTE <= 10` rule on a
+  45-DTE entry permits roughly 35 calendar days, which is an expiry control
+  wearing a time-stop label. Both now exist, separately.
 
 Every threshold is `PROVISIONAL` until replay evidence is attached.
 """
@@ -29,7 +33,8 @@ from .architecture.contracts import Direction
 # --- PROVISIONAL policy values ----------------------------------------------
 STOP_LOSS_FRACTION_OF_DEBIT = Decimal("0.50")
 PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN = Decimal("0.60")
-TIME_STOP_DTE = 10
+#: Completed trading sessions since the reconciled entry fill.
+SESSION_STOP = 3
 EXPIRY_GUARD_DTE = 7
 CONTRACT_MULTIPLIER = Decimal("100")
 
@@ -40,29 +45,38 @@ class ExitTrigger(str, Enum):  # noqa: UP042 - matches the str-Enum style used a
     """Ordered most urgent first. The order in this class *is* the precedence."""
 
     EXPIRY_GUARD = "expiry_guard"
-    UNMEASURABLE = "unmeasurable"
-    STOP_LOSS = "stop_loss"
     INVALIDATION_BREACHED = "invalidation_breached"
+    STOP_LOSS = "stop_loss"
+    SESSION_STOP = "session_stop"
     PROFIT_CAPTURE = "profit_capture"
-    TIME_STOP = "time_stop"
+    UNMEASURABLE = "unmeasurable"
     HOLD = "hold"
 
 
-#: Explicit precedence. Written as data so a test can assert the order rather
-#: than inferring it from control flow.
+#: Explicit precedence, written as data so a test asserts the order rather than
+#: inferring it from control flow. Matches the review's section 5.2 for the rules
+#: H0 implements; scheduled-event blackout is deferred, not silently dropped.
 PRECEDENCE: tuple[ExitTrigger, ...] = (
     ExitTrigger.EXPIRY_GUARD,
-    ExitTrigger.UNMEASURABLE,
-    ExitTrigger.STOP_LOSS,
     ExitTrigger.INVALIDATION_BREACHED,
+    ExitTrigger.STOP_LOSS,
+    ExitTrigger.SESSION_STOP,
     ExitTrigger.PROFIT_CAPTURE,
-    ExitTrigger.TIME_STOP,
+)
+
+#: Triggers that need no option premium, so a missing quote cannot suppress them.
+PREMIUM_INDEPENDENT: frozenset[ExitTrigger] = frozenset(
+    {ExitTrigger.EXPIRY_GUARD, ExitTrigger.INVALIDATION_BREACHED, ExitTrigger.SESSION_STOP}
 )
 
 
 @dataclass(frozen=True)
-class PositionState:
-    """Everything the exit policy is allowed to look at."""
+class ExitInputs:
+    """Everything the exit policy is allowed to look at.
+
+    `entry_debit` must be the **actual reconciled average fill**, never an
+    estimate or a limit price: every economic threshold is a fraction of it.
+    """
 
     direction: Direction
     entry_debit: Decimal
@@ -74,6 +88,8 @@ class PositionState:
     #: Conservative mark: what the spread could be closed for right now.
     current_value: Decimal | None
     as_of: date
+    #: Completed trading sessions since the reconciled entry fill.
+    sessions_elapsed: int = 0
 
 
 @dataclass(frozen=True)
@@ -85,13 +101,15 @@ class ExitDecision:
     unrealized: Decimal | None = None
     #: Limit price for the closing order, when one should be placed.
     suggested_limit: Decimal | None = None
+    #: True when the premium could not be read. Independent rules still ran.
+    value_unmeasurable: bool = False
 
 
-def max_gain(state: PositionState) -> Decimal:
+def max_gain(state: ExitInputs) -> Decimal:
     return state.width - state.entry_debit
 
 
-def unrealized(state: PositionState) -> Decimal | None:
+def unrealized(state: ExitInputs) -> Decimal | None:
     if state.current_value is None:
         return None
     return (
@@ -99,7 +117,7 @@ def unrealized(state: PositionState) -> Decimal | None:
     ).quantize(Decimal("0.01"))
 
 
-def invalidation_breached(state: PositionState) -> bool:
+def invalidation_breached(state: ExitInputs) -> bool:
     if state.invalidation_level is None:
         return False
     if state.direction is Direction.BULLISH:
@@ -107,54 +125,40 @@ def invalidation_breached(state: PositionState) -> bool:
     return state.underlying_price >= state.invalidation_level
 
 
-def evaluate_exit(state: PositionState) -> ExitDecision:
-    """Return the single governing exit decision for a position."""
+def evaluate_exit(state: ExitInputs) -> ExitDecision:
+    """Return the single governing exit decision for a position.
+
+    Premium-independent rules are evaluated first and are never suppressed by a
+    missing quote. Only after they decline does the policy consult the premium.
+    """
     pnl = unrealized(state)
+    unmeasurable = state.current_value is None
 
     def close(trigger: ExitTrigger, reason: str) -> ExitDecision:
         # Closing a debit spread is a sell. Cross the spread deliberately rather
         # than posting at the mark and hoping: an exit that does not fill is not
-        # an exit.
+        # an exit. With no readable premium there is no limit to suggest, and the
+        # caller must price the close from a fresh quote.
         limit = None
         if state.current_value is not None:
             limit = max(
                 (state.current_value * Decimal("0.90")).quantize(Decimal("0.01")),
                 Decimal("0.01"),
             )
-        return ExitDecision(True, trigger, reason, POLICY_VERSION, pnl, limit)
+        return ExitDecision(True, trigger, reason, POLICY_VERSION, pnl, limit, unmeasurable)
 
     # 1. Expiry guard. Overrides everything, including a profitable position:
-    #    holding a spread into expiry risks assignment and pin risk for a gain
-    #    that is already mostly captured.
+    #    holding into expiry risks assignment and pin risk for a gain already
+    #    mostly captured. Needs no premium.
     if state.dte <= EXPIRY_GUARD_DTE:
         return close(
             ExitTrigger.EXPIRY_GUARD,
             f"{state.dte} DTE is at or below the {EXPIRY_GUARD_DTE}-day expiry guard",
         )
 
-    # 2. Unmeasurable. Ranked above the profit and loss rules on purpose: not
-    #    knowing the value is a reason to act, not a reason to wait.
-    if state.current_value is None:
-        return ExitDecision(
-            False,
-            ExitTrigger.UNMEASURABLE,
-            "spread value could not be computed from the current chain; "
-            "position flagged for operator review rather than assumed healthy",
-            POLICY_VERSION,
-            None,
-            None,
-        )
-
-    # 3. Stop loss.
-    stop_level = (state.entry_debit * STOP_LOSS_FRACTION_OF_DEBIT).quantize(Decimal("0.01"))
-    if state.current_value <= stop_level:
-        return close(
-            ExitTrigger.STOP_LOSS,
-            f"value {state.current_value} is at or below the {stop_level} stop "
-            f"({STOP_LOSS_FRACTION_OF_DEBIT} of the {state.entry_debit} entry debit)",
-        )
-
-    # 4. Invalidation. The thesis that justified the position is no longer true.
+    # 2. Invalidation. The thesis that justified the position is no longer true.
+    #    Depends only on the underlying, so a missing option quote must not
+    #    suppress it (EXIT-004).
     if invalidation_breached(state):
         return close(
             ExitTrigger.INVALIDATION_BREACHED,
@@ -162,30 +166,57 @@ def evaluate_exit(state: PositionState) -> ExitDecision:
             f"invalidation level {state.invalidation_level}",
         )
 
-    # 5. Profit capture.
+    # 3. Stop loss. Premium-dependent; skipped, not assumed safe, when unreadable.
+    stop_level = (state.entry_debit * STOP_LOSS_FRACTION_OF_DEBIT).quantize(Decimal("0.01"))
+    if state.current_value is not None and state.current_value <= stop_level:
+        return close(
+            ExitTrigger.STOP_LOSS,
+            f"value {state.current_value} is at or below the {stop_level} stop "
+            f"({STOP_LOSS_FRACTION_OF_DEBIT} of the {state.entry_debit} filled debit)",
+        )
+
+    # 4. Session stop. Implements the declared 1-3 session horizon. Needs no premium.
+    if state.sessions_elapsed >= SESSION_STOP:
+        return close(
+            ExitTrigger.SESSION_STOP,
+            f"{state.sessions_elapsed} completed trading sessions since the entry fill "
+            f"reached the {SESSION_STOP}-session horizon",
+        )
+
+    # 5. Profit capture. Premium-dependent.
     target = (
         state.entry_debit + max_gain(state) * PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN
     ).quantize(Decimal("0.01"))
-    if state.current_value >= target:
+    if state.current_value is not None and state.current_value >= target:
         return close(
             ExitTrigger.PROFIT_CAPTURE,
             f"value {state.current_value} reached the {target} target "
-            f"({PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN} of maximum gain)",
+            f"({PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN} of maximum gain from the filled debit)",
         )
 
-    # 6. Time stop.
-    if state.dte <= TIME_STOP_DTE:
-        return close(
-            ExitTrigger.TIME_STOP,
-            f"{state.dte} DTE is at or below the {TIME_STOP_DTE}-day time stop",
+    # 6. Nothing fired. If the premium was unreadable, say so: it is an integrity
+    #    finding that must raise an incident and halt new risk, not a quiet hold.
+    if unmeasurable:
+        return ExitDecision(
+            False,
+            ExitTrigger.UNMEASURABLE,
+            "spread value could not be computed from the current chain; expiry, "
+            "invalidation, and session rules were evaluated and did not fire, so "
+            "the position is retained under a durable integrity incident",
+            POLICY_VERSION,
+            None,
+            None,
+            True,
         )
 
     return ExitDecision(
         False,
         ExitTrigger.HOLD,
         f"value {state.current_value} is between the {stop_level} stop and the "
-        f"{target} target, and {state.dte} DTE is above the {TIME_STOP_DTE}-day stop",
+        f"{target} target, and {state.sessions_elapsed} of {SESSION_STOP} sessions "
+        "have elapsed",
         POLICY_VERSION,
         pnl,
         None,
+        False,
     )

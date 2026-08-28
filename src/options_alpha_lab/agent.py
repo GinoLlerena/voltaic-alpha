@@ -24,9 +24,10 @@ from typing import Any
 from .architecture.contracts import (
     BotMode,
     DecisionAction,
+    DecisionOutcome,
     DecisionSnapshot,
-    Direction,
     ExecutionState,
+    SpreadStrategy,
 )
 from .architecture.workflow import DecisionWorkflow
 from .components import (
@@ -36,30 +37,24 @@ from .components import (
     DeterministicSpreadSelector,
 )
 from .config import Settings
-from .evidence import build_snapshot, parse_occ_symbol
-from .execution.gateway import ExecutionGateway, ExecutionRefused
-from .execution.intent import OrderIntent, build_close_intent, build_open_intent
+from .evidence import build_snapshot, parse_bars, parse_occ_symbol
+from .execution.gateway import AmbiguousSubmission, ExecutionGateway, ExecutionRefused
+from .execution.intent import IntentLeg, OrderIntent, build_close_intent, build_open_intent
+from .execution.lifecycle import (
+    LifecycleStore,
+    ManagedPosition,
+    OrderState,
+    PositionState,
+    TypedInvalidation,
+)
 from .execution.reconcile import Reconciler, ReconciliationReport
 from .execution.request import prepare_mleg_request
-from .exits import ExitDecision, ExitTrigger, PositionState, evaluate_exit
+from .exits import ExitDecision, ExitInputs, ExitTrigger, evaluate_exit
 from .providers.alpaca_readonly import ProviderError, ReadOnlyAlpacaClient
 
 DEFAULT_TICK_SECONDS = 300
 CHAIN_DTE_LOW = 10
 CHAIN_DTE_HIGH = 60
-
-
-@dataclass
-class OpenPosition:
-    """What the agent needs to manage a position it opened."""
-
-    intent: OrderIntent
-    direction: Direction
-    entry_debit: Decimal
-    width: Decimal
-    quantity: int
-    invalidation_level: Decimal | None
-    expiration: date
 
 
 @dataclass
@@ -114,6 +109,7 @@ class TradingAgent:
         synthesizer: Any = None,
         recorder: Any = None,
         reconciler: Reconciler | None = None,
+        store: LifecycleStore | None = None,
         symbol: str = "SPY",
         clock: Callable[[], datetime] | None = None,
         operator_approval: str | None = None,
@@ -124,13 +120,16 @@ class TradingAgent:
         self.synthesizer = synthesizer
         self.recorder = recorder
         self.reconciler = reconciler
+        self.store = store
         self.symbol = symbol
         self.operator_approval = operator_approval
         self._clock = clock or (lambda: datetime.now(UTC))
-        self.open_position: OpenPosition | None = None
         self.history: list[TickResult] = []
         self.run_id: str | None = None
+        self.decision_row_id: str | None = None
         self.last_reconciliation: ReconciliationReport | None = None
+        #: Completed trading sessions observed in the most recent bar read.
+        self._sessions: list[date] = []
         #: Set by reconciliation. Entries are refused while this is not NORMAL.
         self.execution_state: ExecutionState = ExecutionState.NORMAL
 
@@ -167,7 +166,9 @@ class TradingAgent:
 
     # -- observation -------------------------------------------------------
     def observe(self) -> tuple[DecisionSnapshot, bool]:
-        today = date.today()
+        # EXIT-009: the injected clock, not the host date. Two time sources in
+        # one method means replay and production disagree.
+        today = self._clock().date()
         clock_read = self.client.clock()
         account = self.client.account()
         bars = self.client.daily_bars(self.symbol)
@@ -179,6 +180,10 @@ class TradingAgent:
         is_open = bool(
             isinstance(clock_read.payload, dict) and clock_read.payload.get("is_open")
         )
+        self._sessions = [
+            bar.session
+            for bar in parse_bars(bars, as_of=self._clock(), market_open=is_open)
+        ]
         stamp = self._clock().strftime("%Y%m%dT%H%M%SZ")
         snapshot = build_snapshot(
             snapshot_id=f"{self.symbol.lower()}-agent-{stamp}",
@@ -221,8 +226,9 @@ class TradingAgent:
         report = self.reconcile()
 
         # Exits before entries, always.
-        if self.open_position is not None:
-            return self._record(self._manage_open_position(snapshot, now))
+        managed = self.active_position()
+        if managed is not None:
+            return self._record(self._manage_open_position(managed, snapshot, now))
 
         if report is not None and not report.clean:
             # New risk is halted, but management above still ran: a mismatch
@@ -249,26 +255,81 @@ class TradingAgent:
 
         return self._record(self._consider_entry(snapshot, now))
 
-    def _manage_open_position(self, snapshot: DecisionSnapshot, now: datetime) -> TickResult:
-        position = self.open_position
-        assert position is not None
-        value = spread_value(
-            snapshot,
-            position.intent.legs[0].symbol,
-            position.intent.legs[1].symbol,
-        )
-        state = PositionState(
+    def active_position(self) -> ManagedPosition | None:
+        """The position we are responsible for, read from durable records.
+
+        A `PENDING` position is deliberately not returned: its entry has not been
+        confirmed, so there is nothing to manage and nothing to price an exit
+        from. Reconciliation resolves it.
+        """
+        if self.store is None:
+            return None
+        for position in self.store.active_positions():
+            if position.state in {PositionState.OPEN, PositionState.CLOSING}:
+                return position
+        return None
+
+    def sessions_since(self, filled_at: datetime | None) -> int:
+        """Completed trading sessions since the entry fill (`EXIT-003`).
+
+        Counted from observed daily bars, which exist once per trading session,
+        so weekends and market holidays are excluded without a separate calendar.
+        """
+        if filled_at is None or not self._sessions:
+            return 0
+        entry_day = filled_at.astimezone(UTC).date()
+        return sum(1 for session in self._sessions if session > entry_day)
+
+    def _manage_open_position(
+        self, position: ManagedPosition, snapshot: DecisionSnapshot, now: datetime
+    ) -> TickResult:
+        if position.avg_entry_debit is None:
+            # OPEN without a reconciled basis should be impossible; refuse to
+            # invent one rather than pricing exits off a limit.
+            if self.store is not None:
+                self.store.open_incident(
+                    kind="missing_fill_basis",
+                    detail=f"position {position.position_id} is OPEN with no average debit",
+                    position_id=position.position_id, run_id=self.run_id, now=now,
+                )
+            return TickResult(
+                now, "POSITION_REVIEW",
+                "position is OPEN without a reconciled entry debit; incident raised",
+                snapshot.snapshot_id,
+            )
+
+        value = spread_value(snapshot, position.long_symbol, position.short_symbol)
+        inputs = ExitInputs(
             direction=position.direction,
-            entry_debit=position.entry_debit,
+            # The actual reconciled fill, never the estimate.
+            entry_debit=position.avg_entry_debit,
             width=position.width,
-            quantity=position.quantity,
-            dte=(position.expiration - now.date()).days,
+            quantity=position.filled_quantity,
+            dte=(position.expiration.astimezone(UTC).date() - now.date()).days,
             underlying_price=snapshot.underlying_price,
-            invalidation_level=position.invalidation_level,
+            invalidation_level=(
+                position.invalidation.level if position.invalidation else None
+            ),
             current_value=value,
             as_of=now.date(),
+            sessions_elapsed=self.sessions_since(position.entry_filled_at),
         )
-        decision = evaluate_exit(state)
+        decision = evaluate_exit(inputs)
+
+        # A premium we cannot read is an integrity finding, whether or not an
+        # independent rule fired (EXIT-004).
+        if decision.value_unmeasurable and self.store is not None:
+            self.store.open_incident(
+                kind="unmeasurable_position_value", severity="medium",
+                detail=(
+                    f"spread value unavailable for {position.long_symbol}/"
+                    f"{position.short_symbol}; premium-independent rules were evaluated"
+                ),
+                position_id=position.position_id, run_id=self.run_id, now=now,
+            )
+            self.execution_state = ExecutionState.NO_NEW_RISK
+            if self.gateway is not None:
+                self.gateway.execution_state = ExecutionState.NO_NEW_RISK
 
         if not decision.should_close:
             action = (
@@ -282,37 +343,87 @@ class TradingAgent:
 
         if self.gateway is None or not self.settings.may_write_orders:
             return TickResult(
-                now,
-                "EXIT_SIGNALLED",
+                now, "EXIT_SIGNALLED",
                 f"{decision.trigger.value}: {decision.reason} (no write authority)",
-                snapshot.snapshot_id,
-                exit=decision,
+                snapshot.snapshot_id, exit=decision,
+            )
+        if decision.suggested_limit is None:
+            return TickResult(
+                now, "EXIT_BLOCKED",
+                f"{decision.trigger.value} fired but the close cannot be priced from "
+                "the current chain; position retained and incident raised",
+                snapshot.snapshot_id, exit=decision,
             )
 
+        entry_intent = self._entry_intent_for(position)
+        if entry_intent is None:
+            return TickResult(
+                now, "EXIT_BLOCKED",
+                "close intent cannot be reconstructed from durable records",
+                snapshot.snapshot_id, exit=decision,
+            )
         close_intent = build_close_intent(
-            position.intent,
+            entry_intent,
             approval_reference=f"exit:{decision.trigger.value}",
-            limit_price=decision.suggested_limit or Decimal("0.01"),
+            limit_price=decision.suggested_limit,
             now=now,
         )
         request = prepare_mleg_request(close_intent, now=now)
+
+        # Persist before the mutation.
+        close_order_id = None
+        if self.store is not None:
+            close_order_id = self.store.prepare_close(
+                position_id=position.position_id, decision_id=position.decision_id,
+                intent=close_intent, request=request,
+                reason=decision.trigger.value, now=now,
+            )
         try:
-            # reduces_risk: a close must not be blocked by the guards that exist
-            # to prevent new risk.
             submission = self.gateway.submit(close_intent, request, reduces_risk=True)
         except ExecutionRefused as exc:
+            if self.store is not None and close_order_id is not None:
+                self.store.record_submission(
+                    close_order_id, broker_order_id=None, broker_status="refused",
+                    error=str(exc), now=now,
+                )
             return TickResult(
                 now, "EXIT_REFUSED", str(exc), snapshot.snapshot_id, exit=decision
             )
 
-        self.open_position = None
+        # Persist after the mutation. The close is SUBMITTED, not done: ownership
+        # is retained until reconciliation reports the broker flat.
+        if self.store is not None and close_order_id is not None:
+            self.store.record_submission(
+                close_order_id, broker_order_id=submission.broker_order_id,
+                broker_status=submission.status, ambiguous=submission.ambiguous, now=now,
+            )
         return TickResult(
-            now,
-            "POSITION_CLOSED",
+            now, "CLOSE_SUBMITTED",
             f"{decision.trigger.value}: {decision.reason}",
-            snapshot.snapshot_id,
-            exit=decision,
+            snapshot.snapshot_id, exit=decision,
             submitted=submission.client_order_id,
+        )
+
+    def _entry_intent_for(self, position: ManagedPosition) -> OrderIntent | None:
+        """Rebuild the opening intent so a close can mirror it exactly."""
+        if self.store is None:
+            return None
+        client_order_id = self.store.client_order_id_for(position.entry_order_id)
+        if client_order_id is None:
+            return None
+        strategy = SpreadStrategy(position.strategy)
+        return OrderIntent(
+            decision_hash=position.decision_id,
+            strategy=strategy,
+            legs=(
+                IntentLeg(position.long_symbol, 1, "buy", "buy_to_open"),
+                IntentLeg(position.short_symbol, 1, "sell", "sell_to_open"),
+            ),
+            strategy_quantity=max(position.filled_quantity, 1),
+            limit_price=position.avg_entry_debit or Decimal("0.01"),
+            approval_reference="reconstructed",
+            created_at=self._clock(),
+            expires_at=self._clock() + timedelta(seconds=90),
         )
 
     def _consider_entry(self, snapshot: DecisionSnapshot, now: datetime) -> TickResult:
@@ -334,6 +445,7 @@ class TradingAgent:
                 model_call=getattr(self.synthesizer, "last_call", None),
             )
             recorded_hash = recorded.decision_hash
+            self.decision_row_id = recorded.decision_id
 
         if outcome.action is not DecisionAction.OPTIONS_POSITION:
             return TickResult(
@@ -364,36 +476,95 @@ class TradingAgent:
             now=now,
         )
         request = prepare_mleg_request(intent, now=now)
+        quotes = {q.contract_symbol: q for q in snapshot.option_chain}
+        long_leg = quotes[outcome.spread.long_contract_symbol]
+        short_leg = quotes[outcome.spread.short_contract_symbol]
+
+        # Persist intent, request, order, and a PENDING position BEFORE sending,
+        # so a crash between send and response is recoverable from the database.
+        order_id = position_id = None
+        if self.store is not None and self.decision_row_id is not None:
+            order_id, position_id = self.store.prepare_entry(
+                decision_id=self.decision_row_id,
+                intent=intent,
+                request=request,
+                direction=outcome.direction,
+                long_symbol=long_leg.contract_symbol,
+                short_symbol=short_leg.contract_symbol,
+                expiration=datetime.combine(
+                    long_leg.expiration, datetime.min.time(), tzinfo=UTC
+                ),
+                width=abs(long_leg.strike - short_leg.strike),
+                max_loss=outcome.risk.calculated_max_loss,
+                invalidation=self._typed_invalidation(outcome),
+                now=now,
+            )
+
         try:
             submission = self.gateway.submit(
                 intent, request, operator_approval=self.operator_approval
             )
+        except AmbiguousSubmission as exc:
+            # Sent, outcome unknown. Responsibility is retained and new risk
+            # halts until reconciliation establishes what the broker holds.
+            if self.store is not None and order_id is not None:
+                self.store.record_submission(
+                    order_id, broker_order_id=None, broker_status=None,
+                    ambiguous=True, error=str(exc), now=now,
+                )
+                self.store.open_incident(
+                    kind="ambiguous_entry_submission",
+                    detail=f"entry submission outcome unknown: {exc}",
+                    position_id=position_id, run_id=self.run_id, now=now,
+                )
+            self.execution_state = ExecutionState.NO_NEW_RISK
+            if self.gateway is not None:
+                self.gateway.execution_state = ExecutionState.NO_NEW_RISK
+            return TickResult(
+                now, "ENTRY_AMBIGUOUS", str(exc), snapshot.snapshot_id, recorded_hash
+            )
         except ExecutionRefused as exc:
+            if self.store is not None and order_id is not None and position_id is not None:
+                self.store.record_submission(
+                    order_id, broker_order_id=None, broker_status="refused",
+                    error=str(exc), now=now,
+                )
+                # Refused before anything was sent: no exposure can exist.
+                self.store.apply_entry_outcome(
+                    position_id, state=OrderState.REJECTED, filled_quantity=0,
+                    avg_debit=None, now=now,
+                )
             return TickResult(
                 now, "ENTRY_REFUSED", str(exc), snapshot.snapshot_id, recorded_hash
             )
 
-        quotes = {q.contract_symbol: q for q in snapshot.option_chain}
-        long_leg = quotes[outcome.spread.long_contract_symbol]
-        short_leg = quotes[outcome.spread.short_contract_symbol]
-        self.open_position = OpenPosition(
-            intent=intent,
-            direction=outcome.direction,
-            entry_debit=outcome.spread.estimated_debit,
-            width=abs(long_leg.strike - short_leg.strike),
-            quantity=outcome.spread.quantity,
-            invalidation_level=invalidation_level_from(
-                outcome.setup.invalidation_conditions if outcome.setup else ()
-            ),
-            expiration=long_leg.expiration,
-        )
+        # Persist after the mutation. Acceptance is SUBMITTED, never FILLED, so
+        # no position is opened here: reconciliation does that, from real fills.
+        if self.store is not None and order_id is not None:
+            self.store.record_submission(
+                order_id, broker_order_id=submission.broker_order_id,
+                broker_status=submission.status, ambiguous=submission.ambiguous, now=now,
+            )
         return TickResult(
             now,
-            "POSITION_OPENED",
-            f"{outcome.spread.strategy.value} debit {outcome.spread.estimated_debit}",
+            "ENTRY_SUBMITTED",
+            f"{outcome.spread.strategy.value} debit {outcome.spread.estimated_debit} "
+            "submitted; awaiting fill reconciliation",
             snapshot.snapshot_id,
             recorded_hash,
             submitted=submission.client_order_id,
+        )
+
+    @staticmethod
+    def _typed_invalidation(outcome: DecisionOutcome) -> TypedInvalidation | None:
+        """Store invalidation as a typed rule rather than prose (`EXIT-005`)."""
+        if outcome.setup is None:
+            return None
+        level = invalidation_level_from(outcome.setup.invalidation_conditions)
+        if level is None:
+            return None
+        return TypedInvalidation(
+            level=level, direction=outcome.setup.direction, source="daily_close"
         )
 
     def _record(self, result: TickResult) -> TickResult:
@@ -544,7 +715,6 @@ def main(argv: Any = None) -> int:
 
 
 __all__ = [
-    "OpenPosition",
     "TickResult",
     "TradingAgent",
     "halt_state_for",

@@ -171,7 +171,9 @@ class Reconciler:
                 legs=_leg_fills(entry_order),
                 now=stamp,
             )
-            if position.state is PositionState.PENDING:
+            # INCIDENT is included deliberately: reconciliation exists to heal
+            # an incident once the facts are known, not only to raise one.
+            if position.state in {PositionState.PENDING, PositionState.INCIDENT}:
                 new_state = self._store.apply_entry_outcome(
                     position.position_id,
                     state=resolved,
@@ -181,7 +183,10 @@ class Reconciler:
                 )
                 report.positions_resolved.append(f"{position.position_id}:{new_state.value}")
                 return
-        elif position.state is PositionState.PENDING and entry_state is OrderState.AMBIGUOUS:
+        elif (
+            position.state in {PositionState.PENDING, PositionState.INCIDENT}
+            and entry_state is OrderState.AMBIGUOUS
+        ):
             report.mismatches.append(
                 f"{position.position_id}: entry order state is ambiguous and the broker "
                 "returned no matching order"

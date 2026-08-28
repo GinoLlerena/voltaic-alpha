@@ -117,6 +117,23 @@ class TypedInvalidation:
 
 
 @dataclass(frozen=True)
+class IncidentRecord:
+    """A detached view of an incident.
+
+    Returning ORM instances outside their session raises DetachedInstanceError on
+    first attribute access, which turns a diagnostic call into a crash.
+    """
+
+    incident_id: str
+    kind: str
+    severity: str
+    detail: str
+    execution_state: str
+    position_id: str | None
+    opened_at: datetime
+
+
+@dataclass(frozen=True)
 class ManagedPosition:
     """A position reconstructed from durable records, not from process memory."""
 
@@ -580,8 +597,19 @@ class LifecycleStore:
                     position.lifecycle_status = PositionState.INCIDENT.value
         return incident_id
 
-    def open_incidents(self) -> list[Incident]:
+    def open_incidents(self) -> list[IncidentRecord]:
         with self._session() as session:
-            return list(
-                session.scalars(select(Incident).where(Incident.resolved_at.is_(None))).all()
-            )
+            return [
+                IncidentRecord(
+                    incident_id=row.id,
+                    kind=row.kind,
+                    severity=row.severity,
+                    detail=row.detail,
+                    execution_state=row.execution_state,
+                    position_id=row.position_id,
+                    opened_at=row.opened_at,
+                )
+                for row in session.scalars(
+                    select(Incident).where(Incident.resolved_at.is_(None))
+                ).all()
+            ]

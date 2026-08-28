@@ -269,5 +269,49 @@ class NoWorkTests(ReconcileCase):
         Reconciler(FakeBroker(), self.store).reconcile(now=NOW)
 
 
+
+
+class IncidentHealingTests(ReconcileCase):
+    """Reconciliation exists to heal an incident once the facts are known."""
+
+    def test_an_ambiguous_entry_resolves_once_the_order_is_found(self) -> None:
+        order_id, position_id, intent = self.prepare()
+        self.store.record_submission(order_id, broker_order_id=None,
+                                     broker_status=None, ambiguous=True, now=NOW)
+        self.store.open_incident(kind="ambiguous_entry_submission",
+                                 detail="outcome unknown", position_id=position_id, now=NOW)
+        managed = self.store.get_position(position_id)
+        assert managed is not None
+        self.assertIs(managed.state, PositionState.INCIDENT)
+
+        # The order turns out to have filled after all.
+        broker = FakeBroker(
+            positions=[{"symbol": LONG, "qty": "1"}, {"symbol": SHORT, "qty": "-1"}],
+            by_client_id={intent.client_order_id: filled_order(intent.client_order_id)},
+        )
+        Reconciler(broker, self.store).reconcile(now=NOW)
+        healed = self.store.get_position(position_id)
+        assert healed is not None
+        self.assertIs(healed.state, PositionState.OPEN)
+        self.assertEqual(healed.avg_entry_debit, Decimal("3.13"))
+
+    def test_an_ambiguous_entry_that_never_existed_resolves_to_abandoned(self) -> None:
+        order_id, position_id, intent = self.prepare()
+        self.store.record_submission(order_id, broker_order_id=None,
+                                     broker_status=None, ambiguous=True, now=NOW)
+        self.store.open_incident(kind="ambiguous_entry_submission",
+                                 detail="outcome unknown", position_id=position_id, now=NOW)
+        broker = FakeBroker(by_client_id={
+            intent.client_order_id: {
+                "client_order_id": intent.client_order_id, "id": "brk-1",
+                "status": "rejected", "filled_qty": "0", "filled_avg_price": None,
+            }
+        })
+        Reconciler(broker, self.store).reconcile(now=NOW)
+        healed = self.store.get_position(position_id)
+        assert healed is not None
+        self.assertIs(healed.state, PositionState.ABANDONED)
+
+
 if __name__ == "__main__":
     unittest.main()

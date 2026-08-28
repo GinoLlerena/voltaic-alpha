@@ -40,7 +40,21 @@ PAPER_HOST = "paper-api.alpaca.markets"
 
 
 class ExecutionRefused(RuntimeError):
-    """A guard refused the write. Never caught to retry without re-approval."""
+    """A guard refused the write **before** anything was sent.
+
+    Nothing reached the broker, so no exposure can exist. This is safe to treat
+    as "no position was created".
+    """
+
+
+class AmbiguousSubmission(ExecutionRefused):
+    """The request was sent and its outcome is unknown.
+
+    Distinct from `ExecutionRefused` on purpose. A caller that treats these the
+    same will mark a position abandoned that the broker may actually hold, which
+    loses responsibility for real exposure. The correct response is to retain
+    responsibility, halt new risk, and keep reconciling.
+    """
 
 
 @dataclass(frozen=True)
@@ -160,10 +174,16 @@ class ExecutionGateway:
         except Exception as exc:  # noqa: BLE001 - any failure becomes an ambiguous state
             # We do not know whether the broker accepted it. Resolving by
             # re-submitting is how duplicates are created; resolve by lookup.
-            found = self._broker.get_by_client_order_id(request.client_order_id)
+            try:
+                found = self._broker.get_by_client_order_id(request.client_order_id)
+            except Exception:  # noqa: BLE001 - the lookup is as unreliable as the submit
+                found = None
             if found is None:
-                raise ExecutionRefused(
-                    f"submit failed and no order exists for {request.client_order_id}: {exc}"
+                # We could not confirm the order is absent; we only failed to
+                # find it. Those are different, and only one of them is safe.
+                raise AmbiguousSubmission(
+                    f"submit failed and no order could be located for "
+                    f"{request.client_order_id}: {exc}"
                 ) from exc
             return SubmissionResult(
                 client_order_id=request.client_order_id,
