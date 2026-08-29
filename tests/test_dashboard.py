@@ -49,14 +49,15 @@ class DashboardRenderTests(unittest.TestCase):
         # The refusal case has no thesis, no spread, and no evidence pack, so it
         # exercises a different path through every view.
         app = run_app()
-        options = app.radio[0].options
-        self.assertEqual(len(options), decisions_in_evidence())
+        # radio[0] is the view filter; radio[1] is the decision list.
+        options = app.radio[1].options
         self.assertGreaterEqual(len(options), 3, "need bullish, bearish, and refused cases")
+        self.assertLessEqual(len(options), decisions_in_evidence())
         for option in options:
             with self.subTest(decision=option):
                 run = AppTest.from_file(str(APP), default_timeout=90)
                 run.run()
-                run.radio[0].set_value(option).run()
+                run.radio[1].set_value(option).run()
                 self.assertEqual(list(run.exception), [], f"raised on {option}")
 
     def test_all_five_views_are_present(self) -> None:
@@ -152,7 +153,7 @@ class LiveSourceFallbackTests(unittest.TestCase):
         try:
             app = AppTest.from_file(str(APP), default_timeout=90).run()
             self.assertEqual(list(app.exception), [])
-            self.assertEqual(len(app.radio[0].options), decisions_in_evidence())
+            self.assertGreaterEqual(len(app.radio[1].options), 1)
         finally:
             del os.environ["DASHBOARD_DATABASE_URL"]
 
@@ -162,6 +163,97 @@ class LiveSourceFallbackTests(unittest.TestCase):
         labels = [m.value for m in app.caption] if hasattr(app, "caption") else []
         text = " ".join(labels) or APP.read_text(encoding="utf-8")
         self.assertIn("Source:", text)
+
+
+
+
+class SelectorScaleTests(unittest.TestCase):
+    """A polling agent produces ~66 decisions a session; the list must survive that."""
+
+    def build_busy_database(self, tmp: str, refusals: int = 282) -> str:
+        import uuid
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import select as sa_select
+        from sqlalchemy.orm import Session
+
+        from options_alpha_lab.config import load_settings
+        from options_alpha_lab.persistence.models import Decision, MarketSnapshot, Run
+        from options_alpha_lab.persistence.repository import build_engine, create_schema
+        from options_alpha_lab.replay import replay_paths
+
+        db = Path(tmp) / "busy.db"
+        settings = load_settings({
+            "BOT_MODE": "observe", "ALPACA_PAPER_TRADE": "true",
+            "ALPACA_TRADING_ENABLED": "false",
+            "DATABASE_URL": f"sqlite+pysqlite:///{db}",
+        })
+        engine = build_engine(settings)
+        create_schema(engine)
+        replay_paths(
+            [Path("fixtures/h0/spy_qualified.snapshot.json"),
+             Path("fixtures/h0/spy_refusal.snapshot.json")],
+            settings, create=False,
+        )
+        with Session(engine) as session:
+            run = session.scalars(sa_select(Run)).first()
+            snap = session.scalars(sa_select(MarketSnapshot)).first()
+            base = datetime.now(UTC) - timedelta(hours=30)
+            for i in range(refusals):
+                session.add(Decision(
+                    id=uuid.uuid4().hex, run_id=run.id, market_snapshot_id=snap.id,
+                    snapshot_id=f"spy-agent-{i:04d}", action="NO_TRADE",
+                    direction="neutral", reason_codes=["no_qualified_setup"],
+                    transitions=[], input_hash=f"sha256:{i:064d}",
+                    decision_hash=f"sha256:d{i:063d}",
+                    policy_version="h0-provisional-0",
+                    decided_at=base + timedelta(minutes=5 * i),
+                    recorded_at=base + timedelta(minutes=5 * i),
+                ))
+            session.commit()
+        return f"sqlite+pysqlite:///{db}"
+
+    def test_hundreds_of_decisions_collapse_to_a_readable_list(self) -> None:
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["DASHBOARD_DATABASE_URL"] = self.build_busy_database(tmp)
+            try:
+                app = AppTest.from_file(str(APP), default_timeout=120).run()
+                self.assertEqual(list(app.exception), [])
+                options = app.radio[1].options
+                # 282 identical consecutive refusals are one fact, not 282 rows.
+                self.assertLessEqual(
+                    len(options), 12,
+                    f"selector offered {len(options)} options; it must collapse runs",
+                )
+                self.assertGreaterEqual(len(options), 2, "the distinct cases survive")
+            finally:
+                del os.environ["DASHBOARD_DATABASE_URL"]
+
+    def test_the_query_is_bounded(self) -> None:
+        # Without a limit the page loads the whole decisions table on every
+        # interaction, which is a different failure from the list being long.
+        source = APP.read_text(encoding="utf-8")
+        self.assertIn("DECISION_LIMIT", source)
+        self.assertIn(".limit(", source)
+
+    def test_every_filter_renders(self) -> None:
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["DASHBOARD_DATABASE_URL"] = self.build_busy_database(tmp, refusals=40)
+            try:
+                for choice in ("Notable", "Positions", "Refusals", "Everything"):
+                    with self.subTest(view=choice):
+                        run = AppTest.from_file(str(APP), default_timeout=120)
+                        run.run()
+                        run.radio[0].set_value(choice).run()
+                        self.assertEqual(list(run.exception), [], f"{choice} raised")
+            finally:
+                del os.environ["DASHBOARD_DATABASE_URL"]
 
 
 if __name__ == "__main__":

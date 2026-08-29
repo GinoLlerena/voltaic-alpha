@@ -69,7 +69,7 @@ STAGES = [
 
 st.set_page_config(page_title="Options Alpha", page_icon="◬", layout="wide")
 # st.markdown strips <style>; st.html is the supported path for raw CSS.
-THEME = '\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">\n<style>\n:root{\n  /* Two temperatures, and the rule is semantic: warm means the model touched\n     it, cool means deterministic code owns it. Stated once in the legend, then\n     every view is scannable without reading. */\n  --ink:#0D1117; --panel:#151B23; --panel2:#1B222C; --edge:#263040; --edge2:#31405433;\n  --cool:#5AB3F0;      /* deterministic authority */\n  --warm:#E8A33D;      /* model, advisory only */\n  --affirm:#46D08A;    /* verified, flat, passed */\n  --alarm:#FF6161;     /* blocked, refused */\n  --text:#E7EDF5; --muted:#8896A8; --dim:#5C697A;\n  --mono:\'IBM Plex Mono\',ui-monospace,monospace;\n  --cond:\'IBM Plex Sans Condensed\',\'IBM Plex Sans\',system-ui,sans-serif;\n  --body:\'IBM Plex Sans\',system-ui,sans-serif;\n}\nhtml,body,[data-testid="stAppViewContainer"],[data-testid="stHeader"]{background:var(--ink)!important}\n[data-testid="stHeader"]{border-bottom:1px solid var(--edge)}\n.stApp{font-family:var(--body);color:var(--text)}\n.stApp p,.stApp li{font-family:var(--body)}\n/* Colour is inherited from .stApp rather than set on every span and div: a\n   broad element rule outranks a single-class semantic rule and would quietly\n   win over .pass, .fail and the tone classes. */\n[data-testid="stMainBlockContainer"]{padding-top:1.2rem;max-width:1500px}\n#MainMenu,footer{visibility:hidden}\n\n/* ---- masthead ---- */\n.oa-head{display:flex;align-items:baseline;gap:.85rem;flex-wrap:wrap;\n  border-bottom:1px solid var(--edge);padding-bottom:.7rem;margin-bottom:.9rem}\n.oa-head h1{font-family:var(--cond);font-weight:700;font-size:2.1rem;letter-spacing:-.015em;\n  margin:0;line-height:1;color:var(--text)}\n.oa-head .sub{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;\n  text-transform:uppercase;color:var(--dim)}\n.oa-head .spacer{flex:1}\n\n/* ---- annunciator panel: discrete lit tiles, cockpit vernacular ---- */\n.ann{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;\n  background:var(--edge);border:1px solid var(--edge);margin:0 0 1.1rem}\n.ann .t{background:var(--panel);padding:.6rem .8rem}\n.ann .k{font-family:var(--mono);font-size:.61rem;letter-spacing:.15em;text-transform:uppercase;\n  color:var(--dim);margin-bottom:.28rem}\n.ann .v{font-family:var(--cond);font-weight:700;font-size:1.15rem;line-height:1.1;\n  display:flex;align-items:center;gap:.42rem}\n.ann .v::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;\n  background:currentColor;box-shadow:0 0 8px currentColor}\n.ok{color:var(--affirm)} .warn{color:var(--warm)} .bad{color:var(--alarm)}\n.neutral{color:var(--cool)} .off{color:var(--dim)}\n.off .v::before,.ann .off::before{box-shadow:none;opacity:.45}\n\n/* ---- the signature: authority rail ---- */\n.rail{border:1px solid var(--edge);background:var(--panel);padding:.85rem .9rem 1rem;\n  margin-bottom:1.1rem;overflow-x:auto}\n.rail .cap{font-family:var(--mono);font-size:.61rem;letter-spacing:.15em;text-transform:uppercase;\n  color:var(--dim);margin-bottom:.65rem;display:flex;gap:1.2rem;flex-wrap:wrap}\n.rail .cap i{font-style:normal;display:inline-flex;align-items:center;gap:.34rem}\n.rail .cap i::before{content:"";width:8px;height:8px;border-radius:2px;background:currentColor}\n.flow{display:flex;align-items:stretch;gap:0;min-width:820px}\n.node{flex:1;border:1px solid var(--edge);background:var(--panel2);padding:.5rem .55rem;\n  text-align:center;position:relative}\n.node .n{font-family:var(--mono);font-size:.58rem;color:var(--dim);letter-spacing:.1em}\n.node .l{font-family:var(--cond);font-weight:600;font-size:.92rem;margin-top:.12rem;color:var(--muted)}\n.node.on{background:#101923;border-color:var(--cool);box-shadow:inset 0 -2px 0 var(--cool)}\n.node.on .l{color:var(--cool)}\n.node.model{border-color:var(--warm);background:#1F1808}\n.node.model .l{color:var(--warm)}\n.node.model.on{box-shadow:inset 0 -2px 0 var(--warm)}\n.node.model .n{color:var(--warm);opacity:.8}\n.arrow{display:flex;align-items:center;padding:0 .34rem;color:var(--edge);font-size:.85rem}\n.fence{font-family:var(--mono);font-size:.58rem;color:var(--warm);text-align:center;\n  margin-top:.5rem;letter-spacing:.08em}\n\n/* ---- panels & headings ---- */\n.oa-h{font-family:var(--cond);font-weight:600;font-size:1.02rem;letter-spacing:.01em;\n  color:var(--text);margin:1.35rem 0 .6rem;padding-bottom:.32rem;\n  border-bottom:1px solid var(--edge);display:flex;align-items:baseline;gap:.55rem}\n.oa-h small{font-family:var(--mono);font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;\n  color:var(--dim);font-weight:400}\n.card{border:1px solid var(--edge);background:var(--panel);padding:.85rem .95rem}\n.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:.75rem}\n\n/* ---- data rows ---- */\n.kv{display:grid;grid-template-columns:170px 1fr;gap:.4rem .9rem;font-size:.86rem}\n.kv dt{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;\n  color:var(--dim);padding-top:.15rem}\n.kv dd{margin:0;font-family:var(--mono);font-size:.82rem;color:var(--text);word-break:break-all}\n\n/* ---- ordered guard list: these run in sequence, so number them ---- */\n.seq{counter-reset:g;display:flex;flex-direction:column;gap:1px;background:var(--edge);\n  border:1px solid var(--edge)}\n.seq li{counter-increment:g;list-style:none;background:var(--panel);padding:.5rem .8rem;\n  display:grid;grid-template-columns:26px 1fr auto;gap:.75rem;align-items:baseline}\n.seq li::before{content:counter(g);font-family:var(--mono);font-size:.7rem;color:var(--dim)}\n.seq .g{font-size:.87rem;color:var(--text)}\n.seq .b{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:right}\n\n/* ---- checks ---- */\n.chk{display:flex;flex-direction:column;gap:1px;background:var(--edge);border:1px solid var(--edge)}\n.chk div{background:var(--panel);padding:.44rem .8rem;display:flex;justify-content:space-between;\n  gap:1rem;font-size:.84rem;align-items:baseline}\n.chk .m{font-family:var(--mono);font-size:.75rem}\n.pass{color:var(--affirm)} .fail{color:var(--alarm)}\n\n/* ---- hash chain: the differentiator, drawn as an actual chain ---- */\n.chain{display:flex;flex-direction:column;gap:0}\n.link{display:grid;grid-template-columns:180px 1fr;gap:.9rem;align-items:center;\n  border:1px solid var(--edge);border-bottom:none;background:var(--panel);padding:.55rem .8rem}\n.chain .link:last-child{border-bottom:1px solid var(--edge)}\n.link .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;\n  color:var(--dim)}\n.link .dig{font-family:var(--mono);font-size:.78rem;color:var(--cool);word-break:break-all}\n.link.warm .dig{color:var(--warm)}\n.knot{font-family:var(--mono);font-size:.62rem;color:var(--dim);padding:.16rem 0 .16rem 1rem}\n\n/* ---- signal strength ---- */\n.sig{display:flex;flex-direction:column;gap:1px;background:var(--edge);border:1px solid var(--edge)}\n.sig .r{background:var(--panel);padding:.55rem .8rem;display:grid;\n  grid-template-columns:1fr 92px 54px;gap:.8rem;align-items:center}\n.sig .nm{font-size:.85rem}\n.sig .nm em{font-style:normal;font-family:var(--mono);font-size:.66rem;color:var(--dim);\n  display:block;letter-spacing:.09em;text-transform:uppercase}\n.bar{height:5px;background:var(--edge);position:relative}\n.bar i{position:absolute;inset:0 auto 0 0;display:block}\n.num{font-family:var(--mono);font-size:.78rem;text-align:right}\n\n/* ---- badges & prose ---- */\n.badge{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;\n  padding:.16rem .45rem;border:1px solid currentColor;display:inline-block}\n.memo{border-left:2px solid var(--warm);background:#1B160B;padding:.75rem .95rem;\n  font-size:.92rem;line-height:1.55}\n.note{color:var(--muted);font-size:.85rem;line-height:1.55}\n.rule{border:none;border-top:1px solid var(--edge);margin:1.1rem 0}\n\n/* ---- streamlit overrides ---- */\n[data-testid="stSidebar"]{background:var(--panel)!important;border-right:1px solid var(--edge)}\n[data-testid="stSidebar"] *{font-family:var(--body)}\n.stTabs [data-baseweb="tab-list"]{gap:0;border-bottom:1px solid var(--edge);background:transparent}\n.stTabs [data-baseweb="tab"]{font-family:var(--mono)!important;font-size:.72rem!important;\n  letter-spacing:.11em;text-transform:uppercase;color:var(--dim)!important;\n  padding:.55rem .95rem!important;border-radius:0}\n.stTabs [aria-selected="true"]{color:var(--cool)!important;background:var(--panel)}\n.stTabs [data-baseweb="tab-highlight"]{background:var(--cool)!important}\n.stTabs [data-baseweb="tab-border"]{display:none}\n[data-testid="stRadio"] label p{font-size:.83rem!important}\ndiv[data-testid="stSelectbox"] div[data-baseweb="select"]>div{background:var(--panel2);\n  border-color:var(--edge);font-family:var(--mono);font-size:.82rem}\n[data-testid="stAlert"]{border-radius:0;font-size:.87rem}\ncode{font-family:var(--mono)!important;background:var(--panel2)!important;color:var(--cool)!important;\n  font-size:.8rem!important;padding:.1rem .3rem!important}\n:focus-visible{outline:2px solid var(--cool);outline-offset:2px}\n@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}\n</style>\n'  # noqa: E501 - one stylesheet literal, not code
+THEME = '\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">\n<style>\n:root{\n  /* Two temperatures, and the rule is semantic: warm means the model touched\n     it, cool means deterministic code owns it. Stated once in the legend, then\n     every view is scannable without reading. */\n  --ink:#0D1117; --panel:#151B23; --panel2:#1B222C; --edge:#263040; --edge2:#31405433;\n  --cool:#5AB3F0;      /* deterministic authority */\n  --warm:#E8A33D;      /* model, advisory only */\n  --affirm:#46D08A;    /* verified, flat, passed */\n  --alarm:#FF6161;     /* blocked, refused */\n  --text:#E7EDF5; --muted:#8896A8; --dim:#5C697A;\n  --mono:\'IBM Plex Mono\',ui-monospace,monospace;\n  --cond:\'IBM Plex Sans Condensed\',\'IBM Plex Sans\',system-ui,sans-serif;\n  --body:\'IBM Plex Sans\',system-ui,sans-serif;\n}\nhtml,body,[data-testid="stAppViewContainer"],[data-testid="stHeader"]{background:var(--ink)!important}\n[data-testid="stHeader"]{border-bottom:1px solid var(--edge)}\n.stApp{font-family:var(--body);color:var(--text)}\n.stApp p,.stApp li{font-family:var(--body)}\n/* Colour is inherited from .stApp rather than set on every span and div: a\n   broad element rule outranks a single-class semantic rule and would quietly\n   win over .pass, .fail and the tone classes. */\n[data-testid="stMainBlockContainer"]{padding-top:1.2rem;max-width:1500px}\n#MainMenu,footer{visibility:hidden}\n\n/* ---- masthead ---- */\n.oa-head{display:flex;align-items:baseline;gap:.85rem;flex-wrap:wrap;\n  border-bottom:1px solid var(--edge);padding-bottom:.7rem;margin-bottom:.9rem}\n.oa-head h1{font-family:var(--cond);font-weight:700;font-size:2.1rem;letter-spacing:-.015em;\n  margin:0;line-height:1;color:var(--text)}\n.oa-head .sub{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;\n  text-transform:uppercase;color:var(--dim)}\n.oa-head .spacer{flex:1}\n\n/* ---- annunciator panel: discrete lit tiles, cockpit vernacular ---- */\n.ann{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;\n  background:var(--edge);border:1px solid var(--edge);margin:0 0 1.1rem}\n.ann .t{background:var(--panel);padding:.6rem .8rem}\n.ann .k{font-family:var(--mono);font-size:.61rem;letter-spacing:.15em;text-transform:uppercase;\n  color:var(--dim);margin-bottom:.28rem}\n.ann .v{font-family:var(--cond);font-weight:700;font-size:1.15rem;line-height:1.1;\n  display:flex;align-items:center;gap:.42rem}\n.ann .v::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;\n  background:currentColor;box-shadow:0 0 8px currentColor}\n.ok{color:var(--affirm)} .warn{color:var(--warm)} .bad{color:var(--alarm)}\n.neutral{color:var(--cool)} .off{color:var(--dim)}\n.off .v::before,.ann .off::before{box-shadow:none;opacity:.45}\n\n/* ---- the signature: authority rail ---- */\n.rail{border:1px solid var(--edge);background:var(--panel);padding:.85rem .9rem 1rem;\n  margin-bottom:1.1rem;overflow-x:auto}\n.rail .cap{font-family:var(--mono);font-size:.61rem;letter-spacing:.15em;text-transform:uppercase;\n  color:var(--dim);margin-bottom:.65rem;display:flex;gap:1.2rem;flex-wrap:wrap}\n.rail .cap i{font-style:normal;display:inline-flex;align-items:center;gap:.34rem}\n.rail .cap i::before{content:"";width:8px;height:8px;border-radius:2px;background:currentColor}\n.flow{display:flex;align-items:stretch;gap:0;min-width:820px}\n.node{flex:1;border:1px solid var(--edge);background:var(--panel2);padding:.5rem .55rem;\n  text-align:center;position:relative}\n.node .n{font-family:var(--mono);font-size:.58rem;color:var(--dim);letter-spacing:.1em}\n.node .l{font-family:var(--cond);font-weight:600;font-size:.92rem;margin-top:.12rem;color:var(--muted)}\n.node.on{background:#101923;border-color:var(--cool);box-shadow:inset 0 -2px 0 var(--cool)}\n.node.on .l{color:var(--cool)}\n.node.model{border-color:var(--warm);background:#1F1808}\n.node.model .l{color:var(--warm)}\n.node.model.on{box-shadow:inset 0 -2px 0 var(--warm)}\n.node.model .n{color:var(--warm);opacity:.8}\n.arrow{display:flex;align-items:center;padding:0 .34rem;color:var(--edge);font-size:.85rem}\n.fence{font-family:var(--mono);font-size:.58rem;color:var(--warm);text-align:center;\n  margin-top:.5rem;letter-spacing:.08em}\n\n/* ---- panels & headings ---- */\n.oa-h{font-family:var(--cond);font-weight:600;font-size:1.02rem;letter-spacing:.01em;\n  color:var(--text);margin:1.35rem 0 .6rem;padding-bottom:.32rem;\n  border-bottom:1px solid var(--edge);display:flex;align-items:baseline;gap:.55rem}\n.oa-h small{font-family:var(--mono);font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;\n  color:var(--dim);font-weight:400}\n.card{border:1px solid var(--edge);background:var(--panel);padding:.85rem .95rem}\n.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:.75rem}\n\n/* ---- data rows ---- */\n.kv{display:grid;grid-template-columns:170px 1fr;gap:.4rem .9rem;font-size:.86rem}\n.kv dt{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;\n  color:var(--dim);padding-top:.15rem}\n.kv dd{margin:0;font-family:var(--mono);font-size:.82rem;color:var(--text);word-break:break-all}\n\n/* ---- ordered guard list: these run in sequence, so number them ---- */\n.seq{counter-reset:g;display:flex;flex-direction:column;gap:1px;background:var(--edge);\n  border:1px solid var(--edge)}\n.seq li{counter-increment:g;list-style:none;background:var(--panel);padding:.5rem .8rem;\n  display:grid;grid-template-columns:26px 1fr auto;gap:.75rem;align-items:baseline}\n.seq li::before{content:counter(g);font-family:var(--mono);font-size:.7rem;color:var(--dim)}\n.seq .g{font-size:.87rem;color:var(--text)}\n.seq .b{font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:right}\n\n/* ---- checks ---- */\n.chk{display:flex;flex-direction:column;gap:1px;background:var(--edge);border:1px solid var(--edge)}\n.chk div{background:var(--panel);padding:.44rem .8rem;display:flex;justify-content:space-between;\n  gap:1rem;font-size:.84rem;align-items:baseline}\n.chk .m{font-family:var(--mono);font-size:.75rem}\n.pass{color:var(--affirm)} .fail{color:var(--alarm)}\n\n/* ---- hash chain: the differentiator, drawn as an actual chain ---- */\n.chain{display:flex;flex-direction:column;gap:0}\n.link{display:grid;grid-template-columns:180px 1fr;gap:.9rem;align-items:center;\n  border:1px solid var(--edge);border-bottom:none;background:var(--panel);padding:.55rem .8rem}\n.chain .link:last-child{border-bottom:1px solid var(--edge)}\n.link .lab{font-family:var(--mono);font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;\n  color:var(--dim)}\n.link .dig{font-family:var(--mono);font-size:.78rem;color:var(--cool);word-break:break-all}\n.link.warm .dig{color:var(--warm)}\n.knot{font-family:var(--mono);font-size:.62rem;color:var(--dim);padding:.16rem 0 .16rem 1rem}\n\n/* ---- signal strength ---- */\n.sig{display:flex;flex-direction:column;gap:1px;background:var(--edge);border:1px solid var(--edge)}\n.sig .r{background:var(--panel);padding:.55rem .8rem;display:grid;\n  grid-template-columns:1fr 92px 54px;gap:.8rem;align-items:center}\n.sig .nm{font-size:.85rem}\n.sig .nm em{font-style:normal;font-family:var(--mono);font-size:.66rem;color:var(--dim);\n  display:block;letter-spacing:.09em;text-transform:uppercase}\n.bar{height:5px;background:var(--edge);position:relative}\n.bar i{position:absolute;inset:0 auto 0 0;display:block}\n.num{font-family:var(--mono);font-size:.78rem;text-align:right}\n\n/* ---- badges & prose ---- */\n.badge{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;\n  padding:.16rem .45rem;border:1px solid currentColor;display:inline-block}\n.memo{border-left:2px solid var(--warm);background:#1B160B;padding:.75rem .95rem;\n  font-size:.92rem;line-height:1.55}\n.note{color:var(--muted);font-size:.85rem;line-height:1.55}\n.rule{border:none;border-top:1px solid var(--edge);margin:1.1rem 0}\n\n/* ---- streamlit overrides ---- */\n[data-testid="stSidebar"]{background:var(--panel)!important;border-right:1px solid var(--edge)}\n[data-testid="stSidebar"] p,[data-testid="stSidebar"] label,[data-testid="stSidebar"] li{font-family:var(--body)}\n/* Icon fonts render ligatures: overriding their family shows the literal\n   ligature name instead of the glyph, e.g. keyboard_double_arrow_left on\n   the sidebar collapse control. Never let a broad rule reach them. */\n[data-testid="stIconMaterial"],span[class*="material-symbols"],\n.material-symbols-rounded,.material-symbols-outlined{\n  font-family:\"Material Symbols Rounded\",\"Material Symbols Outlined\",\"Material Icons\"!important;\n  font-weight:normal;font-style:normal;letter-spacing:normal;\n  text-transform:none;white-space:nowrap;direction:ltr;\n  -webkit-font-feature-settings:\"liga\";font-feature-settings:\"liga\"}\n.stTabs [data-baseweb="tab-list"]{gap:0;border-bottom:1px solid var(--edge);background:transparent}\n.stTabs [data-baseweb="tab"]{font-family:var(--mono)!important;font-size:.72rem!important;\n  letter-spacing:.11em;text-transform:uppercase;color:var(--dim)!important;\n  padding:.55rem .95rem!important;border-radius:0}\n.stTabs [aria-selected="true"]{color:var(--cool)!important;background:var(--panel)}\n.stTabs [data-baseweb="tab-highlight"]{background:var(--cool)!important}\n.stTabs [data-baseweb="tab-border"]{display:none}\n[data-testid="stRadio"] label p{font-size:.83rem!important}\ndiv[data-testid="stSelectbox"] div[data-baseweb="select"]>div{background:var(--panel2);\n  border-color:var(--edge);font-family:var(--mono);font-size:.82rem}\n[data-testid="stAlert"]{border-radius:0;font-size:.87rem}\ncode{font-family:var(--mono)!important;background:var(--panel2)!important;color:var(--cool)!important;\n  font-size:.8rem!important;padding:.1rem .3rem!important}\n:focus-visible{outline:2px solid var(--cool);outline-offset:2px}\n@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}\n</style>\n'  # noqa: E501 - one stylesheet literal, not code
 
 # st.markdown strips <style> tags; st.html is the supported path for raw CSS.
 st.html(THEME)
@@ -232,8 +232,46 @@ def signals_panel(signals: list[Any], evidence_ids: set[str],
     block(f'<div class="sig">{"".join(out)}</div>')
 
 
-# ------------------------------------------------------------------- masthead
-decisions = rows(select(Decision).order_by(Decision.recorded_at))
+# ----------------------------------------------------------------- decisions
+#: A polling agent produces roughly 66 decisions per session at a five-minute
+#: cadence, so an unbounded list is a few hundred rows within days. The query is
+#: bounded and the list is collapsed rather than paginated, because pagination
+#: would still leave a judge scrolling past sixty identical refusals to find the
+#: two decisions that matter.
+DECISION_LIMIT = 400
+RUN_THRESHOLD = 2
+
+
+def load_decisions(limit: int = DECISION_LIMIT) -> tuple[list[Any], int]:
+    total = int(scalar(select(func.count()).select_from(Decision)) or 0)
+    recent = rows(select(Decision).order_by(Decision.recorded_at.desc()).limit(limit))
+    return list(reversed(recent)), total
+
+
+def outcome_key(decision: Any) -> tuple[str, str]:
+    """What makes two decisions the same story: the action and why."""
+    return decision.action, ", ".join(decision.reason_codes or [])
+
+
+def collapse_runs(items: list[Any]) -> list[dict[str, Any]]:
+    """Run-length encode consecutive identical outcomes.
+
+    Sixty consecutive `NO_TRADE / no_qualified_setup` decisions are one fact, not
+    sixty. Collapsing them keeps the two decisions that differ visible instead of
+    burying them, and each run still exposes its most recent member so the full
+    trace remains one click away.
+    """
+    runs: list[dict[str, Any]] = []
+    for decision in items:
+        key = outcome_key(decision)
+        if runs and runs[-1]["key"] == key:
+            runs[-1]["members"].append(decision)
+        else:
+            runs.append({"key": key, "members": [decision]})
+    return runs
+
+
+decisions, total_decisions = load_decisions()
 if not decisions:
     block('<div class="oa-head"><h1>Options Alpha</h1></div>')
     st.error("No evidence database found. Run `python scripts/build_demo_db.py`.")
@@ -262,23 +300,73 @@ annunciator([
 ])
 
 # ------------------------------------------------------------------- selector
-labels: dict[str, str] = {}
-for decision in decisions:
-    outcome = "position" if decision.action == "OPTIONS_POSITION" else "refused"
-    name = decision.snapshot_id.replace("spy-", "SPY ").replace("-", " ")
-    labels[decision.id] = f"{name}  ·  {outcome} ({decision.direction})"
-
 st.sidebar.markdown(
-    '<div class="sub" style="font-family:var(--mono);font-size:.62rem;'
+    '<div style="font-family:var(--mono);font-size:.62rem;'
     'letter-spacing:.15em;text-transform:uppercase;color:var(--dim);'
-    'margin-bottom:.5rem">Recorded decisions</div>',
+    'margin-bottom:.4rem">Recorded decisions</div>',
     unsafe_allow_html=True,
 )
+
+view = st.sidebar.radio(
+    "Show", ["Notable", "Positions", "Refusals", "Everything"],
+    horizontal=False, label_visibility="collapsed", index=0,
+)
+
+if view == "Positions":
+    candidates = [d for d in decisions if d.action == "OPTIONS_POSITION"]
+elif view == "Refusals":
+    candidates = [d for d in decisions if d.action != "OPTIONS_POSITION"]
+else:
+    candidates = list(decisions)
+
+runs = collapse_runs(candidates)
+if view == "Notable":
+    # Every position, plus one representative of each run of identical refusals.
+    entries = [
+        {"decision": run["members"][-1], "count": len(run["members"]), "run": run}
+        for run in runs
+    ]
+else:
+    entries = [
+        {"decision": member, "count": 1, "run": run}
+        for run in runs
+        for member in reversed(run["members"])
+    ]
+
+labels: dict[str, str] = {}
+for entry in entries:
+    decision_row = entry["decision"]
+    name = decision_row.snapshot_id.replace("spy-", "SPY ").replace("-", " ")
+    if decision_row.action == "OPTIONS_POSITION":
+        summary = f"position · {decision_row.direction}"
+    else:
+        summary = ", ".join(decision_row.reason_codes or ["refused"])
+    repeat = f"  ×{entry['count']}" if entry["count"] > 1 else ""
+    labels[decision_row.id] = f"{name}\n{summary}{repeat}"
+
 chosen_id = st.sidebar.radio(
     "Decision", list(labels), format_func=lambda k: labels[k], index=0,
     label_visibility="collapsed",
 )
 decision = next(d for d in decisions if d.id == chosen_id)
+
+shown = len(labels)
+st.sidebar.markdown(
+    f'<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);'
+    f'margin-top:.5rem;line-height:1.5">{shown} of {total_decisions} recorded'
+    + (
+        '<br>identical consecutive outcomes are grouped'
+        if view == "Notable" and shown < len(candidates)
+        else ""
+    )
+    + (
+        f'<br>showing the most recent {DECISION_LIMIT}'
+        if total_decisions > DECISION_LIMIT
+        else ""
+    )
+    + "</div>",
+    unsafe_allow_html=True,
+)
 
 st.sidebar.markdown('<hr class="rule">', unsafe_allow_html=True)
 st.sidebar.markdown(
