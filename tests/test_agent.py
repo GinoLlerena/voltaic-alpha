@@ -116,6 +116,7 @@ class FakeBroker:
     def __init__(self, *, open_strategies: int = 0) -> None:
         self.open_strategies = open_strategies
         self.submits: list[dict[str, Any]] = []
+        self.cancels: list[str] = []
 
     def resolved_endpoint(self) -> str:
         return "https://paper-api.alpaca.markets"
@@ -126,6 +127,9 @@ class FakeBroker:
     def submit(self, body: dict[str, Any]) -> dict[str, Any]:
         self.submits.append(body)
         return {"id": f"brk-{len(self.submits)}", "status": "accepted"}
+
+    def cancel_order(self, broker_order_id: str) -> None:
+        self.cancels.append(broker_order_id)
 
     def get_by_client_order_id(self, cid: str) -> dict[str, Any] | None:
         return None
@@ -571,3 +575,100 @@ class OutOfHoursReconciliationTests(DurableAgentCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReconciliationIsNotOptionalTests(DurableAgentCase):
+    """Findings 2 and 5: broker responsibility survives a data outage, and a
+    mutation is followed by a read rather than by an assumption."""
+
+    def with_recon(self, agent, positions, *, orders=None, once=None):
+        """Attach reconciliation to a built agent; the store exists only by then.
+
+        `once` gates when the broker starts reporting the exposure, so a test can
+        distinguish the reconciliation that opens a tick from the one that must
+        follow a submission.
+        """
+        from options_alpha_lab.execution.reconcile import Reconciler
+        from test_reconcile import FakeBroker as ReconBroker
+
+        class Broker(ReconBroker):
+            def list_positions(self):
+                return positions if (once is None or once()) else []
+
+            def get_by_client_order_id(self, client_order_id: str):
+                if orders is None or (once is not None and not once()):
+                    return None
+                return orders(client_order_id)
+
+        agent.reconciler = Reconciler(Broker(positions=positions), self.store)
+        return agent
+
+    def test_a_market_data_outage_does_not_suppress_reconciliation(self) -> None:
+        # The regression: observe() ran first, so a chain outage returned
+        # OBSERVE_FAILED and every open order and position went unmanaged until
+        # the provider recovered. The broker keeps filling regardless.
+        agent = self.with_recon(
+            self.build(
+                WRITE_ENV, client=FakeClient(fail=ProviderError("chain unavailable"))
+            ),
+            [],
+        )
+        self.open_position()
+        result = agent.tick()
+
+        self.assertEqual(result.action, "OBSERVE_FAILED")
+        self.assertIn("reconciled", result.detail, "the tick must report what it found")
+        self.assertIn("position_vanished", [i.kind for i in self.store.open_incidents()])
+        self.assertIs(agent.execution_state, ExecutionState.NO_NEW_RISK)
+
+    def test_an_accepted_entry_is_reconciled_before_the_tick_returns(self) -> None:
+        # Acceptance is SUBMITTED, never FILLED. Waiting a whole 300-second tick
+        # to learn which one it was leaves a filled position unmanaged.
+        from test_reconcile import filled_order
+
+        broker = FakeBroker()
+        agent = self.build(WRITE_ENV, broker=broker)
+        # The broker holds the spread only after the order reaches it, so the
+        # reconciliation that opens the tick still sees a flat account.
+        self.with_recon(
+            agent,
+            [{"symbol": LONG, "qty": "1"}, {"symbol": SHORT, "qty": "-1"}],
+            orders=lambda cid: filled_order(cid),
+            once=lambda: bool(broker.submits),
+        )
+        result = agent.tick()
+        self.assertEqual(result.action, "ENTRY_SUBMITTED")
+
+        managed = agent.active_position()
+        assert managed is not None, "the fill must be established inside the tick"
+        self.assertIs(managed.state, PositionState.OPEN)
+        self.assertEqual(managed.avg_entry_debit, Decimal("3.13"))
+
+    def test_deadline_enforcement_does_not_depend_on_market_data(self) -> None:
+        # A 90-second deadline cannot wait for a chain that may never return.
+        from options_alpha_lab.execution.deadline import DeadlineEnforcer
+
+        broker = FakeBroker()
+        agent = self.with_recon(
+            self.build(
+                WRITE_ENV, broker=broker,
+                client=FakeClient(fail=ProviderError("chain unavailable")),
+            ),
+            [],
+        )
+        intent = entry_intent()
+        order_id, _ = self.store.prepare_entry(
+            decision_id=self.decision_id, intent=intent,
+            request=prepare_mleg_request(intent, now=NOW), direction=Direction.BULLISH,
+            long_symbol=LONG, short_symbol=SHORT, expiration=NOW + timedelta(days=25),
+            width=Decimal("5.00"), max_loss=Decimal("339.00"), invalidation=None, now=NOW,
+        )
+        self.store.record_submission(order_id, broker_order_id="brk-late",
+                                     broker_status="accepted", now=NOW)
+        agent.deadlines = DeadlineEnforcer(agent.gateway, self.store)
+        agent._clock = lambda: NOW + timedelta(seconds=200)
+
+        result = agent.tick()
+        self.assertEqual(result.action, "DEADLINE_ACTION")
+        self.assertIn("canceled 1", result.detail)
+        self.assertEqual(broker.cancels, ["brk-late"])

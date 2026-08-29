@@ -57,6 +57,50 @@ def _dec(value: Any) -> Decimal | None:
         return None
 
 
+def _held_quantities(positions: list[dict[str, Any]]) -> dict[str, int]:
+    """Signed contract quantity per option symbol: positive long, negative short.
+
+    Symbol presence alone cannot distinguish the spread we opened from one leg
+    of it left behind by a partial close, an assignment, or a cancel that lost a
+    race with a fill. All three are naked exposure wearing the shape of a hedged
+    position, so the quantity is what gets compared.
+
+    Alpaca reports a short option leg as a negative `qty` alongside
+    `side: "short"`. Both conventions are honoured, because a provider that
+    reports an unsigned quantity beside an explicit side must not be read as a
+    long position.
+    """
+    held: dict[str, int] = {}
+    for raw in positions:
+        symbol = raw.get("symbol")
+        if not symbol:
+            continue
+        try:
+            quantity = int(float(str(raw.get("qty"))))
+        except (TypeError, ValueError):
+            continue
+        if quantity > 0 and str(raw.get("side") or "").lower() == "short":
+            quantity = -quantity
+        held[str(symbol)] = held.get(str(symbol), 0) + quantity
+    return held
+
+
+def _expected_exposure(position: ManagedPosition) -> dict[str, int]:
+    """Signed exposure a fully filled vertical should show at the broker.
+
+    H0 selects one-to-one verticals only, so each leg carries the strategy
+    quantity. A ratio spread would need per-leg ratios from the entry intent;
+    the selector cannot produce one, and if it ever did, the comparison below
+    would report the imbalance rather than quietly accept it.
+    """
+    quantity = position.filled_quantity
+    return {position.long_symbol: quantity, position.short_symbol: -quantity}
+
+
+def _describe(exposure: dict[str, int]) -> str:
+    return ", ".join(f"{symbol} {qty:+d}" for symbol, qty in sorted(exposure.items()))
+
+
 def _leg_fills(order: dict[str, Any]) -> list[dict[str, Any]]:
     """Per-leg fills from a nested MLeg order, when the broker supplies them."""
     fills: list[dict[str, Any]] = []
@@ -109,9 +153,7 @@ class Reconciler:
             )
             return report
 
-        held_symbols = {
-            str(p.get("symbol")) for p in broker_positions if p.get("symbol")
-        }
+        held = _held_quantities(broker_positions)
         working_by_client_id = {
             str(o.get("client_order_id")): o for o in open_orders if o.get("client_order_id")
         }
@@ -123,11 +165,14 @@ class Reconciler:
         for position in managed:
             claimed_symbols.update({position.long_symbol, position.short_symbol})
             self._reconcile_one(
-                position, held_symbols, working_by_client_id, report, run_id, stamp
+                position, held, working_by_client_id, report, run_id, stamp
             )
 
         # Exposure the broker reports that no local record claims.
-        unexpected = sorted(held_symbols - claimed_symbols)
+        unexpected = sorted(
+            symbol for symbol, quantity in held.items()
+            if quantity and symbol not in claimed_symbols
+        )
         if unexpected:
             report.unexpected_symbols = unexpected
             report.mismatches.append(f"unclaimed broker exposure: {', '.join(unexpected)}")
@@ -149,13 +194,15 @@ class Reconciler:
     def _reconcile_one(
         self,
         position: ManagedPosition,
-        held_symbols: set[str],
+        held: dict[str, int],
         working_by_client_id: dict[str, dict[str, Any]],
         report: ReconciliationReport,
         run_id: str | None,
         stamp: datetime,
     ) -> None:
-        broker_holds = bool({position.long_symbol, position.short_symbol} & held_symbols)
+        expected = _expected_exposure(position)
+        observed = {symbol: held.get(symbol, 0) for symbol in expected}
+        broker_holds = any(observed.values())
 
         # A position we abandoned that the broker turns out to hold is a late
         # fill: exposure we own and had stopped managing.
@@ -219,21 +266,43 @@ class Reconciler:
             return
 
         # 2. A position we believe is open must be visible at the broker.
-        if position.state is PositionState.OPEN and not broker_holds:
-            report.mismatches.append(
-                f"{position.position_id}: locally OPEN but the broker holds neither leg"
-            )
-            report.incidents.append(
-                self._store.open_incident(
-                    kind="position_vanished",
-                    detail=(
-                        f"local OPEN position {position.position_id} has no broker exposure "
-                        f"in {position.long_symbol} or {position.short_symbol}"
-                    ),
-                    position_id=position.position_id, run_id=run_id, now=stamp,
+        if position.state is PositionState.OPEN:
+            if not broker_holds:
+                report.mismatches.append(
+                    f"{position.position_id}: locally OPEN but the broker holds neither leg"
                 )
-            )
-            return
+                report.incidents.append(
+                    self._store.open_incident(
+                        kind="position_vanished",
+                        detail=(
+                            f"local OPEN position {position.position_id} has no broker "
+                            f"exposure in {position.long_symbol} or {position.short_symbol}"
+                        ),
+                        position_id=position.position_id, run_id=run_id, now=stamp,
+                    )
+                )
+                return
+
+            # Present but not equal: one leg short-filled, partly closed, or
+            # assigned. The remaining leg is directional exposure the risk
+            # governor never sized and the exit policy cannot price.
+            if observed != expected:
+                report.mismatches.append(
+                    f"{position.position_id}: broker exposure ({_describe(observed)}) "
+                    f"does not match the local record ({_describe(expected)})"
+                )
+                report.incidents.append(
+                    self._store.open_incident(
+                        kind="leg_imbalance",
+                        detail=(
+                            f"position {position.position_id} expected "
+                            f"{_describe(expected)} but the broker reports "
+                            f"{_describe(observed)}; new risk halted"
+                        ),
+                        position_id=position.position_id, run_id=run_id, now=stamp,
+                    )
+                )
+                return
 
         # 3. A close is only complete when the broker confirms flat.
         if position.state is PositionState.CLOSING:
@@ -281,7 +350,8 @@ class Reconciler:
 
             state = self._store.apply_close_outcome(
                 position.position_id, broker_flat=False,
-                remaining_quantity=position.filled_quantity, now=stamp,
+                remaining_quantity=max(abs(qty) for qty in observed.values()),
+                now=stamp,
             )
             report.positions_resolved.append(f"{position.position_id}:{state.value}")
             return

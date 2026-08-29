@@ -219,39 +219,39 @@ class TradingAgent:
     # -- the cycle ---------------------------------------------------------
     def tick(self) -> TickResult:
         now = self._clock()
+
+        # Broker responsibility comes first, because it depends on nothing else.
+        # Reconciliation is a read, and broker state does not stop changing at
+        # the close: an order that expired at 16:00, or a fill that landed at
+        # 15:59:59, must not go unnoticed until the next open - 65 hours over a
+        # long weekend. Nor may an options-chain outage suppress it. Observing
+        # first made a market-data failure silently abandon every open order and
+        # position until the provider recovered (EXIT-002).
+        report = self.reconcile()
+
+        # Deadlines next, for that reason and one more: they are measured in
+        # seconds against a tick measured in minutes, so anything that defers
+        # them defers a cancel that is already late. A deadline that expires
+        # after the close is still enforced - an order left working overnight is
+        # abandoned responsibility, not paused responsibility - and cancelling
+        # only ever reduces risk.
+        deadline_result = self._enforce_deadlines(now)
+        if deadline_result is not None:
+            return self._record(deadline_result)
+
         try:
             snapshot, market_open = self.observe()
         except (ProviderError, ValueError) as exc:
-            return self._record(
-                TickResult(now, "OBSERVE_FAILED", f"{type(exc).__name__}: {exc}")
-            )
-
-        # Reconcile first, and regardless of market hours. Reconciliation is a
-        # read: broker state does not stop changing at the close. An order that
-        # expired at 16:00, or a fill that landed at 15:59:59, must not go
-        # unnoticed until the next open, which over a long weekend is 65 hours.
-        report = self.reconcile()
+            detail = f"{type(exc).__name__}: {exc}"
+            if report is not None:
+                detail = f"{detail}; reconciled: {report.summary()}"
+            return self._record(TickResult(now, "OBSERVE_FAILED", detail))
 
         if not market_open:
             detail = "no action taken"
             if report is not None:
                 detail = f"reconciled: {report.summary()}"
             return self._record(TickResult(now, "MARKET_CLOSED", detail))
-
-        # Then enforce post-submission deadlines, so an unfilled order is
-        # cancelled rather than left occupying the single strategy slot.
-        if self.deadlines is not None and self.settings.may_write_orders:
-            outcome = self.deadlines.enforce(run_id=self.run_id, now=now)
-            self.last_deadline_outcome = outcome
-            if outcome.late_fills or outcome.failures:
-                self.execution_state = ExecutionState.NO_NEW_RISK
-                if self.gateway is not None:
-                    self.gateway.execution_state = ExecutionState.NO_NEW_RISK
-            if outcome.acted:
-                return self._record(
-                    TickResult(now, "DEADLINE_ACTION", outcome.summary(),
-                               snapshot.snapshot_id)
-                )
 
         # Exits before entries, always.
         managed = self.active_position()
@@ -308,6 +308,31 @@ class TradingAgent:
             )
 
         return self._record(self._consider_entry(snapshot, now))
+
+    def _halt_new_risk(self) -> None:
+        """Stop new risk here *and* at the gateway, which is what must refuse."""
+        self.execution_state = ExecutionState.NO_NEW_RISK
+        if self.gateway is not None:
+            self.gateway.execution_state = ExecutionState.NO_NEW_RISK
+
+    def _enforce_deadlines(self, now: datetime) -> TickResult | None:
+        """Cancel anything past its post-submission deadline. Needs no market data."""
+        if self.deadlines is None or not self.settings.may_write_orders:
+            return None
+        outcome = self.deadlines.enforce(run_id=self.run_id, now=now)
+        self.last_deadline_outcome = outcome
+        if outcome.late_fills or outcome.failures:
+            self._halt_new_risk()
+        if not outcome.acted:
+            return None
+        # A requested cancel is not a confirmed one, and it can still lose a race
+        # with a fill. Establish the terminal state now rather than leaving the
+        # single strategy slot occupied until the next tick.
+        after = self.reconcile()
+        detail = outcome.summary()
+        if after is not None:
+            detail = f"{detail}; reconciled: {after.summary()}"
+        return TickResult(now, "DEADLINE_ACTION", detail)
 
     def unresolved_position(self) -> ManagedPosition | None:
         """Any position that is not finished, including one whose entry is in flight.
@@ -423,9 +448,7 @@ class TradingAgent:
                 ),
                 position_id=position.position_id, run_id=self.run_id, now=now,
             )
-            self.execution_state = ExecutionState.NO_NEW_RISK
-            if self.gateway is not None:
-                self.gateway.execution_state = ExecutionState.NO_NEW_RISK
+            self._halt_new_risk()
 
         if not decision.should_close:
             action = (
@@ -493,6 +516,9 @@ class TradingAgent:
                 close_order_id, broker_order_id=submission.broker_order_id,
                 broker_status=submission.status, ambiguous=submission.ambiguous, now=now,
             )
+        # A submitted close is not a closed position. Reconcile immediately so
+        # the broker, not the acknowledgement, decides whether we are flat.
+        self.reconcile()
         return TickResult(
             now, "CLOSE_SUBMITTED",
             f"{decision.trigger.value}: {decision.reason}",
@@ -621,9 +647,12 @@ class TradingAgent:
                     detail=f"entry submission outcome unknown: {exc}",
                     position_id=position_id, run_id=self.run_id, now=now,
                 )
-            self.execution_state = ExecutionState.NO_NEW_RISK
-            if self.gateway is not None:
-                self.gateway.execution_state = ExecutionState.NO_NEW_RISK
+            self._halt_new_risk()
+            # The request was sent and the outcome is unknown, so ask the broker
+            # now instead of waiting a tick. Reconciliation either locates the
+            # order by our derived client id and resolves the ambiguity, or
+            # fails to and keeps new risk halted. Its report governs either way.
+            self.reconcile()
             return TickResult(
                 now, "ENTRY_AMBIGUOUS", str(exc), snapshot.snapshot_id, recorded_hash
             )
@@ -649,6 +678,10 @@ class TradingAgent:
                 order_id, broker_order_id=submission.broker_order_id,
                 broker_status=submission.status, ambiguous=submission.ambiguous, now=now,
             )
+        # Accepted is not filled. Reconcile now so a same-second fill, or an
+        # immediate rejection, is established from broker state rather than
+        # inferred from the acknowledgement.
+        self.reconcile()
         return TickResult(
             now,
             "ENTRY_SUBMITTED",

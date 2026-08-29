@@ -295,8 +295,28 @@ class AlpacaBroker(BrokerPort):
         self._client.cancel_order_by_id(broker_order_id)
 
 
+def _normalize(value: Any) -> Any:
+    """Coerce scalars to strings **without flattening structure**.
+
+    Every scalar becomes a string so the reconciler can compare provider values
+    that arrive as `Decimal`, `UUID`, enum, or `datetime` on different reads of
+    the same order. Containers are walked instead of stringified: an MLeg order
+    carries its per-leg fills in a nested `legs` list, and `str()` on that list
+    turns the only record of which leg filled into prose. `_leg_fills` would
+    then iterate the string character by character and raise `AttributeError`,
+    taking reconciliation down at exactly the moment a real fill arrives.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        return {str(key): _normalize(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_normalize(item) for item in value]
+    return str(value)
+
+
 def _as_dict(obj: Any) -> dict[str, Any]:
     if hasattr(obj, "model_dump"):
         dumped: dict[str, Any] = obj.model_dump()
-        return {key: (str(value) if value is not None else None) for key, value in dumped.items()}
+        return {str(key): _normalize(value) for key, value in dumped.items()}
     return dict(obj)

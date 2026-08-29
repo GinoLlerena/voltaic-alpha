@@ -120,6 +120,18 @@ class ReconcileCase(unittest.TestCase):
         )
         return order_id, position_id, intent
 
+    def open_position(self) -> tuple[str, OrderIntent]:
+        order_id, position_id, intent = self.prepare()
+        self.store.record_submission(order_id, broker_order_id="brk-1",
+                                     broker_status="accepted", now=NOW)
+        self.store.apply_order_reconciliation(
+            order_id, broker_status="filled", filled_quantity=1,
+            filled_avg_price=Decimal("3.13"), now=NOW,
+        )
+        self.store.apply_entry_outcome(position_id, state=OrderState.FILLED,
+                                       filled_quantity=1, avg_debit=Decimal("3.13"), now=NOW)
+        return position_id, intent
+
     def incidents(self) -> list[Incident]:
         with Session(self.engine) as session:
             return list(session.scalars(select(Incident)).all())
@@ -166,18 +178,6 @@ class StartupRecoveryTests(ReconcileCase):
 
 
 class MismatchTests(ReconcileCase):
-    def open_position(self) -> tuple[str, OrderIntent]:
-        order_id, position_id, intent = self.prepare()
-        self.store.record_submission(order_id, broker_order_id="brk-1",
-                                     broker_status="accepted", now=NOW)
-        self.store.apply_order_reconciliation(
-            order_id, broker_status="filled", filled_quantity=1,
-            filled_avg_price=Decimal("3.13"), now=NOW,
-        )
-        self.store.apply_entry_outcome(position_id, state=OrderState.FILLED,
-                                       filled_quantity=1, avg_debit=Decimal("3.13"), now=NOW)
-        return position_id, intent
-
     def test_an_open_position_the_broker_does_not_hold_halts_new_risk(self) -> None:
         position_id, _ = self.open_position()
         report = Reconciler(FakeBroker(positions=[]), self.store).reconcile(now=NOW)
@@ -315,3 +315,103 @@ class IncidentHealingTests(ReconcileCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LegQuantityTests(ReconcileCase):
+    """Symbol presence is not exposure. Finding 3 of the improvement plan.
+
+    Every case below reports both leg symbols the local record claims, so the
+    previous set-intersection check called each of them clean.
+    """
+
+    def test_a_short_leg_left_behind_by_a_partial_close_is_a_mismatch(self) -> None:
+        # The long leg closed and the short did not. What remains is a naked
+        # short call: unlimited-risk exposure the governor never sized.
+        position_id, _ = self.open_position()
+        broker = FakeBroker(positions=[{"symbol": SHORT, "qty": "-1"}])
+        report = Reconciler(broker, self.store).reconcile(now=NOW)
+        self.assertFalse(report.clean, "a broken vertical is not a reconciled position")
+        self.assertIs(report.execution_state, ExecutionState.NO_NEW_RISK)
+        self.assertIn("leg_imbalance", [i.kind for i in self.incidents()])
+        managed = self.store.get_position(position_id)
+        assert managed is not None
+        self.assertIs(managed.state, PositionState.INCIDENT)
+
+    def test_a_quantity_drift_on_one_leg_is_a_mismatch(self) -> None:
+        # Both symbols present, both sides right, quantities unequal.
+        self.open_position()
+        broker = FakeBroker(
+            positions=[{"symbol": LONG, "qty": "2"}, {"symbol": SHORT, "qty": "-1"}]
+        )
+        report = Reconciler(broker, self.store).reconcile(now=NOW)
+        self.assertFalse(report.clean)
+        self.assertIn("leg_imbalance", [i.kind for i in self.incidents()])
+
+    def test_an_inverted_leg_is_a_mismatch(self) -> None:
+        # Right symbols, right quantities, wrong signs: the spread is backwards
+        # and its maximum loss is not the debit we approved.
+        self.open_position()
+        broker = FakeBroker(
+            positions=[{"symbol": LONG, "qty": "-1"}, {"symbol": SHORT, "qty": "1"}]
+        )
+        report = Reconciler(broker, self.store).reconcile(now=NOW)
+        self.assertFalse(report.clean)
+        self.assertIn("leg_imbalance", [i.kind for i in self.incidents()])
+
+    def test_an_unsigned_quantity_beside_an_explicit_short_side_is_read_as_short(self) -> None:
+        # A provider that reports qty "1" with side "short" must not be read as
+        # a long position, which would invert the whole comparison.
+        self.open_position()
+        broker = FakeBroker(positions=[
+            {"symbol": LONG, "qty": "1", "side": "long"},
+            {"symbol": SHORT, "qty": "1", "side": "short"},
+        ])
+        report = Reconciler(broker, self.store).reconcile(now=NOW)
+        self.assertTrue(report.clean, report.mismatches)
+
+    def test_the_matching_vertical_still_reconciles_clean(self) -> None:
+        self.open_position()
+        broker = FakeBroker(
+            positions=[{"symbol": LONG, "qty": "1"}, {"symbol": SHORT, "qty": "-1"}]
+        )
+        report = Reconciler(broker, self.store).reconcile(now=NOW)
+        self.assertTrue(report.clean, report.mismatches)
+        self.assertEqual([], [i.kind for i in self.incidents()])
+
+
+class NestedLegPreservationTests(unittest.TestCase):
+    """Finding 4: an MLeg order's per-leg fills must survive normalization."""
+
+    def test_normalization_walks_containers_instead_of_stringifying_them(self) -> None:
+        from options_alpha_lab.execution.gateway import _as_dict
+        from options_alpha_lab.execution.reconcile import _leg_fills
+
+        class Order:
+            """Shaped like a pydantic order: model_dump returns nested values."""
+
+            @staticmethod
+            def model_dump() -> dict[str, Any]:
+                return {
+                    "status": "filled",
+                    "filled_qty": 1,
+                    "filled_avg_price": Decimal("3.13"),
+                    "legs": [
+                        {"symbol": LONG, "filled_qty": 1,
+                         "filled_avg_price": Decimal("6.90")},
+                        {"symbol": SHORT, "filled_qty": 1,
+                         "filled_avg_price": Decimal("3.77")},
+                    ],
+                }
+
+        normalized = _as_dict(Order())
+        self.assertIsInstance(normalized["legs"], list, "legs must not be stringified")
+        # Scalars still normalize to strings, which is what the comparison needs.
+        self.assertEqual(normalized["filled_avg_price"], "3.13")
+
+        # The real regression: this raised AttributeError while legs was a
+        # string, taking reconciliation down on the first genuine MLeg fill.
+        fills = _leg_fills(normalized)
+        self.assertEqual(
+            [(f["symbol"], f["quantity"], f["price"]) for f in fills],
+            [(LONG, 1, "6.90"), (SHORT, 1, "3.77")],
+        )
