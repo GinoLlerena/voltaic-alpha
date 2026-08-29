@@ -32,6 +32,11 @@ from .persistence.models import WorkerLease
 
 DEFAULT_LEASE = "options-alpha-worker"
 LEASE_TTL = timedelta(seconds=90)
+#: The lease must be renewed several times within its own TTL. Heartbeating once
+#: per tick would leave it expired between ticks whenever the tick interval
+#: exceeds the TTL, and an expired lease is exactly what another worker takes
+#: over - while the first is still alive and mid-tick.
+HEARTBEAT_INTERVAL_SECONDS = 20
 
 
 class LeaseUnavailable(RuntimeError):
@@ -332,10 +337,19 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
 
             if args.max_ticks and health.ticks >= args.max_ticks:
                 break
-            for _ in range(args.interval):
-                if stopping["now"]:
-                    break
+
+            # Heartbeat through the wait, not just once per tick. The lease must
+            # never lapse while this process is alive and holding a position.
+            waited = 0
+            while waited < args.interval and not stopping["now"]:
                 time.sleep(1)
+                waited += 1
+                if waited % HEARTBEAT_INTERVAL_SECONDS == 0 and not lease.heartbeat():
+                    health.lease_lost = True
+                    health.write(args.health_file)
+                    print(json.dumps({"event": "lease_lost", "action": "stopping"}),
+                          flush=True)
+                    return 4
     finally:
         recorder.end_run(agent.run_id, "ok" if not health.last_error else "degraded")
         lease.release()

@@ -9,11 +9,12 @@ a simplification - the surface a judge browses is not the surface that trades.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from options_alpha_lab.architecture.contracts import ExecutionState
@@ -39,12 +40,43 @@ ROOT = Path(__file__).resolve().parent
 DB = ROOT / "demo" / "h0_demo.db"
 RECEIPT = ROOT / "artifacts" / "h0_paper_lifecycle.json"
 
+#: When DASHBOARD_DATABASE_URL is set the dashboard reads the live worker
+#: database; otherwise it falls back to the committed evidence file. Read-only
+#: either way: this page has no code path that writes, and no broker access.
+LIVE_DATABASE_URL = os.environ.get("DASHBOARD_DATABASE_URL", "").strip()
+
 st.set_page_config(page_title="Options Alpha", page_icon="🔒", layout="wide")
 
 
 @st.cache_resource
+def _resolve_source():  # type: ignore[no-untyped-def]
+    """Prefer the live worker database, but never show a judge an empty page.
+
+    The live database is empty until the worker has decided something, and a
+    worker started outside market hours has not. Falling back to the committed
+    evidence keeps the demo honest and working; the sidebar always says which
+    source is in use, so "live" is never implied when it is not true.
+    """
+    committed = create_engine(f"sqlite+pysqlite:///{DB}", future=True)
+    if not LIVE_DATABASE_URL:
+        return committed, "committed evidence"
+    try:
+        live = create_engine(LIVE_DATABASE_URL, future=True, pool_pre_ping=True)
+        with Session(live) as session:
+            count = session.scalar(select(func.count()).select_from(Decision)) or 0
+        if count:
+            return live, f"live worker database ({count} decisions)"
+        return committed, "committed evidence (live worker has decided nothing yet)"
+    except Exception as exc:  # noqa: BLE001 - a broken live source must not break the page
+        return committed, f"committed evidence (live source unavailable: {type(exc).__name__})"
+
+
 def engine():  # type: ignore[no-untyped-def]
-    return create_engine(f"sqlite+pysqlite:///{DB}", future=True)
+    return _resolve_source()[0]
+
+
+def source_label() -> str:
+    return _resolve_source()[1]
 
 
 def rows(stmt: Any) -> list[Any]:
@@ -77,6 +109,7 @@ chosen_id = st.sidebar.radio(
 decision = next(d for d in decisions if d.id == chosen_id)
 
 st.sidebar.divider()
+st.sidebar.caption(f"Source: {source_label()}")
 st.sidebar.markdown(
     "**Disclosures**\n\n"
     "- Alpaca **Paper** only. No live endpoint exists in this build.\n"

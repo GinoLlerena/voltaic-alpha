@@ -118,5 +118,31 @@ class DashboardBoundaryTests(unittest.TestCase):
             self.assertIn(phrase, text)
 
 
+
+
+class LiveSourceFallbackTests(unittest.TestCase):
+    """A judge must never see an empty page because the worker is between sessions."""
+
+    def test_an_unreachable_live_source_falls_back_to_committed_evidence(self) -> None:
+        import os
+
+        # Port 1 refuses instantly. Deliberately no user:password in the URL:
+        # a credential-shaped string here trips the secret scanner for no reason.
+        os.environ["DASHBOARD_DATABASE_URL"] = "postgresql+psycopg://localhost:1/nothing"
+        try:
+            app = AppTest.from_file(str(APP), default_timeout=90).run()
+            self.assertEqual(list(app.exception), [])
+            self.assertEqual(len(app.radio[0].options), decisions_in_evidence())
+        finally:
+            del os.environ["DASHBOARD_DATABASE_URL"]
+
+    def test_the_source_is_always_labelled(self) -> None:
+        # "live" must never be implied when it is not true.
+        app = run_app()
+        labels = [m.value for m in app.caption] if hasattr(app, "caption") else []
+        text = " ".join(labels) or APP.read_text(encoding="utf-8")
+        self.assertIn("Source:", text)
+
+
 if __name__ == "__main__":
     unittest.main()

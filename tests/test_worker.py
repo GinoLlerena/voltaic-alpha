@@ -178,5 +178,51 @@ class RestartRecoveryTests(LeaseCase):
         self.assertEqual(recovered[0].position_id, position_id)
 
 
+
+
+class HeartbeatCadenceTests(unittest.TestCase):
+    """The lease must be renewed several times inside its own TTL."""
+
+    def test_the_heartbeat_interval_is_well_inside_the_ttl(self) -> None:
+        # Heartbeating once per tick left the lease expired between ticks
+        # whenever the tick interval exceeded the TTL, so another worker could
+        # take over while the first was alive and mid-tick.
+        from options_alpha_lab.worker import HEARTBEAT_INTERVAL_SECONDS
+
+        self.assertLessEqual(
+            HEARTBEAT_INTERVAL_SECONDS * 3,
+            LEASE_TTL.total_seconds(),
+            "the lease must survive at least two missed heartbeats",
+        )
+
+    def test_a_lease_renewed_on_cadence_never_lapses(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from options_alpha_lab.config import load_settings
+        from options_alpha_lab.persistence.repository import build_engine, create_schema
+        from options_alpha_lab.worker import HEARTBEAT_INTERVAL_SECONDS, LeaseManager
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = load_settings({
+                "BOT_MODE": "observe", "ALPACA_PAPER_TRADE": "true",
+                "ALPACA_TRADING_ENABLED": "false",
+                "DATABASE_URL": f"sqlite+pysqlite:///{Path(tmp) / 'hb.db'}",
+            })
+            engine = build_engine(settings)
+            create_schema(engine)
+            manager = LeaseManager(engine)
+            manager.acquire(now=NOW)
+            moment = NOW
+            # Simulate five minutes of heartbeats at the configured cadence.
+            for _ in range(15):
+                moment += timedelta(seconds=HEARTBEAT_INTERVAL_SECONDS)
+                self.assertTrue(manager.heartbeat(now=moment))
+                current = manager.current()
+                assert current is not None
+                self.assertGreater(current.expires_at, moment,
+                                   "the lease must never be expired while alive")
+
+
 if __name__ == "__main__":
     unittest.main()
