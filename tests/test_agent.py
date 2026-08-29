@@ -7,13 +7,14 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from options_alpha_lab.agent import (
     TradingAgent,
     halt_state_for,
-    invalidation_level_from,
     spread_value,
 )
-from options_alpha_lab.architecture.contracts import Direction, ExecutionState
+from options_alpha_lab.architecture.contracts import Direction, ExecutionState, PriceSource
 from options_alpha_lab.config import load_settings
 from options_alpha_lab.execution.gateway import ExecutionGateway
 from options_alpha_lab.execution.intent import IntentLeg, OrderIntent
@@ -25,6 +26,7 @@ from options_alpha_lab.execution.lifecycle import (
 )
 from options_alpha_lab.execution.reconcile import Reconciler
 from options_alpha_lab.execution.request import prepare_mleg_request
+from options_alpha_lab.persistence.models import Position as PositionRow
 from options_alpha_lab.persistence.repository import build_engine, create_schema
 from options_alpha_lab.providers.alpaca_readonly import ProviderError, ProviderRead
 from options_alpha_lab.replay import replay_paths
@@ -65,9 +67,16 @@ class FakeClient:
     stock_feed = "sip"
 
     def __init__(self, *, market_open: bool = True, fail: Exception | None = None,
-                 quotes: dict[str, tuple[str, str]] | None = None) -> None:
+                 quotes: dict[str, tuple[str, str]] | None = None,
+                 clock_payload: dict[str, Any] | None = None,
+                 clock_age_seconds: int = 0) -> None:
         self.market_open = market_open
         self.fail = fail
+        #: Lets a test return a clock the snapshot cannot read `is_open` from.
+        self.clock_payload = clock_payload
+        #: A readable but stale clock: `is_open` is trustworthy as a fact about
+        #: some past moment, and not as a fact about now.
+        self.clock_age_seconds = clock_age_seconds
         # `quotes or {...}` would swallow an intentionally empty chain, since an
         # empty dict is falsy. The empty case is exactly what one test needs.
         self.quotes = (
@@ -77,7 +86,16 @@ class FakeClient:
     def clock(self) -> ProviderRead:
         if self.fail:
             raise self.fail
-        return read({"is_open": self.market_open, "timestamp": NOW.isoformat()})
+        payload = self.clock_payload
+        if payload is None:
+            payload = {"is_open": self.market_open, "timestamp": NOW.isoformat()}
+        if self.clock_age_seconds:
+            return ProviderRead(
+                provider="alpaca", endpoint="/test", feed="indicative",
+                source_time=NOW - timedelta(seconds=self.clock_age_seconds),
+                received_time=NOW, pages=1, payload=payload,
+            )
+        return read(payload)
 
     def account(self) -> ProviderRead:
         return read({
@@ -207,6 +225,28 @@ class DurableAgentCase(unittest.TestCase):
         if hasattr(self, "_tmp"):
             self._tmp.cleanup()
 
+    def with_recon(self, agent, positions, *, orders=None, once=None):
+        """Attach reconciliation to a built agent; the store exists only by then.
+
+        `once` gates when the broker starts reporting the exposure, so a test can
+        distinguish the reconciliation that opens a tick from the one that must
+        follow a submission.
+        """
+        from options_alpha_lab.execution.reconcile import Reconciler
+        from test_reconcile import FakeBroker as ReconBroker
+
+        class Broker(ReconBroker):
+            def list_positions(self):
+                return positions if (once is None or once()) else []
+
+            def get_by_client_order_id(self, client_order_id: str):
+                if orders is None or (once is not None and not once()):
+                    return None
+                return orders(client_order_id)
+
+        agent.reconciler = Reconciler(Broker(positions=positions), self.store)
+        return agent
+
     def open_position(self, *, avg_debit: str = "3.13", filled_at=None) -> str:
         """An OPEN position established the only legal way: from reconciled fills."""
         intent = entry_intent()
@@ -216,7 +256,8 @@ class DurableAgentCase(unittest.TestCase):
             direction=Direction.BULLISH, long_symbol=LONG, short_symbol=SHORT,
             expiration=NOW + timedelta(days=25), width=Decimal("5.00"),
             max_loss=Decimal("339.00"),
-            invalidation=TypedInvalidation(Decimal("600.00"), Direction.BULLISH, "daily_close"),
+            invalidation=TypedInvalidation(Decimal("600.00"), Direction.BULLISH,
+                                        PriceSource.COMPLETED_DAILY_CLOSE),
             now=NOW,
         )
         self.store.record_submission(order_id, broker_order_id="brk-1",
@@ -408,12 +449,21 @@ class HelperTests(unittest.TestCase):
         snap = load_snapshot("fixtures/h0/spy_qualified.snapshot.json")
         self.assertIsNone(spread_value(snap, "MISSING", "SPY260918C00645000"))
 
-    def test_invalidation_level_is_recovered_from_the_condition_text(self) -> None:
-        self.assertEqual(
-            invalidation_level_from(("close below 631.63 invalidates the retest",)),
-            Decimal("631.63"),
-        )
-        self.assertIsNone(invalidation_level_from(("loss of structure",)))
+    def test_the_invalidation_level_is_carried_typed_not_recovered_from_prose(self) -> None:
+        # EXIT-AC-06. The classifier used to format the level into English and
+        # the agent regexed it back out, so the first decimal in an arbitrary
+        # sentence became the level a live position was managed against.
+        from options_alpha_lab.components import DeterministicSetupClassifier
+        from options_alpha_lab.snapshot_io import load_snapshot
+
+        snap = load_snapshot("fixtures/h0/spy_qualified.snapshot.json")
+        setup = DeterministicSetupClassifier().classify(snap)
+        assert setup is not None and setup.invalidation is not None
+
+        # The prose is written from the rule, so it agrees by construction.
+        self.assertIn(str(setup.invalidation.level), setup.invalidation_conditions[0])
+        self.assertIs(setup.invalidation.direction, setup.direction)
+        self.assertIs(setup.invalidation.source, snap.underlying_source)
 
     def test_unusable_data_halts_new_risk_without_trapping_a_position(self) -> None:
         from options_alpha_lab.architecture.contracts import DataQuality
@@ -581,28 +631,6 @@ class ReconciliationIsNotOptionalTests(DurableAgentCase):
     """Findings 2 and 5: broker responsibility survives a data outage, and a
     mutation is followed by a read rather than by an assumption."""
 
-    def with_recon(self, agent, positions, *, orders=None, once=None):
-        """Attach reconciliation to a built agent; the store exists only by then.
-
-        `once` gates when the broker starts reporting the exposure, so a test can
-        distinguish the reconciliation that opens a tick from the one that must
-        follow a submission.
-        """
-        from options_alpha_lab.execution.reconcile import Reconciler
-        from test_reconcile import FakeBroker as ReconBroker
-
-        class Broker(ReconBroker):
-            def list_positions(self):
-                return positions if (once is None or once()) else []
-
-            def get_by_client_order_id(self, client_order_id: str):
-                if orders is None or (once is not None and not once()):
-                    return None
-                return orders(client_order_id)
-
-        agent.reconciler = Reconciler(Broker(positions=positions), self.store)
-        return agent
-
     def test_a_market_data_outage_does_not_suppress_reconciliation(self) -> None:
         # The regression: observe() ran first, so a chain outage returned
         # OBSERVE_FAILED and every open order and position went unmanaged until
@@ -672,3 +700,134 @@ class ReconciliationIsNotOptionalTests(DurableAgentCase):
         self.assertEqual(result.action, "DEADLINE_ACTION")
         self.assertIn("canceled 1", result.detail)
         self.assertEqual(broker.cancels, ["brk-late"])
+
+
+class InvalidationSourceTests(DurableAgentCase):
+    """EXIT-AC-06 at the agent: the price a rule is judged on must be checkable."""
+
+    DEGRADED_CLOCK = {"timestamp": NOW.isoformat()}  # no `is_open` at all
+
+    def test_a_clock_without_is_open_is_a_provider_error_not_a_closed_market(self) -> None:
+        # `bool(None)` used to read a missing `is_open` as "closed", which told
+        # parse_bars to keep the forming bar and presented a partial session as
+        # a completed close.
+        agent = self.build(WRITE_ENV, client=FakeClient(clock_payload=self.DEGRADED_CLOCK))
+        snapshot, market_open = agent.observe()
+        self.assertFalse(market_open)
+        self.assertIn("clock:is_open_unreadable", snapshot.data_quality.reason_codes[0])
+        self.assertIs(snapshot.underlying_source, PriceSource.UNKNOWN)
+        self.assertFalse(snapshot.data_quality.is_usable, "entries must be halted")
+
+    def test_a_healthy_clock_states_the_source_and_the_session(self) -> None:
+        agent = self.build(WRITE_ENV)
+        snapshot, _ = agent.observe()
+        self.assertIs(snapshot.underlying_source, PriceSource.COMPLETED_DAILY_CLOSE)
+        self.assertIsNotNone(snapshot.underlying_session, "the close must be attributable")
+
+    def test_an_unreadable_clock_is_not_treated_as_a_closed_market(self) -> None:
+        agent = self.build(
+            WRITE_ENV,
+            client=FakeClient(clock_payload=self.DEGRADED_CLOCK, market_open=True),
+        )
+        self.open_position()
+        # It reports closed because it does not know, which is the safe reading -
+        # but it reaches that answer from a recorded provider error, not from
+        # `bool(None)`.
+        self.assertEqual(agent.tick().action, "MARKET_CLOSED")
+
+    def test_a_stale_clock_leaves_the_position_managed_but_the_rule_unevaluated(self) -> None:
+        # The reachable mismatch: `is_open` parses, so the market is open and
+        # exits are evaluated, but the read is too old to establish that the last
+        # bar is a completed close. Exits are deliberately not gated on data
+        # quality, so without this check the rule would be judged anyway.
+        agent = self.build(
+            WRITE_ENV, client=FakeClient(clock_age_seconds=600, market_open=True)
+        )
+        position_id = self.open_position()
+        snapshot, market_open = agent.observe()
+        self.assertTrue(market_open)
+        self.assertIs(snapshot.underlying_source, PriceSource.UNKNOWN)
+
+        result = agent.tick()
+        self.assertEqual(result.action, "POSITION_REVIEW")
+        assert result.exit is not None
+        self.assertTrue(result.exit.invalidation_unverifiable)
+        self.assertFalse(result.exit.should_close)
+        self.assertIn(
+            "unverifiable_invalidation_source",
+            [i.kind for i in self.store.open_incidents()],
+        )
+        self.assertIs(agent.execution_state, ExecutionState.NO_NEW_RISK)
+
+        # The incident marks the position, and `active_position` skips INCIDENT.
+        # Responsibility is not lost by that: reconciliation opens the next tick
+        # and heals it from broker state, so the position keeps being evaluated
+        # by every rule that does not read the underlying, tick after tick.
+        managed = self.store.get_position(position_id)
+        assert managed is not None
+        self.assertIs(managed.state, PositionState.INCIDENT)
+
+        from test_reconcile import filled_order
+
+        self.with_recon(
+            agent,
+            [{"symbol": LONG, "qty": "1"}, {"symbol": SHORT, "qty": "-1"}],
+            orders=lambda cid: filled_order(cid),
+        )
+        self.assertEqual(agent.tick().action, "POSITION_REVIEW", "still managed")
+
+        # The steady state while the clock stays stale: healed at the top of the
+        # tick, evaluated by every premium- and price-independent rule, marked
+        # again at the bottom. It never becomes flat or disowned on its own.
+        after = self.store.get_position(position_id)
+        assert after is not None
+        self.assertIs(after.state, PositionState.INCIDENT)
+        self.assertEqual(after.filled_quantity, 1)
+        self.assertNotIn(
+            after.state, {PositionState.CLOSED, PositionState.ABANDONED},
+            "an integrity incident must never release exposure",
+        )
+
+    def test_the_rule_is_reported_unverifiable_rather_than_silently_skipped(self) -> None:
+        from options_alpha_lab.exits import ExitInputs, evaluate_exit
+
+        agent = self.build(WRITE_ENV)
+        position_id = self.open_position()
+        managed = agent.active_position()
+        assert managed is not None and managed.invalidation is not None
+        self.assertIs(managed.invalidation.source, PriceSource.COMPLETED_DAILY_CLOSE)
+
+        # The stored rule is judged against an intraday price.
+        decision = evaluate_exit(ExitInputs(
+            direction=managed.direction, entry_debit=Decimal("3.13"),
+            width=managed.width, quantity=managed.filled_quantity, dte=25,
+            underlying_price=Decimal("500.00"),
+            underlying_source=PriceSource.INTRADAY,
+            invalidation=managed.invalidation, current_value=Decimal("3.10"),
+            as_of=NOW.date(),
+        ))
+        self.assertTrue(decision.invalidation_unverifiable)
+        self.assertFalse(decision.should_close, "500 is far below the level, and irrelevant")
+        self.assertIsNotNone(position_id)
+
+    def test_a_direction_conflict_halts_rather_than_picking_a_side(self) -> None:
+        agent = self.build(WRITE_ENV)
+        self.open_position()
+        managed = agent.active_position()
+        assert managed is not None
+
+        # Corrupt the stored rule's direction, as a bad migration or a hand-edit
+        # would. Nothing may quietly manage the position against it.
+        with Session(agent.store._engine) as session:
+            row = session.get(PositionRow, managed.position_id)
+            row.invalidation_direction = Direction.BEARISH.value
+            session.commit()
+
+        result = agent.tick()
+        self.assertEqual(result.action, "POSITION_REVIEW")
+        self.assertIn("disagrees", result.detail)
+        self.assertIn(
+            "invalidation_direction_conflict",
+            [i.kind for i in self.store.open_incidents()],
+        )
+        self.assertIs(agent.execution_state, ExecutionState.NO_NEW_RISK)

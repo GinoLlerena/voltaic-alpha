@@ -45,6 +45,54 @@ class SignalFamily(str, Enum):
     PORTFOLIO_RISK = "portfolio_risk"
 
 
+class PriceSource(str, Enum):
+    """Which price series a level was read from.
+
+    The distinction is the whole of `EXIT-AC-06`. A structural invalidation is a
+    *completed-session* rule: "close below 631.63". Judging it against a print
+    taken at 11:04 answers a different question, and answers it wrongly in both
+    directions - a level touched intraday and recovered by the close is not a
+    breach, and a level that has not been touched yet says nothing about where
+    the session ends.
+    """
+
+    COMPLETED_DAILY_CLOSE = "completed_daily_close"
+    INTRADAY = "intraday"
+    #: The clock could not be trusted, so which of the two this is, is unknown.
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class TypedInvalidation:
+    """A structural invalidation rule: a level, a direction, and a source.
+
+    Stored as three typed fields rather than recovered from prose. The earlier
+    implementation formatted the level into English and regexed it back out,
+    which made the first decimal in an arbitrary sentence the thing the position
+    was managed against.
+    """
+
+    level: Decimal
+    direction: Direction
+    source: PriceSource
+
+    def __post_init__(self) -> None:
+        if self.level <= 0:
+            raise ValueError("an invalidation level must be positive")
+        if self.direction is Direction.NEUTRAL:
+            raise ValueError("an invalidation rule must be directional")
+
+    def evaluable_against(self, source: PriceSource) -> bool:
+        """Whether a price from `source` can decide this rule at all."""
+        return source is self.source
+
+    def breached(self, price: Decimal) -> bool:
+        """Direction comes from the rule, never from the position holding it."""
+        if self.direction is Direction.BULLISH:
+            return price <= self.level
+        return price >= self.level
+
+
 class SetupFamily(str, Enum):
     TREND_CONTINUATION_RETEST = "trend_continuation_retest"
     BREAKOUT_BREAKDOWN = "breakout_breakdown"
@@ -190,6 +238,13 @@ class DecisionSnapshot:
     signals: tuple[Signal, ...]
     option_chain: tuple[OptionQuoteSnapshot, ...] = ()
     data_quality: DataQuality = field(default_factory=DataQuality)
+    #: What `underlying_price` is, stated rather than inferred by its readers.
+    #: `build_snapshot` always sets this; the default serves stored fixtures,
+    #: every one of which is assembled from completed daily bars.
+    underlying_source: PriceSource = PriceSource.COMPLETED_DAILY_CLOSE
+    #: The session `underlying_price` closed, when it is a completed close. This
+    #: is what makes "the level was breached" checkable after the fact.
+    underlying_session: date | None = None
     schema_version: str = "decision_snapshot.v1"
 
     def __post_init__(self) -> None:
@@ -220,11 +275,22 @@ class SetupCandidate:
     direction: Direction
     evidence_ids: tuple[str, ...]
     invalidation_conditions: tuple[str, ...]
+    #: The machine-readable form of the structural condition above. The prose is
+    #: written *from* this; nothing reads the prose to recover it.
+    invalidation: TypedInvalidation | None = None
 
     def __post_init__(self) -> None:
         _require_nonblank(self.setup_id, "setup_id")
         if self.direction is Direction.NEUTRAL:
             raise ValueError("a qualified setup must be directional")
+        if self.invalidation is not None and self.invalidation.direction is not self.direction:
+            # A bearish rule on a bullish setup inverts the comparison and turns
+            # the exit into its own opposite. Caught here, at construction,
+            # rather than three components later while a position is open.
+            raise ValueError(
+                f"setup direction {self.direction.value} disagrees with its "
+                f"invalidation direction {self.invalidation.direction.value}"
+            )
         if not self.evidence_ids:
             raise ValueError("a qualified setup must reference evidence")
         if len(self.evidence_ids) != len(set(self.evidence_ids)):

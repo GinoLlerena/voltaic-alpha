@@ -6,7 +6,7 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
-from options_alpha_lab.architecture.contracts import Direction
+from options_alpha_lab.architecture.contracts import Direction, PriceSource, TypedInvalidation
 from options_alpha_lab.exits import (
     EXPIRY_GUARD_DTE,
     PRECEDENCE,
@@ -22,6 +22,14 @@ TODAY = date(2026, 8, 28)
 
 
 def position(**overrides: object) -> ExitInputs:
+    """An `ExitInputs` for a healthy bullish spread.
+
+    `invalidation_level` stays available as a shorthand: it builds a rule whose
+    direction matches the position and whose source matches the observed price,
+    which is the ordinary case. A test that needs them to disagree passes
+    `invalidation` or `underlying_source` explicitly.
+    """
+    level = overrides.pop("invalidation_level", Decimal("631.63"))
     base = dict(
         direction=Direction.BULLISH,
         entry_debit=Decimal("3.00"),
@@ -29,12 +37,18 @@ def position(**overrides: object) -> ExitInputs:
         quantity=1,
         dte=25,
         underlying_price=Decimal("641.25"),
-        invalidation_level=Decimal("631.63"),
+        underlying_source=PriceSource.COMPLETED_DAILY_CLOSE,
         current_value=Decimal("3.10"),
         as_of=TODAY,
         sessions_elapsed=0,
     )
     base.update(overrides)
+    base.setdefault(
+        "invalidation",
+        TypedInvalidation(level, base["direction"], PriceSource.COMPLETED_DAILY_CLOSE)
+        if level is not None
+        else None,
+    )
     return ExitInputs(**base)  # type: ignore[arg-type]
 
 
@@ -202,3 +216,74 @@ class ArithmeticTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InvalidationSourceTests(unittest.TestCase):
+    """EXIT-AC-06: the correct completed-session source is enforced, not assumed."""
+
+    def test_a_completed_close_rule_is_not_judged_on_an_intraday_price(self) -> None:
+        # 631.00 is below the 631.63 level. On a completed close that is a
+        # breach; at 11:04 it is a price that may still recover by 16:00, and
+        # the rule says nothing about it.
+        decision = evaluate_exit(
+            position(
+                underlying_price=Decimal("631.00"),
+                underlying_source=PriceSource.INTRADAY,
+            )
+        )
+        self.assertIsNot(decision.trigger, ExitTrigger.INVALIDATION_BREACHED)
+        self.assertTrue(decision.invalidation_unverifiable)
+        self.assertFalse(decision.should_close)
+
+    def test_an_unverifiable_source_is_reported_rather_than_held_quietly(self) -> None:
+        decision = evaluate_exit(position(underlying_source=PriceSource.UNKNOWN))
+        self.assertIs(decision.trigger, ExitTrigger.UNMEASURABLE)
+        self.assertIn("was not evaluated", decision.reason)
+        self.assertIn("unknown", decision.reason)
+
+    def test_rules_that_do_not_read_the_underlying_still_fire(self) -> None:
+        # The whole point of skipping one rule rather than halting evaluation.
+        for overrides, expected in [
+            ({"dte": 5}, ExitTrigger.EXPIRY_GUARD),
+            ({"sessions_elapsed": 3}, ExitTrigger.SESSION_STOP),
+            ({"current_value": Decimal("1.40")}, ExitTrigger.STOP_LOSS),
+        ]:
+            with self.subTest(expected=expected):
+                decision = evaluate_exit(
+                    position(underlying_source=PriceSource.UNKNOWN, **overrides)
+                )
+                self.assertIs(decision.trigger, expected)
+                self.assertTrue(decision.should_close)
+                self.assertTrue(decision.invalidation_unverifiable, "still reported")
+
+    def test_a_matching_source_evaluates_the_rule_normally(self) -> None:
+        decision = evaluate_exit(position(underlying_price=Decimal("631.00")))
+        self.assertIs(decision.trigger, ExitTrigger.INVALIDATION_BREACHED)
+        self.assertFalse(decision.invalidation_unverifiable)
+
+    def test_the_rules_own_direction_governs_not_the_positions(self) -> None:
+        # A bearish rule stored against a bullish position is a fault, not a
+        # branch: evaluating either direction manages the position against a
+        # condition nobody approved.
+        with self.assertRaises(ValueError) as caught:
+            evaluate_exit(
+                position(
+                    direction=Direction.BULLISH,
+                    invalidation=TypedInvalidation(
+                        Decimal("650.00"), Direction.BEARISH,
+                        PriceSource.COMPLETED_DAILY_CLOSE,
+                    ),
+                )
+            )
+        self.assertIn("disagrees with position direction", str(caught.exception))
+
+    def test_a_position_with_no_invalidation_is_not_reported_unverifiable(self) -> None:
+        decision = evaluate_exit(position(invalidation_level=None))
+        self.assertIs(decision.trigger, ExitTrigger.HOLD)
+        self.assertFalse(decision.invalidation_unverifiable)
+
+    def test_a_rule_cannot_be_built_with_a_neutral_direction(self) -> None:
+        with self.assertRaises(ValueError):
+            TypedInvalidation(
+                Decimal("631.63"), Direction.NEUTRAL, PriceSource.COMPLETED_DAILY_CLOSE
+            )

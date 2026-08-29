@@ -12,7 +12,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from options_alpha_lab.architecture.contracts import Direction, ExecutionState, SpreadStrategy
+from options_alpha_lab.architecture.contracts import (
+    Direction,
+    ExecutionState,
+    PriceSource,
+    SpreadStrategy,
+)
 from options_alpha_lab.config import load_settings
 from options_alpha_lab.execution.gateway import BrokerPort
 from options_alpha_lab.execution.intent import IntentLeg, OrderIntent, build_close_intent
@@ -115,7 +120,8 @@ class ReconcileCase(unittest.TestCase):
             request=prepare_mleg_request(intent, now=NOW), direction=Direction.BULLISH,
             long_symbol=LONG, short_symbol=SHORT, expiration=NOW + timedelta(days=22),
             width=Decimal("5.00"), max_loss=Decimal("339.00"),
-            invalidation=TypedInvalidation(Decimal("631.63"), Direction.BULLISH, "daily_close"),
+            invalidation=TypedInvalidation(Decimal("631.63"), Direction.BULLISH,
+                                        PriceSource.COMPLETED_DAILY_CLOSE),
             now=NOW,
         )
         return order_id, position_id, intent

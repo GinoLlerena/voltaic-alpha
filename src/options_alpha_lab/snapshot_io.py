@@ -26,6 +26,7 @@ from .architecture.contracts import (
     Direction,
     OptionQuoteSnapshot,
     OptionType,
+    PriceSource,
     Signal,
     SignalFamily,
 )
@@ -184,6 +185,17 @@ def snapshot_from_dict(payload: Mapping[str, Any]) -> DecisionSnapshot:
         account=account,
         signals=tuple(signals),
         option_chain=tuple(chain),
+        # A stored snapshot is assembled from completed daily bars, so that is
+        # the reading when the document predates the field. It is written out
+        # below, so every snapshot this code produces states it explicitly.
+        underlying_source=PriceSource(
+            payload.get("underlying_source", PriceSource.COMPLETED_DAILY_CLOSE.value)
+        ),
+        underlying_session=(
+            _date(payload["underlying_session"], "snapshot.underlying_session")
+            if payload.get("underlying_session")
+            else None
+        ),
         data_quality=data_quality,
     )
 
@@ -234,6 +246,8 @@ def snapshot_to_dict(snapshot: DecisionSnapshot) -> dict[str, Any]:
             }
             for quote in snapshot.option_chain
         ],
+        "underlying_source": snapshot.underlying_source,
+        "underlying_session": snapshot.underlying_session,
         "data_quality": {
             "missing_fields": list(snapshot.data_quality.missing_fields),
             "stale_fields": list(snapshot.data_quality.stale_fields),

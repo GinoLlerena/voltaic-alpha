@@ -27,6 +27,7 @@ from .architecture.contracts import (
     SpreadCandidate,
     SpreadStrategy,
     Thesis,
+    TypedInvalidation,
 )
 
 # --- PROVISIONAL policy values. Not approved thresholds. ---------------------
@@ -105,27 +106,45 @@ class DeterministicSetupClassifier:
 
         confirmation = max(confirmations, key=lambda signal: (signal.strength, signal.signal_id))
         evidence_ids = tuple(sorted({anchor.signal_id, confirmation.signal_id}))
+        rule = self._invalidation(snapshot, direction)
 
         return SetupCandidate(
             setup_id=f"{snapshot.symbol.lower()}-trend-retest-{snapshot.snapshot_id}",
             family=SetupFamily.TREND_CONTINUATION_RETEST,
             direction=direction,
             evidence_ids=evidence_ids,
-            invalidation_conditions=self._invalidation(snapshot, direction),
+            invalidation_conditions=self._conditions(rule),
+            invalidation=rule,
         )
 
     @staticmethod
-    def _invalidation(snapshot: DecisionSnapshot, direction: Direction) -> tuple[str, ...]:
-        # Deterministic and derived only from observed price. The model is not
-        # permitted to alter these; the workflow rejects a thesis that tries.
+    def _invalidation(snapshot: DecisionSnapshot, direction: Direction) -> TypedInvalidation:
+        """The structural rule, as three typed fields.
+
+        Deterministic and derived only from observed price. The model is not
+        permitted to alter it; the workflow rejects a thesis that tries.
+
+        `source` records what `underlying_price` actually was rather than
+        asserting a completed close, so a snapshot built while the clock was
+        unreadable produces a rule that later refuses to be evaluated instead of
+        one that is quietly judged against a partial session.
+        """
         price = snapshot.underlying_price
-        if direction is Direction.BULLISH:
-            level = (price * Decimal("0.985")).quantize(Decimal("0.01"))
-            structural = f"close below {level} invalidates the retest"
-        else:
-            level = (price * Decimal("1.015")).quantize(Decimal("0.01"))
-            structural = f"close above {level} invalidates the retest"
-        return (structural, "loss of directional structure on the decision timeframe")
+        multiplier = Decimal("0.985") if direction is Direction.BULLISH else Decimal("1.015")
+        return TypedInvalidation(
+            level=(price * multiplier).quantize(Decimal("0.01")),
+            direction=direction,
+            source=snapshot.underlying_source,
+        )
+
+    @staticmethod
+    def _conditions(rule: TypedInvalidation) -> tuple[str, ...]:
+        """Prose written *from* the typed rule. Nothing reads it back."""
+        side = "below" if rule.direction is Direction.BULLISH else "above"
+        return (
+            f"close {side} {rule.level} invalidates the retest",
+            "loss of directional structure on the decision timeframe",
+        )
 
 
 class DeterministicBaselineThesis:

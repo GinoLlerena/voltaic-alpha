@@ -28,6 +28,7 @@ from .architecture.contracts import (
     DecisionSnapshot,
     ExecutionState,
     SpreadStrategy,
+    TypedInvalidation,
 )
 from .architecture.workflow import DecisionWorkflow
 from .calendar import TradingCalendar
@@ -48,7 +49,6 @@ from .execution.lifecycle import (
     ManagedPosition,
     OrderState,
     PositionState,
-    TypedInvalidation,
 )
 from .execution.reconcile import Reconciler, ReconciliationReport
 from .execution.request import prepare_mleg_request
@@ -87,17 +87,6 @@ def spread_value(snapshot: DecisionSnapshot, long_symbol: str, short_symbol: str
     if long_leg.bid <= 0 or short_leg.ask <= 0:
         return None
     return long_leg.bid - short_leg.ask
-
-
-def invalidation_level_from(conditions: tuple[str, ...]) -> Decimal | None:
-    """Recover the numeric level the deterministic classifier wrote."""
-    import re
-
-    for condition in conditions:
-        match = re.search(r"(\d+\.\d+)", condition)
-        if match:
-            return Decimal(match.group(1))
-    return None
 
 
 class TradingAgent:
@@ -428,14 +417,28 @@ class TradingAgent:
             quantity=position.filled_quantity,
             dte=(position.expiration.astimezone(UTC).date() - now.date()).days,
             underlying_price=snapshot.underlying_price,
-            invalidation_level=(
-                position.invalidation.level if position.invalidation else None
-            ),
+            underlying_source=snapshot.underlying_source,
+            invalidation=position.invalidation,
             current_value=value,
             as_of=now.date(),
             sessions_elapsed=self.sessions_since(position.entry_filled_at),
         )
-        decision = evaluate_exit(inputs)
+        try:
+            decision = evaluate_exit(inputs)
+        except ValueError as exc:
+            # The stored rule and the position disagree about direction. Managing
+            # the position against either would be acting on a condition nobody
+            # approved, so nothing is decided and the disagreement is durable.
+            if self.store is not None:
+                self.store.open_incident(
+                    kind="invalidation_direction_conflict", severity="high",
+                    detail=f"position {position.position_id}: {exc}",
+                    position_id=position.position_id, run_id=self.run_id, now=now,
+                )
+            self._halt_new_risk()
+            return TickResult(
+                now, "POSITION_REVIEW", str(exc), snapshot.snapshot_id
+            )
 
         # A premium we cannot read is an integrity finding, whether or not an
         # independent rule fired (EXIT-004).
@@ -445,6 +448,22 @@ class TradingAgent:
                 detail=(
                     f"spread value unavailable for {position.long_symbol}/"
                     f"{position.short_symbol}; premium-independent rules were evaluated"
+                ),
+                position_id=position.position_id, run_id=self.run_id, now=now,
+            )
+            self._halt_new_risk()
+
+        # So is an invalidation we hold but cannot judge. The position stays
+        # managed by every rule that does not need the underlying (EXIT-AC-06).
+        if decision.invalidation_unverifiable and self.store is not None:
+            assert position.invalidation is not None
+            self.store.open_incident(
+                kind="unverifiable_invalidation_source", severity="medium",
+                detail=(
+                    f"position {position.position_id} holds a "
+                    f"{position.invalidation.source.value} invalidation rule but the "
+                    f"observed price is {snapshot.underlying_source.value}; the rule "
+                    "was not evaluated and new risk is halted"
                 ),
                 position_id=position.position_id, run_id=self.run_id, now=now,
             )
@@ -694,15 +713,14 @@ class TradingAgent:
 
     @staticmethod
     def _typed_invalidation(outcome: DecisionOutcome) -> TypedInvalidation | None:
-        """Store invalidation as a typed rule rather than prose (`EXIT-005`)."""
-        if outcome.setup is None:
-            return None
-        level = invalidation_level_from(outcome.setup.invalidation_conditions)
-        if level is None:
-            return None
-        return TypedInvalidation(
-            level=level, direction=outcome.setup.direction, source="daily_close"
-        )
+        """The rule the classifier built, carried through unchanged (`EXIT-005`).
+
+        This used to regex a level back out of the English sentence the
+        classifier had just formatted it into, which made the first decimal in an
+        arbitrary string the thing a live position was managed against. The
+        classifier now emits the typed rule and writes the prose from it.
+        """
+        return outcome.setup.invalidation if outcome.setup is not None else None
 
     def _record(self, result: TickResult) -> TickResult:
         self.history.append(result)
@@ -877,7 +895,6 @@ __all__ = [
     "TickResult",
     "TradingAgent",
     "halt_state_for",
-    "invalidation_level_from",
     "parse_occ_symbol",
     "spread_value",
 ]

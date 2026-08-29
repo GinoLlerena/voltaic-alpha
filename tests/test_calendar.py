@@ -154,3 +154,47 @@ class ParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SessionStopAcrossAHolidayTests(unittest.TestCase):
+    """EXIT-AC-07: the third completed *session*, not the third calendar day.
+
+    The counter was already correct; nothing proved it across a market holiday,
+    which is the case where a day-based stop and a session-based stop diverge.
+    """
+
+    #: Thanksgiving week 2026. 26 November is a holiday, so no session exists
+    #: for it at all, and 27 November closes early at 13:00.
+    SESSIONS = [
+        {"date": "2026-11-24", "open": "09:30", "close": "16:00"},  # Tue
+        {"date": "2026-11-25", "open": "09:30", "close": "16:00"},  # Wed
+        {"date": "2026-11-27", "open": "09:30", "close": "13:00"},  # Fri, early
+        {"date": "2026-11-30", "open": "09:30", "close": "16:00"},  # Mon
+    ]
+
+    def cal(self) -> TradingCalendar:
+        return TradingCalendar.from_payload({"sessions": self.SESSIONS})
+
+    def test_a_holiday_and_a_weekend_do_not_advance_the_session_stop(self) -> None:
+        filled = et("2026-11-24", 16, 0)
+        # Saturday: four calendar days after the fill, but only Wednesday and
+        # Friday have closed. A day-based stop would already have fired.
+        self.assertEqual(
+            self.cal().completed_sessions_between(filled, et("2026-11-28", 12, 0)), 2
+        )
+        # The third session completes at Monday's close, six calendar days out.
+        self.assertEqual(
+            self.cal().completed_sessions_between(filled, et("2026-11-30", 16, 1)), 3
+        )
+
+    def test_an_early_close_completes_its_session_at_its_own_close(self) -> None:
+        # 13:00, not 16:00. A hard-coded close would not count this session.
+        cal = self.cal()
+        self.assertEqual(
+            cal.completed_sessions_between(et("2026-11-25", 16, 0), et("2026-11-27", 12, 59)),
+            0,
+        )
+        self.assertEqual(
+            cal.completed_sessions_between(et("2026-11-25", 16, 0), et("2026-11-27", 13, 1)),
+            1,
+        )

@@ -28,7 +28,12 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from ..architecture.contracts import Direction, ExecutionState
+from ..architecture.contracts import (
+    Direction,
+    ExecutionState,
+    PriceSource,
+    TypedInvalidation,
+)
 from ..persistence.models import (
     BrokerOrder,
     Fill,
@@ -110,20 +115,6 @@ def map_broker_status(raw: str | None) -> OrderState:
         return OrderState.AMBIGUOUS
     key = str(raw).lower().rsplit(".", 1)[-1].strip()
     return BROKER_STATUS_MAP.get(key, OrderState.AMBIGUOUS)
-
-
-@dataclass(frozen=True)
-class TypedInvalidation:
-    """A structural invalidation rule, stored rather than parsed from prose."""
-
-    level: Decimal
-    direction: Direction
-    source: str
-
-    def breached(self, price: Decimal) -> bool:
-        if self.direction is Direction.BULLISH:
-            return price <= self.level
-        return price >= self.level
 
 
 @dataclass(frozen=True)
@@ -317,7 +308,9 @@ class LifecycleStore:
                     invalidation_direction=(
                         invalidation.direction.value if invalidation else None
                     ),
-                    invalidation_source=invalidation.source if invalidation else None,
+                    invalidation_source=(
+                        invalidation.source.value if invalidation else None
+                    ),
                 )
             )
         return order_id, position_id
@@ -640,7 +633,11 @@ class LifecycleStore:
             invalidation = TypedInvalidation(
                 level=Decimal(str(row.invalidation_level)),
                 direction=Direction(row.invalidation_direction),
-                source=row.invalidation_source or "unspecified",
+                # An older row without a recorded source is not evidence that
+                # the price was a completed close, so it is not read as one.
+                source=PriceSource(row.invalidation_source)
+                if row.invalidation_source in set(PriceSource)
+                else PriceSource.UNKNOWN,
             )
         return ManagedPosition(
             position_id=row.id,

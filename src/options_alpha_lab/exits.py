@@ -13,6 +13,13 @@ Two properties matter more than the thresholds:
   A missing option quote cannot suppress expiry, invalidation, or the session
   stop, because none of those depend on the premium. It is recorded, it halts new
   risk, and the rules that remain computable are still evaluated.
+* **A rule is only evaluated against the price series it was written for**
+  (`EXIT-AC-06`). A structural invalidation is a completed-session condition -
+  "close below 631.63". Judged on a partial session it answers a different
+  question and answers it wrongly both ways round, so when the observed price
+  cannot be matched to the rule's source the rule is skipped, reported, and
+  raised as an integrity finding rather than guessed at. Its direction comes
+  from the stored rule, never from the position that happens to hold it.
 * **The time stop counts completed trading sessions, not DTE** (`EXIT-003`). The
   declared thesis horizon is one to three sessions; a `DTE <= 10` rule on a
   45-DTE entry permits roughly 35 calendar days, which is an expiry control
@@ -28,7 +35,7 @@ from datetime import date
 from decimal import Decimal
 from enum import Enum
 
-from .architecture.contracts import Direction
+from .architecture.contracts import Direction, PriceSource, TypedInvalidation
 
 # --- PROVISIONAL policy values ----------------------------------------------
 STOP_LOSS_FRACTION_OF_DEBIT = Decimal("0.50")
@@ -38,7 +45,10 @@ SESSION_STOP = 3
 EXPIRY_GUARD_DTE = 7
 CONTRACT_MULTIPLIER = Decimal("100")
 
-POLICY_VERSION = "h0-exit-provisional-0"
+#: Bumped from -0 when invalidation stopped being evaluated against a price whose
+#: source had not been checked. The thresholds are unchanged; the behaviour when
+#: the source cannot be matched is not, so the version has to move with it.
+POLICY_VERSION = "h0-exit-provisional-1"
 
 
 class ExitTrigger(str, Enum):  # noqa: UP042 - matches the str-Enum style used across contracts.py
@@ -84,7 +94,12 @@ class ExitInputs:
     quantity: int
     dte: int
     underlying_price: Decimal
-    invalidation_level: Decimal | None
+    #: What `underlying_price` is. A completed-session rule cannot be decided by
+    #: an intraday print, and refusing to try is the point of carrying this.
+    underlying_source: PriceSource
+    #: The stored rule itself, so its own direction and source govern - not the
+    #: position's direction, which can disagree with it.
+    invalidation: TypedInvalidation | None
     #: Conservative mark: what the spread could be closed for right now.
     current_value: Decimal | None
     as_of: date
@@ -103,6 +118,9 @@ class ExitDecision:
     suggested_limit: Decimal | None = None
     #: True when the premium could not be read. Independent rules still ran.
     value_unmeasurable: bool = False
+    #: True when an invalidation rule exists but its price source could not be
+    #: matched, so the rule was not evaluated. Every other rule still was.
+    invalidation_unverifiable: bool = False
 
 
 def max_gain(state: ExitInputs) -> Decimal:
@@ -117,12 +135,31 @@ def unrealized(state: ExitInputs) -> Decimal | None:
     ).quantize(Decimal("0.01"))
 
 
-def invalidation_breached(state: ExitInputs) -> bool:
-    if state.invalidation_level is None:
+def invalidation_verifiable(state: ExitInputs) -> bool:
+    """Whether the recorded rule can be judged against the observed price.
+
+    A structural invalidation is written against completed daily closes. Judging
+    it on a partial session answers a different question, so when the sources do
+    not match the rule is skipped and reported rather than guessed at.
+    """
+    if state.invalidation is None:
         return False
-    if state.direction is Direction.BULLISH:
-        return state.underlying_price <= state.invalidation_level
-    return state.underlying_price >= state.invalidation_level
+    return state.invalidation.evaluable_against(state.underlying_source)
+
+
+def invalidation_breached(state: ExitInputs) -> bool:
+    """Evaluate the stored rule, using *its* direction and *its* source."""
+    if state.invalidation is None or not invalidation_verifiable(state):
+        return False
+    if state.invalidation.direction is not state.direction:
+        # The rule and the position disagree about which way the thesis runs.
+        # Evaluating either one would manage the position against a condition
+        # nobody approved, so it is a fault, not a branch.
+        raise ValueError(
+            f"invalidation direction {state.invalidation.direction.value} disagrees "
+            f"with position direction {state.direction.value}"
+        )
+    return state.invalidation.breached(state.underlying_price)
 
 
 def evaluate_exit(state: ExitInputs) -> ExitDecision:
@@ -133,6 +170,7 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
     """
     pnl = unrealized(state)
     unmeasurable = state.current_value is None
+    unverifiable = state.invalidation is not None and not invalidation_verifiable(state)
 
     def close(trigger: ExitTrigger, reason: str) -> ExitDecision:
         # Closing a debit spread is a sell. Cross the spread deliberately rather
@@ -145,7 +183,9 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
                 (state.current_value * Decimal("0.90")).quantize(Decimal("0.01")),
                 Decimal("0.01"),
             )
-        return ExitDecision(True, trigger, reason, POLICY_VERSION, pnl, limit, unmeasurable)
+        return ExitDecision(
+            True, trigger, reason, POLICY_VERSION, pnl, limit, unmeasurable, unverifiable
+        )
 
     # 1. Expiry guard. Overrides everything, including a profitable position:
     #    holding into expiry risks assignment and pin risk for a gain already
@@ -162,8 +202,9 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
     if invalidation_breached(state):
         return close(
             ExitTrigger.INVALIDATION_BREACHED,
-            f"underlying {state.underlying_price} breached the recorded "
-            f"invalidation level {state.invalidation_level}",
+            f"{state.underlying_source.value} {state.underlying_price} breached the "
+            f"recorded invalidation level "
+            f"{state.invalidation.level if state.invalidation else None}",
         )
 
     # 3. Stop loss. Premium-dependent; skipped, not assumed safe, when unreadable.
@@ -196,17 +237,27 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
 
     # 6. Nothing fired. If the premium was unreadable, say so: it is an integrity
     #    finding that must raise an incident and halt new risk, not a quiet hold.
-    if unmeasurable:
+    if unmeasurable or unverifiable:
+        missing = []
+        if unmeasurable:
+            missing.append("the spread value could not be computed from the current chain")
+        if unverifiable:
+            assert state.invalidation is not None
+            missing.append(
+                f"the invalidation rule reads {state.invalidation.source.value} but the "
+                f"observed price is {state.underlying_source.value}, so it was not evaluated"
+            )
         return ExitDecision(
             False,
             ExitTrigger.UNMEASURABLE,
-            "spread value could not be computed from the current chain; expiry, "
-            "invalidation, and session rules were evaluated and did not fire, so "
-            "the position is retained under a durable integrity incident",
+            "; ".join(missing)
+            + ". Every rule that remained computable was evaluated and did not "
+            "fire, so the position is retained under a durable integrity incident",
             POLICY_VERSION,
+            pnl,
             None,
-            None,
-            True,
+            unmeasurable,
+            unverifiable,
         )
 
     return ExitDecision(
@@ -218,5 +269,6 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
         POLICY_VERSION,
         pnl,
         None,
+        False,
         False,
     )

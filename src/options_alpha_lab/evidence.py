@@ -31,6 +31,7 @@ from .architecture.contracts import (
     Direction,
     OptionQuoteSnapshot,
     OptionType,
+    PriceSource,
     Signal,
     SignalFamily,
 )
@@ -334,9 +335,19 @@ def build_snapshot(
     errors: list[str] = []
 
     clock_payload = clock_read.payload if isinstance(clock_read.payload, dict) else {}
-    market_open = bool(clock_payload.get("is_open"))
+    raw_is_open = clock_payload.get("is_open")
+    # Whether the market is open is what decides if the last daily bar is a close
+    # or a bar still forming. A missing or non-boolean `is_open` used to fall
+    # through `bool(None)` to "closed", so a degraded clock silently promoted a
+    # partial session to a completed close - and every rule downstream believed
+    # it. An unreadable clock is now a provider error, which halts new entries.
+    clock_trusted = isinstance(raw_is_open, bool)
+    if not clock_trusted:
+        errors.append("clock:is_open_unreadable")
+    market_open = bool(raw_is_open)
     if clock_read.source_time and now - clock_read.source_time > CLOCK_FRESHNESS:
         stale.append("clock")
+        clock_trusted = False
 
     account_payload = account_read.payload if isinstance(account_read.payload, dict) else {}
     equity = _dec(account_payload.get("equity"))
@@ -357,6 +368,13 @@ def build_snapshot(
     if not bars:
         raise EvidenceError("no completed daily bars available")
     underlying_price = bars[-1].close
+    underlying_session = bars[-1].session
+    # `parse_bars` removes the forming bar, but it can only do that when the
+    # clock was readable. Without one, the last bar may be a partial session, so
+    # the snapshot says the source is unknown instead of asserting a close.
+    underlying_source = (
+        PriceSource.COMPLETED_DAILY_CLOSE if clock_trusted else PriceSource.UNKNOWN
+    )
 
     quotes, atm_iv, chain_stale = build_option_chain(
         chain_read, as_of=now, underlying_price=underlying_price
@@ -384,6 +402,8 @@ def build_snapshot(
         ),
         signals=tuple(signals),
         option_chain=tuple(quotes),
+        underlying_source=underlying_source,
+        underlying_session=underlying_session,
         data_quality=DataQuality(
             missing_fields=tuple(missing),
             stale_fields=tuple(stale),

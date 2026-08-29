@@ -126,13 +126,17 @@ class RestartRecoveryTests(LeaseCase):
         from sqlalchemy import select
         from sqlalchemy.orm import Session
 
-        from options_alpha_lab.architecture.contracts import Direction, SpreadStrategy
+        from options_alpha_lab.architecture.contracts import (
+            Direction,
+            PriceSource,
+            SpreadStrategy,
+            TypedInvalidation,
+        )
         from options_alpha_lab.execution.intent import IntentLeg, OrderIntent
         from options_alpha_lab.execution.lifecycle import (
             LifecycleStore,
             OrderState,
             PositionState,
-            TypedInvalidation,
         )
         from options_alpha_lab.execution.request import prepare_mleg_request
         from options_alpha_lab.persistence.models import Decision
@@ -158,7 +162,8 @@ class RestartRecoveryTests(LeaseCase):
             long_symbol="SPY260918C00640000", short_symbol="SPY260918C00645000",
             expiration=NOW + timedelta(days=22), width=Decimal("5.00"),
             max_loss=Decimal("339.00"),
-            invalidation=TypedInvalidation(Decimal("631.63"), Direction.BULLISH, "close"),
+            invalidation=TypedInvalidation(Decimal("631.63"), Direction.BULLISH,
+                                        PriceSource.COMPLETED_DAILY_CLOSE),
             now=NOW,
         )
         store.record_submission(order_id, broker_order_id="brk-1",

@@ -78,25 +78,49 @@ The current system does not durably capture:
   rollback events.
 
 The current runtime is polling, not event-driven real time. Its default five-minute
-tick is too slow to enforce 90-second entry and 120-second close deadlines. The
-underlying price used by the strategy is the last completed daily close, so the
-structural invalidation is intentionally a completed-session rule rather than an
-intraday trigger.
+tick is too slow to enforce 90-second entry and 120-second close deadlines.
+
+The underlying price used by the strategy is the last completed daily close, so
+the structural invalidation is intentionally a completed-session rule rather than
+an intraday trigger. **Corrected 29 August 2026:** that was true by consequence
+rather than by enforcement. `parse_bars` dropped the forming bar only when the
+clock reported the market open, and a clock payload without a usable `is_open`
+fell through `bool(None)` to "closed", which silently promoted a partial session
+to a completed close. Nothing downstream could tell the difference, because the
+snapshot did not record what its price was. The snapshot now states its price
+source, an unreadable clock is a provider error, and the exit policy refuses to
+judge a completed-session rule against a price it cannot match. See `EV-023`.
 
 ### 2.3 Known engineering findings to resolve
 
-1. Separate order-deadline enforcement from the five-minute strategy loop.
-2. Reconcile even when a market-data observation fails.
-3. Compare exact broker leg symbol, side, and quantity rather than symbol presence
-   alone.
-4. Preserve nested Alpaca MLeg response structures; do not stringify the `legs`
-   collection before reconciliation.
-5. Reconcile immediately after every submit, cancel, and ambiguous response.
-6. Persist the observations and exit decisions used while a position is open.
-7. Pass deterministic risk-check details into live decision recording.
-8. Add versioned database migrations before changing the hosted schema.
-9. Reconcile documents that still describe the older, process-local lifecycle and
-   the deployment runbook sections that disagree about worker deployment.
+Status as of 29 August 2026. Findings 2 to 5 are closed under `EV-023`; finding 4
+turned out to be a crash rather than a data-fidelity issue.
+
+1. **Open.** Separate order-deadline enforcement from the five-minute strategy
+   loop. Enforcement now runs before observation and outside market hours, so a
+   data outage cannot defer it, but it is still driven by the strategy tick and
+   can overshoot a 90-second deadline by up to 300 seconds.
+2. **Closed.** Reconcile even when a market-data observation fails.
+   Reconciliation and deadline enforcement now precede observation.
+3. **Closed.** Compare exact broker leg symbol, side, and quantity rather than
+   symbol presence alone. Signed per-leg quantities are compared and a mismatch
+   raises `leg_imbalance` and halts new risk.
+4. **Closed.** Preserve nested Alpaca MLeg response structures; do not stringify
+   the `legs` collection before reconciliation. This was more than a fidelity
+   loss: `_leg_fills` iterated the resulting string character by character and
+   raised `AttributeError`, which propagated out of `reconcile()` and would have
+   killed the tick on the first genuine multi-leg fill.
+5. **Closed.** Reconcile immediately after every submit, cancel, and ambiguous
+   response.
+6. **Open.** Persist the observations and exit decisions used while a position is
+   open. This is Phase 1.
+7. **Open.** Pass deterministic risk-check details into live decision recording.
+   `record_decision` accepts `risk_checks`; the agent still does not supply it.
+8. **Open.** Add versioned database migrations before changing the hosted schema.
+   Alembic is installed but unconfigured; the schema is still `create_all`.
+9. **Open.** Reconcile documents that still describe the older, process-local
+   lifecycle and the deployment runbook sections that disagree about worker
+   deployment.
 
 ## 3. Recommended operating cadence
 
