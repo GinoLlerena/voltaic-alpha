@@ -51,15 +51,11 @@ must not share broker-write credentials or expose control actions. Until this
 gate passes, the hosted system demonstrates the judge experience only, not
 unattended trading.
 
-## 2. Platform caveat
+## 2. Platform
 
-The Rule Book says "Demo Application Platform: Use Streamlit, Replit, or
-Vercel". Alibaba is not on that list. This deployment is a working fallback and
-proof the application runs unattended; **Streamlit Community Cloud remains the
-compliant target** and is the first option on the allowlist.
-
-Vercel is not a viable alternative for this app: it runs short-lived serverless
-functions, and Streamlit needs a persistent WebSocket to a long-running process.
+The organizers confirmed on 29 August 2026 that there is **no deployment-platform
+restriction**. The Rule Book and Submission Guidelines name Streamlit, Replit,
+and Vercel as suggestions. This deployment is the submission URL.
 
 ## 3. Known limitations
 

@@ -57,7 +57,7 @@ zero decisions. Both results are reported as they happened. No alpha is claimed.
 | Artifact | Requirement | Status |
 |---|---|---|
 | Public GitHub repository | **Mandatory**; private "may lower your overall score" | Repository created private. **Must be flipped public before submitting** |
-| Application URL | Streamlit, Replit, or Vercel only | **Running** at `http://47.84.108.130:8501` on Alibaba ECS ([runbook](./options_alpha_deployment_runbook_v0_1.md)). Alibaba is **not on the platform allowlist**, so this is a working fallback; deploy to Streamlit Community Cloud for the compliant URL. |
+| Application URL | No platform restriction (organizers, 29 Aug 2026) | **Done.** `http://47.84.108.130:8501` on Alibaba ECS ([runbook](./options_alpha_deployment_runbook_v0_1.md)). |
 | Video | MP4, **5 minutes maximum** | Beats drafted in the narrative §8; not yet recorded |
 | Slide deck | PDF | Ten-slide outline in the narrative §7; not yet exported |
 | Cover image | PNG or JPG, 16:9 | **Done.** `assets/cover.png`, 1920x1080. Source and regeneration steps in `assets/cover.html` |
@@ -82,7 +82,6 @@ Run in this order; each has a known-good answer.
 ## 4. Open items owned by the team
 
 - [ ] Flip `github.com/GinoLlerena/voltaic-alpha` to **public** (`F-J`).
-- [ ] Deploy to **Streamlit Community Cloud** for an allowlisted URL. The Alibaba deployment works but the Rule Book names Streamlit, Replit, or Vercel. Vercel cannot host Streamlit: it runs short-lived serverless functions and Streamlit needs a persistent WebSocket.
 - [ ] Record the MP4 (≤ 5 min) and export the deck PDF.
 - [ ] Ask the organizers whether the Submission Guidelines' "IBM Bob Report"
       clause applies to this event. It reads as carried-over copy from another

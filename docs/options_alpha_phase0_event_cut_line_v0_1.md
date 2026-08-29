@@ -42,7 +42,7 @@ opening. Each row is a fact this project may rely on without further proof.
 | `F-H` | **Submission deadline: 4 September 2026, 15:00 UTC** (10:00 GMT-5). "You have until Sep 4, 2026, 15:00 UTC to submit." Kickoff and registration close 28 August 2026, 15:00 UTC | `HK-001` |
 | `F-I` | Manual submission is available for 6 hours after the deadline, only with prior organizer or mentor approval | `HK-001` |
 | `F-J` | **A public GitHub repository is mandatory.** A private repository "may lower your overall score" because judges cannot review it | `HK-010`, `DEC-001` |
-| `F-K` | The demo must be hosted on **Streamlit, Replit, or Vercel** | `HK-009`, `HK-011`, `DEC-005` |
+| `F-K` | ~~The demo must be hosted on Streamlit, Replit, or Vercel~~ **Superseded 29 August 2026: the organizers confirmed there is no deployment-platform restriction.** The platform pages name those three as suggestions, not requirements | `HK-009`, `HK-011`, `DEC-005` |
 | `F-L` | Video: maximum 5 minutes, MP4, mandatory. Deck: PDF, mandatory. Cover: PNG or JPG, 16:9. Short description ≤ 255 characters; long description ≥ 100 words | `HK-012` to `HK-015` |
 | `F-M` | Judging criteria confirmed as Presentation, Business Value, Application of Technology, and Originality. **No weights are published** | `HK-017` |
 | `F-N` | One track: **Options Alpha Agents**, main track, open to all. Prize pool $6,000 | `HK-014` |
@@ -59,8 +59,10 @@ Two consequences follow directly and are binding:
 3. Because of `F-J`, `github.com/GinoLlerena/voltaic-alpha` **must be public at
    submission**. It may be created private; the flip to public is a release-gate
    checklist item at `G4`, not an afterthought.
-4. Because of `F-K`, the hosting choice is constrained to three platforms and
-   is no longer a free architectural decision. See `D-01` in §6.
+4. `F-K` is superseded. The organizers confirmed on 29 August 2026 that no
+   deployment platform is required, so `D-01` is closed and the hosting choice
+   is a free architectural decision again. The Alibaba ECS deployment is the
+   submission URL.
 
 ## 3. Frozen H0 scope (normative)
 
@@ -79,7 +81,7 @@ and a schedule re-plan, not a code change.
 | Model role | Bounded memo only | Direction, invalidation, sizing, eligibility, or execution authority |
 | Judge interface | Five views: health/mode, evidence and baseline, model memo, approval/request lineage, reconciled outcome or refusal | A sixth view |
 | Broker interface | Alpaca Trading API through `alpaca-py`, single execution path | MCP in the deployed runtime (`F-03`; permitted as a local read-only testing tool); raw HTTP outside contract tests |
-| Hosting | Streamlit, Replit, or Vercel only (`F-K`) | Any other host, however convenient |
+| Hosting | Free choice. `F-K` was superseded on 29 August 2026 by an organizer answer confirming no platform restriction | — |
 
 This table is the single source for the Phase 1 allowlist configuration. Phase 1
 transcribes it; it does not reinterpret it.
@@ -301,26 +303,20 @@ first action.
 Not organizer questions — decisions this team owes itself, created by facts
 confirmed on 28 August 2026.
 
-### D-01 — Demo hosting platform (`DEC-005`, `HK-009`, `HK-011`, `F-K`)
+### D-01 — Demo hosting platform — **CLOSED 29 August 2026**
 
-**Constraint:** the demo must run on Streamlit, Replit, or Vercel.
+**Answered by the organizers:** there is no deployment-platform restriction. The
+Rule Book and Submission Guidelines name Streamlit, Replit, and Vercel as
+suggestions rather than requirements.
 
-**Problem:** the frontend design assumes FastAPI, Jinja2, and Plotly, and the
-architecture assumes an always-on APScheduler worker. None of the three
-permitted hosts runs an always-on Python worker well; Vercel's Python runtime is
-serverless. The judge interface and the scheduler therefore cannot be assumed to
-live in the same place.
+**Resolution:** the Alibaba ECS deployment is the submission URL. The decision
+that drove `D-01` - that the judge view is read-only over evidence already
+produced, so it needs no always-on worker - remains correct on its merits and is
+what made a credential-free dashboard possible. The worker now runs separately
+on its own host with its own database, which is a better architecture than the
+constraint would have permitted.
 
-**Owed by:** the start of Phase 5 (2 September), and earlier if Phase 1's
-configuration work would otherwise encode a host assumption.
-
-**Recommended direction, not yet frozen:** Streamlit for the five judge views,
-reading from PostgreSQL, with the decision worker hosted separately. This keeps
-the views thin and read-only, which the firewall thesis already requires, and
-avoids porting the workflow to a serverless request model.
-
-**Consequence for `SRC-UI`:** the frontend design's rendering assumptions need a
-revision before Phase 5 regardless of which option is chosen.
+No Streamlit Community Cloud deployment is required.
 
 ## 7. Schedule under `F-H`
 
