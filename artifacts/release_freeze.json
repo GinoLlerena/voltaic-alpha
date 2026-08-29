@@ -1,7 +1,7 @@
 {
   "categories": {
     "code": {
-      "app.py": "sha256:7faf2de67e254c00ccbc3d547fed75e49767fcef203e072507e048e1b960229c",
+      "app.py": "sha256:2c0b99a410d1a9063b010a06abda5e8f123a8dd1357f738b10545e4b0f3839e6",
       "scripts/build_demo_db.py": "sha256:0b6fd5d21a2abb9281367f54e3493f4b47461bb6c127ffad02b38cb696a45702",
       "scripts/check_no_write_path.py": "sha256:68b793642499883e7014a50f089a46dfa777988164ebef63fe8c92fe28aa968b",
       "scripts/configure_secrets.py": "sha256:6c70749aa83394d9d2260226948629cd6e1ed450771c275e37a035dd287af4e5",
@@ -51,7 +51,7 @@
     "configuration": {
       ".env.example": "sha256:dfcbc6eb70d89cc2da089f0e9a9011c08096dc7896c8d2f0fb83f94b0080df78",
       ".github/workflows/ci.yml": "sha256:6faba5776ded74f4148898d869d19c9d9e2fd90d33cd38fc014952122daad752",
-      ".streamlit/config.toml": "sha256:b6d7e05e60ab5da34028853865eac38ab474899bd74f6503df027fec91f1d4b6",
+      ".streamlit/config.toml": "sha256:9316ec439ba62ee2166bdfa271731d49460f9f7ccf421d9ba72a59ef580f7955",
       "Dockerfile": "sha256:7678c301df3c3883197b5ddadb2ebb0111649552ade3fa6a0c37186be9c8abd9",
       "docker-compose.yml": "sha256:9b0ab104722d8c14fa8336e2cf24f68950719a389cfbf198d72c7b63aa564127",
       "pyproject.toml": "sha256:c7a49eb64a7aeaed492e577979a717a958b67e632910349a2c7ce177c9c29272",
@@ -81,8 +81,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:eb36000394fd5da65bcca6e2f0a9909c67c0c7517d22e497130595030c94d8a8"
     }
   },
-  "commit": "git:193f9ccf0341f07d1460be220feab137a4248cef",
-  "freeze_digest": "sha256:483d47810c62d282a692e0ec4297845fcd83a5fc1e860de258e11643633ef681",
-  "frozen_at": "2026-08-29T02:25:15.300191+00:00",
+  "commit": "git:f1da02fde37b31dc63bf906433735c03345d9be0",
+  "freeze_digest": "sha256:f5f4f7950d78c2db4380ba5df282ceea4ea4a64bad6b921ceb91cb2111c9d91a",
+  "frozen_at": "2026-08-29T02:54:59.417080+00:00",
   "manifest_version": "release_freeze.v1"
 }

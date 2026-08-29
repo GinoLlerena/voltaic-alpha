@@ -63,9 +63,29 @@ class DashboardRenderTests(unittest.TestCase):
         self.assertEqual(len(run_app().tabs), TABS)
 
     def test_render_produces_substantive_content(self) -> None:
+        # Asserts on what the page says rather than on which Streamlit widget
+        # says it: the annunciator panel and the authority rail are custom
+        # markup, so counting st.metric measured an implementation detail.
         app = run_app()
         self.assertGreater(len(app.markdown), 10)
-        self.assertGreater(len(app.metric), 3)
+        rendered = " ".join(m.value for m in app.markdown)
+        for expected in ("Options Alpha", "Environment", "Order writes", "Memo"):
+            self.assertIn(expected, rendered)
+
+    def test_the_authority_rail_marks_the_model_stage(self) -> None:
+        # The central claim is spatial: the model occupies one fenced stage of
+        # seven. If that markup disappears, the page stops making the argument.
+        rendered = " ".join(m.value for m in run_app().markdown)
+        self.assertIn("node model", rendered)
+        self.assertIn("model advises only", rendered)
+        self.assertIn("deterministic code decides", rendered)
+
+    def test_the_colour_rule_is_stated_not_assumed(self) -> None:
+        # Semantic colour only works if the reader is told the rule once.
+        source = APP.read_text(encoding="utf-8")
+        self.assertIn("model advises only", source)
+        self.assertIn("--warm", source)
+        self.assertIn("--cool", source)
 
     def test_no_deprecated_streamlit_arguments(self) -> None:
         # use_container_width was removed after 2025-12-31; leaving it in would

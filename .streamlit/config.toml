@@ -1,5 +1,5 @@
-# Judge-facing deployment. The dashboard is read-only and holds no secrets:
-# it reads the committed evidence database at demo/h0_demo.db.
+# Judge-facing deployment. The dashboard is read-only and holds no provider
+# credentials: it reads recorded evidence.
 [server]
 headless = true
 # enableCORS = false makes Streamlit send Access-Control-Allow-Origin: * and
@@ -11,5 +11,13 @@ enableXsrfProtection = true
 [browser]
 gatherUsageStats = false
 
+# Set the theme here rather than fighting it with !important in a stylesheet.
+# The palette is semantic: cool primary for values deterministic code owns,
+# amber elsewhere in CSS for anything the model touched.
 [theme]
-base = "light"
+base = "dark"
+backgroundColor = "#0D1117"
+secondaryBackgroundColor = "#151B23"
+textColor = "#E7EDF5"
+primaryColor = "#5AB3F0"
+font = "sans serif"
