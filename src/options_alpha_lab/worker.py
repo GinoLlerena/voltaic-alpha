@@ -264,20 +264,20 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
             model=env.get("OPENAI_MODEL", "gpt-5.6-terra"),
         )
 
-    gateway = None
-    broker = None
-    if settings.may_write_orders:
-        from .execution.gateway import AlpacaBroker
+    # Constructed in every mode: reconciliation is a read, and a position opened
+    # by an earlier paper_execute run must still be managed by a recommend-mode
+    # process. The gateway, not the broker, governs write authority.
+    from .execution.gateway import AlpacaBroker
 
-        broker = AlpacaBroker(env.get("ALPACA_API_KEY", ""), env.get("ALPACA_SECRET_KEY", ""))
-        gateway = ExecutionGateway(broker, settings)
+    broker = AlpacaBroker(env.get("ALPACA_API_KEY", ""), env.get("ALPACA_SECRET_KEY", ""))
+    gateway = ExecutionGateway(broker, settings) if settings.may_write_orders else None
 
     store = LifecycleStore(engine)
     recorder = DecisionRecorder(engine, settings)
     agent = TradingAgent(
         settings, client=client, gateway=gateway, synthesizer=synthesizer,
         recorder=recorder, store=store,
-        reconciler=Reconciler(broker, store) if broker is not None else None,
+        reconciler=Reconciler(broker, store),
         deadlines=DeadlineEnforcer(gateway, store) if gateway is not None else None,
         calendar=calendar, symbol=args.symbol, operator_approval=args.approve,
     )

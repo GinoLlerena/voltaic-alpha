@@ -225,12 +225,17 @@ class TradingAgent:
                 TickResult(now, "OBSERVE_FAILED", f"{type(exc).__name__}: {exc}")
             )
 
-        if not market_open:
-            return self._record(TickResult(now, "MARKET_CLOSED", "no action taken"))
-
-        # Reconcile before deciding anything. Stale beliefs about what we hold
-        # are the failure this whole cycle exists to prevent.
+        # Reconcile first, and regardless of market hours. Reconciliation is a
+        # read: broker state does not stop changing at the close. An order that
+        # expired at 16:00, or a fill that landed at 15:59:59, must not go
+        # unnoticed until the next open, which over a long weekend is 65 hours.
         report = self.reconcile()
+
+        if not market_open:
+            detail = "no action taken"
+            if report is not None:
+                detail = f"reconciled: {report.summary()}"
+            return self._record(TickResult(now, "MARKET_CLOSED", detail))
 
         # Then enforce post-submission deadlines, so an unfilled order is
         # cancelled rather than left occupying the single strategy slot.
@@ -721,22 +726,23 @@ def main(argv: Any = None) -> int:
             model=env.get("OPENAI_MODEL", "gpt-5.6-terra"),
         )
 
-    gateway = None
-    gateway_broker = None
-    if settings.may_write_orders:
-        from .execution.gateway import AlpacaBroker
+    # The broker is constructed for reconciliation in every mode, not only when
+    # writes are permitted. Knowing what we hold is a read, and a position opened
+    # by an earlier paper_execute run must still be reconciled and managed by a
+    # recommend-mode process. Write authority remains governed by the gateway.
+    from .execution.gateway import AlpacaBroker
 
-        gateway_broker = AlpacaBroker(
-            env.get("ALPACA_API_KEY", ""), env.get("ALPACA_SECRET_KEY", "")
-        )
-        gateway = ExecutionGateway(gateway_broker, settings)
+    gateway_broker = AlpacaBroker(
+        env.get("ALPACA_API_KEY", ""), env.get("ALPACA_SECRET_KEY", "")
+    )
+    gateway = ExecutionGateway(gateway_broker, settings) if settings.may_write_orders else None
 
     engine = build_engine(settings)
     create_schema(engine)
     recorder = DecisionRecorder(engine, settings)
 
     store = LifecycleStore(engine)
-    reconciler = Reconciler(gateway_broker, store) if gateway_broker is not None else None
+    reconciler = Reconciler(gateway_broker, store)
     deadlines = DeadlineEnforcer(gateway, store) if gateway is not None else None
 
     agent = TradingAgent(

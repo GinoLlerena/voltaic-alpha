@@ -536,5 +536,38 @@ class EntryWindowTests(DurableAgentCase):
         self.assertEqual(agent.tick().action, "CLOSE_SUBMITTED")
 
 
+
+
+class OutOfHoursReconciliationTests(DurableAgentCase):
+    """Broker state does not stop changing at the close."""
+
+    def test_reconciliation_runs_even_when_the_market_is_closed(self) -> None:
+        # An order that expired at 16:00, or a fill that landed at 15:59:59,
+        # must not go unnoticed until the next open.
+        agent = self.build(
+            WRITE_ENV, client=FakeClient(market_open=False),
+            reconcile_positions=[{"symbol": "SPY260918P00600000", "qty": "-1"}],
+        )
+        result = agent.tick()
+        self.assertEqual(result.action, "MARKET_CLOSED")
+        self.assertIn("reconciled", result.detail)
+        self.assertIsNotNone(agent.last_reconciliation)
+
+    def test_an_out_of_hours_mismatch_still_halts_new_risk(self) -> None:
+        agent = self.build(
+            WRITE_ENV, client=FakeClient(market_open=False),
+            reconcile_positions=[{"symbol": "SPY260918P00600000", "qty": "-1"}],
+        )
+        agent.tick()
+        self.assertIs(agent.execution_state, ExecutionState.NO_NEW_RISK)
+        assert agent.gateway is not None
+        self.assertIs(agent.gateway.execution_state, ExecutionState.NO_NEW_RISK)
+
+    def test_no_entry_is_attempted_out_of_hours(self) -> None:
+        agent = self.build(WRITE_ENV, client=FakeClient(market_open=False))
+        self.assertEqual(agent.tick().action, "MARKET_CLOSED")
+        self.assertEqual(self.broker.submits, [])
+
+
 if __name__ == "__main__":
     unittest.main()
