@@ -136,33 +136,19 @@ approximately ten hours, exactly as its stated cost predicted. The schedule in
 The 6-hour manual-submission window (`F-I`) requires prior approval and is a
 backstop for a technical failure, never a planned part of the schedule.
 
-### F-02 — Pre-existing code (`DEC-001`, `HK-008`)
+### F-02 — Pre-existing code — **RETIRED 29 August 2026**
 
-**Unknown:** whether code written before the window may be part of the
-submission. **NOT STATED** in the event page, the Rule Book, or the Submission
-Guidelines, all read in full on 28 August 2026; the Rule Book addresses
-plagiarism and conduct but never prior work. The fallback therefore stands.
+**Team determination:** the H0 build began at the event start time, so the
+question the fallback was hedging against does not arise. The fallback is
+retired and pre-existing code is no longer tracked as an open risk.
 
-**Fallback:** the boundary is made auditable rather than guessed. Commit
-`baseline-pre-event` tags everything authored before the window. From that tag
-onward, two rules bind:
-
-1. The H0 runtime path is authored in-window.
-2. Any pre-event module reused in the H0 path is listed in the
-   [reuse ledger](./options_alpha_reuse_ledger.md), naming the module, its
-   baseline commit, and what it contributes. The entry lands in the same commit
-   that first reuses the module.
-
-**Why safe:** if pre-existing code is permitted, the ledger is merely honest
-documentation. If it is prohibited, the ledger is the exact worklist to replace,
-and eligibility can be assessed without archaeology through the diff.
-
-**Recorded fact:** no code was under version control before kickoff. The project
-had no repository until 28 August 2026, which is why the first commit is
-timestamped at or after the 15:00 UTC start. The commit message states this
-plainly and separates it from authorship, which it does not misrepresent.
-
-**Cost if wrong:** bounded by the ledger's length, which the rules keep short.
+The [reuse ledger](./options_alpha_reuse_ledger.md) is kept, not because the
+question is still open, but because it is the evidence for the answer: it names
+the three pre-event modules the H0 path uses - the contracts, the ports and the
+workflow state machine - with their baseline commit and replacement cost, and it
+shows the rest of the pre-event lab is not in the H0 path at all. The
+`baseline-pre-event` tag stays for the same reason. Deleting either would remove
+the support for the claim rather than strengthen it.
 
 ### F-03 — Are the MCP server and CLI mandatory? — **RETIRED 28 August 2026**
 
@@ -267,6 +253,12 @@ The approval state is durable and auditable in both configurations.
 **Cost if wrong:** one configuration value and the demo script's mode.
 
 ### F-05 — Account, equity, reset policy, leaderboard (`DEC-003`, `HK-003`, `HK-005`)
+
+**Leaderboard answered 29 August 2026 by inspection of the live dashboard.** It
+ranks *Top builders*, *Top referrers* and *Top submissions*. There is no P&L or
+trading-performance ranking anywhere on it. Paper P&L therefore stays a
+diagnostic, which is what the dashboard, README and deck already say. The
+account, equity and reset questions remain open under the fallback below.
 
 **Unknown:** required account type, starting equity, reset rules, and whether a
 separate enrolled-dashboard P&L leaderboard exists.
