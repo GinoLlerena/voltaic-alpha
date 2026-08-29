@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..architecture.contracts import DecisionOutcome, DecisionSnapshot
@@ -139,6 +139,22 @@ class DecisionRecorder:
         now = datetime.now(UTC)
         market_snapshot_id = _new_id()
         decision_id = _new_id()
+
+        # Recording the same decision twice is a no-op, not an error. The
+        # decision hash is unique by design - identical inputs must produce
+        # exactly one record - but a re-decision on unchanged inputs is a normal
+        # event for a polling agent, and it must not crash the tick that made it.
+        with self._session() as session:
+            existing = session.scalar(
+                select(Decision).where(Decision.decision_hash == decision_hash)
+            )
+            if existing is not None:
+                return RecordedDecision(
+                    decision_id=existing.id,
+                    input_hash=existing.input_hash,
+                    decision_hash=existing.decision_hash,
+                    action=existing.action,
+                )
 
         with self._session() as session:
             session.add(

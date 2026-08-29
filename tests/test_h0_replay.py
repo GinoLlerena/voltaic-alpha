@@ -390,5 +390,31 @@ class BearishMirrorTests(unittest.TestCase):
         )
 
 
+
+
+class IdempotentRecordingTests(unittest.TestCase):
+    """Re-deciding on unchanged inputs is normal for a polling agent."""
+
+    def test_recording_the_same_decision_twice_is_a_no_op(self) -> None:
+        # decision_hash is unique by design; a re-decision must not crash the
+        # tick that made it.
+        from sqlalchemy import func, select
+
+        from options_alpha_lab.persistence.models import Decision
+        from options_alpha_lab.persistence.repository import build_engine
+
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = settings_for(Path(tmp) / "twice.db")
+            first = replay_paths([QUALIFIED], settings)[0]
+            second = replay_paths([QUALIFIED], settings, create=False)[0]
+            self.assertEqual(first.recorded.decision_hash, second.recorded.decision_hash)
+            self.assertEqual(first.recorded.decision_id, second.recorded.decision_id)
+            from sqlalchemy.orm import Session
+
+            with Session(build_engine(settings)) as session:
+                count = session.scalar(select(func.count()).select_from(Decision))
+        self.assertEqual(count, 1, "one decision, recorded once")
+
+
 if __name__ == "__main__":
     unittest.main()

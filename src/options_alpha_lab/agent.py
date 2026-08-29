@@ -43,6 +43,7 @@ from .execution.deadline import DeadlineEnforcer, DeadlineOutcome, deadline_for
 from .execution.gateway import AmbiguousSubmission, ExecutionGateway, ExecutionRefused
 from .execution.intent import IntentLeg, OrderIntent, build_close_intent, build_open_intent
 from .execution.lifecycle import (
+    DuplicateIntent,
     LifecycleStore,
     ManagedPosition,
     OrderState,
@@ -257,6 +258,21 @@ class TradingAgent:
         if managed is not None:
             return self._record(self._manage_open_position(managed, snapshot, now))
 
+        # An entry already in flight blocks another. active_position() above
+        # deliberately ignores PENDING because there is nothing to manage, but a
+        # pending entry still owns the single strategy slot.
+        in_flight = self.unresolved_position()
+        if in_flight is not None:
+            return self._record(
+                TickResult(
+                    now,
+                    "ENTRY_IN_FLIGHT",
+                    f"position {in_flight.position_id} is {in_flight.state.value}; "
+                    "awaiting reconciliation before any new entry",
+                    snapshot.snapshot_id,
+                )
+            )
+
         if report is not None and not report.clean:
             # New risk is halted, but management above still ran: a mismatch
             # must not also stop us managing what we may still own.
@@ -292,6 +308,30 @@ class TradingAgent:
             )
 
         return self._record(self._consider_entry(snapshot, now))
+
+    def unresolved_position(self) -> ManagedPosition | None:
+        """Any position that is not finished, including one whose entry is in flight.
+
+        Distinct from `active_position`, which answers "what do I manage exits
+        for". A PENDING entry has nothing to manage, but it absolutely blocks a
+        second entry: the strategy slot is already spoken for, and preparing
+        another intent from the same decision would collide on the deterministic
+        client order id.
+        """
+        if self.store is None:
+            return None
+        unresolved = [
+            position
+            for position in self.store.active_positions()
+            if position.state
+            in {
+                PositionState.PENDING,
+                PositionState.OPEN,
+                PositionState.CLOSING,
+                PositionState.INCIDENT,
+            }
+        ]
+        return unresolved[0] if unresolved else None
 
     def active_position(self) -> ManagedPosition | None:
         """The position we are responsible for, read from durable records.
@@ -540,22 +580,29 @@ class TradingAgent:
         # so a crash between send and response is recoverable from the database.
         order_id = position_id = None
         if self.store is not None and self.decision_row_id is not None:
-            order_id, position_id = self.store.prepare_entry(
-                decision_id=self.decision_row_id,
-                intent=intent,
-                request=request,
-                direction=outcome.direction,
-                long_symbol=long_leg.contract_symbol,
-                short_symbol=short_leg.contract_symbol,
-                expiration=datetime.combine(
+            try:
+                    order_id, position_id = self.store.prepare_entry(
+                    decision_id=self.decision_row_id,
+                    intent=intent,
+                    request=request,
+                    direction=outcome.direction,
+                    long_symbol=long_leg.contract_symbol,
+                    short_symbol=short_leg.contract_symbol,
+                    expiration=datetime.combine(
                     long_leg.expiration, datetime.min.time(), tzinfo=UTC
-                ),
-                width=abs(long_leg.strike - short_leg.strike),
-                max_loss=outcome.risk.calculated_max_loss,
-                invalidation=self._typed_invalidation(outcome),
-                deadline_at=deadline_for("entry", now),
-                now=now,
-            )
+                    ),
+                    width=abs(long_leg.strike - short_leg.strike),
+                    max_loss=outcome.risk.calculated_max_loss,
+                    invalidation=self._typed_invalidation(outcome),
+                    deadline_at=deadline_for("entry", now),
+                    now=now,
+                    )
+            except DuplicateIntent as exc:
+                # The derived client order id already exists, so this authority
+                # was used. Refusing is the idempotency guard working.
+                return TickResult(
+                    now, "ENTRY_REFUSED", str(exc), snapshot.snapshot_id, recorded_hash
+                )
 
         try:
             submission = self.gateway.submit(

@@ -43,6 +43,16 @@ from .intent import OrderIntent
 from .request import PreparedRequest
 
 
+class DuplicateIntent(RuntimeError):
+    """This exact approved intent has already been prepared.
+
+    The client order id is derived from the intent hash, so a collision means the
+    same authority is being used twice. Refusing is the whole point of deriving
+    the id; crashing on the database constraint is the same decision made
+    badly.
+    """
+
+
 class OrderState(str, Enum):  # noqa: UP042 - matches the str-Enum style used project-wide
     """Our view of an order. Distinct from the broker's `status` string."""
 
@@ -221,6 +231,18 @@ class LifecycleStore:
         """
         stamp = now or datetime.now(UTC)
         intent_id, order_id, position_id = _new_id(), _new_id(), _new_id()
+
+        with self._session() as session:
+            clash = session.scalar(
+                select(OrderIntentRow).where(
+                    OrderIntentRow.client_order_id == intent.client_order_id
+                )
+            )
+            if clash is not None:
+                raise DuplicateIntent(
+                    f"intent {intent.client_order_id} has already been prepared; "
+                    "the same approved authority cannot be submitted twice"
+                )
 
         with self._session() as session:
             session.add(
