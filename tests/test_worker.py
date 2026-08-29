@@ -231,3 +231,36 @@ class HeartbeatCadenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OrderClockWiringTests(unittest.TestCase):
+    """The fast clock has to actually be driven, not merely exist."""
+
+    def test_the_wait_loop_runs_the_order_clock_on_its_own_cadence(self) -> None:
+        # Reading the loop rather than running it: `main` needs credentials, a
+        # broker and a lease. What is asserted here is the wiring - that the
+        # order clock is called from inside the wait, alongside the heartbeat,
+        # rather than once per strategy tick.
+        import inspect
+
+        from options_alpha_lab import worker
+
+        source = inspect.getsource(worker.main)
+        wait_loop = source.split("while waited < args.interval")[1]
+        self.assertIn("agent.order_clock()", wait_loop,
+                      "the order clock must run inside the wait, not once per tick")
+        self.assertIn("lease.heartbeat()", wait_loop)
+
+    def test_the_cadence_is_well_inside_the_shortest_deadline(self) -> None:
+        from options_alpha_lab.agent import DEFAULT_ORDER_CLOCK_SECONDS
+        from options_alpha_lab.execution.deadline import CLOSE_DEADLINE, ENTRY_DEADLINE
+
+        shortest = min(ENTRY_DEADLINE, CLOSE_DEADLINE).total_seconds()
+        self.assertLess(DEFAULT_ORDER_CLOCK_SECONDS, shortest / 10)
+
+    def test_a_zero_interval_disables_the_clock_rather_than_dividing_by_it(self) -> None:
+        import inspect
+
+        from options_alpha_lab import worker
+
+        self.assertIn("args.order_clock_interval <= 0", inspect.getsource(worker.main))

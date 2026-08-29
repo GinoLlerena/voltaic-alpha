@@ -66,6 +66,11 @@ from .exits import (
 from .providers.alpaca_readonly import ProviderError, ReadOnlyAlpacaClient
 
 DEFAULT_TICK_SECONDS = 300
+#: The order clock's cadence. Must be well inside the shortest deadline it
+#: enforces (90 seconds), with room for a slow broker read.
+DEFAULT_ORDER_CLOCK_SECONDS = 5
+#: How long after a submission the fast clock keeps watching one order.
+ORDER_CLOCK_WINDOW = timedelta(minutes=10)
 CHAIN_DTE_LOW = 10
 CHAIN_DTE_HIGH = 60
 
@@ -314,6 +319,58 @@ class TradingAgent:
             )
 
         return self._record(self._consider_entry(snapshot, now))
+
+    # -- the order clock ---------------------------------------------------
+    def working_order_deadline(self, now: datetime) -> datetime | None:
+        """The deadline of an outstanding broker mutation, if one is live.
+
+        A local database read, deliberately: the fast clock must be able to
+        decide whether to talk to the broker at all without talking to it.
+
+        Bounded by `ORDER_CLOCK_WINDOW`. A submitted order that is still
+        non-terminal ten minutes later has outlived every deadline the policy
+        declares; something is wrong with it that fast polling will not fix, and
+        the five-minute strategy loop keeps reconciling it. Polling a stuck
+        order every five seconds forever spends rate limit on a fact that has
+        stopped changing.
+        """
+        if self.store is None:
+            return None
+        for position in self.store.active_positions():
+            order_id = (
+                position.close_order_id
+                if position.state is PositionState.CLOSING and position.close_order_id
+                else position.entry_order_id
+            )
+            record = self.store.order_record(order_id)
+            if record is None or record["submitted_at"] is None:
+                continue
+            state, _, _ = self.store.order_state(order_id)
+            if state.is_terminal or state is OrderState.PREPARED:
+                continue
+            if now - record["submitted_at"] <= ORDER_CLOCK_WINDOW:
+                return deadline_for(record["role"], record["submitted_at"])
+        return None
+
+    def order_clock(self) -> TickResult | None:
+        """Reconcile and enforce deadlines while a broker mutation is outstanding.
+
+        Separate from `tick()` because the two answer questions on different
+        timescales. The strategy hypothesis is daily and its inputs change once
+        per completed session, so re-deciding it every few seconds would add
+        correlated records rather than information. An order deadline is ninety
+        seconds, and a check that runs every five minutes can enforce it three
+        hundred seconds late - by which time the unfilled order still occupies
+        the single strategy slot and the market has moved away from its limit.
+
+        Returns `None` on a quiet pass, which is most of them.
+        """
+        now = self._clock()
+        if self.working_order_deadline(now) is None:
+            return None
+        self.reconcile()
+        result = self._enforce_deadlines(now)
+        return self._record(result) if result is not None else None
 
     def _halt_new_risk(self) -> None:
         """Stop new risk here *and* at the gateway, which is what must refuse."""

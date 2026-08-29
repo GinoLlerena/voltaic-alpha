@@ -871,3 +871,109 @@ class RiskCheckRecordingTests(DurableAgentCase):
             [c["check"] for c in stored],
             [c["check"] for c in agent.risk_governor.last_checks],
         )
+
+
+class OrderClockTests(DurableAgentCase):
+    """Finding 1: the deadline check runs on the deadline's timescale.
+
+    A 90-second deadline enforced by a 300-second loop is enforced up to 300
+    seconds late, by which time the unfilled order still occupies the single
+    strategy slot and the market has moved away from its limit.
+    """
+
+    def pending_entry(self) -> str:
+        """An entry that has been submitted and has not come back."""
+        intent = entry_intent()
+        order_id, _ = self.store.prepare_entry(
+            decision_id=self.decision_id, intent=intent,
+            request=prepare_mleg_request(intent, now=NOW), direction=Direction.BULLISH,
+            long_symbol=LONG, short_symbol=SHORT, expiration=NOW + timedelta(days=25),
+            width=Decimal("5.00"), max_loss=Decimal("339.00"), invalidation=None, now=NOW,
+        )
+        self.store.record_submission(order_id, broker_order_id="brk-slow",
+                                     broker_status="accepted", now=NOW)
+        return order_id
+
+    def agent_with_deadlines(self, broker):
+        from options_alpha_lab.execution.deadline import DeadlineEnforcer
+
+        agent = self.with_recon(self.build(WRITE_ENV, broker=broker), [])
+        agent.deadlines = DeadlineEnforcer(agent.gateway, self.store)
+        return agent
+
+    def test_a_quiet_pass_does_no_broker_work_at_all(self) -> None:
+        # The fast clock runs every few seconds. It must decide whether to talk
+        # to the broker from a local read, or it becomes the rate-limit problem.
+        broker = FakeBroker()
+        agent = self.agent_with_deadlines(broker)
+        self.assertIsNone(agent.working_order_deadline(NOW), "nothing is outstanding")
+        self.assertIsNone(agent.order_clock())
+        self.assertEqual(broker.cancels, [])
+
+    def test_it_does_nothing_before_the_deadline(self) -> None:
+        broker = FakeBroker()
+        agent = self.agent_with_deadlines(broker)
+        self.pending_entry()
+
+        agent._clock = lambda: NOW + timedelta(seconds=60)
+        self.assertIsNotNone(agent.working_order_deadline(NOW + timedelta(seconds=60)))
+        self.assertIsNone(agent.order_clock(), "60s is inside the 90s entry deadline")
+        self.assertEqual(broker.cancels, [])
+
+    def test_it_cancels_at_the_deadline_without_a_strategy_tick(self) -> None:
+        broker = FakeBroker()
+        agent = self.agent_with_deadlines(broker)
+        self.pending_entry()
+
+        agent._clock = lambda: NOW + timedelta(seconds=95)
+        result = agent.order_clock()
+        assert result is not None
+        self.assertEqual(result.action, "DEADLINE_ACTION")
+        self.assertIn("canceled 1", result.detail)
+        self.assertEqual(broker.cancels, ["brk-slow"])
+        # And it did so without evaluating the strategy: no decision was made.
+        self.assertEqual(
+            [r.action for r in agent.history], ["DEADLINE_ACTION"],
+        )
+
+    def test_the_deadline_is_enforced_within_one_clock_interval(self) -> None:
+        # The property the separation exists for, stated as a bound rather than
+        # as "it is faster now".
+        from options_alpha_lab.agent import DEFAULT_ORDER_CLOCK_SECONDS
+        from options_alpha_lab.execution.deadline import ENTRY_DEADLINE
+
+        broker = FakeBroker()
+        agent = self.agent_with_deadlines(broker)
+        self.pending_entry()
+
+        fired_at = None
+        for second in range(0, 200, DEFAULT_ORDER_CLOCK_SECONDS):
+            agent._clock = lambda s=second: NOW + timedelta(seconds=s)
+            if agent.order_clock() is not None:
+                fired_at = second
+                break
+
+        self.assertIsNotNone(fired_at, "the deadline was never enforced")
+        assert fired_at is not None
+        lateness = fired_at - ENTRY_DEADLINE.total_seconds()
+        self.assertGreaterEqual(lateness, 0, "it must not fire early")
+        self.assertLess(lateness, DEFAULT_ORDER_CLOCK_SECONDS)
+
+    def test_it_stops_watching_an_order_that_has_outlived_every_deadline(self) -> None:
+        # A submitted order still non-terminal ten minutes later has something
+        # wrong with it that five-second polling will not fix. The strategy loop
+        # keeps reconciling it; the fast clock stands down.
+        agent = self.agent_with_deadlines(FakeBroker())
+        self.pending_entry()
+
+        self.assertIsNotNone(agent.working_order_deadline(NOW + timedelta(minutes=9)))
+        self.assertIsNone(agent.working_order_deadline(NOW + timedelta(minutes=11)))
+
+    def test_a_resolved_order_is_no_longer_watched(self) -> None:
+        agent = self.agent_with_deadlines(FakeBroker())
+        order_id = self.pending_entry()
+        self.store.apply_order_reconciliation(
+            order_id, broker_status="filled", filled_quantity=1,
+            filled_avg_price=Decimal("3.13"), now=NOW,
+        )
+        self.assertIsNone(agent.working_order_deadline(NOW + timedelta(seconds=95)))

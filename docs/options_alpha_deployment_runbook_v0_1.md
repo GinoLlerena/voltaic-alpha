@@ -176,6 +176,31 @@ showing frozen evidence honestly labelled.
   the read-only adapter imports it at module scope. The dashboard had never
   exposed this because it does not import the provider modules.
 
+### 7.6 The order clock
+
+The worker runs two cadences, because the questions have different timescales.
+
+| Clock | Cadence | What it does |
+|---|---|---|
+| Strategy | `--interval`, default 300s | Reconcile, enforce deadlines, manage exits, consider entries |
+| Order | `--order-clock-interval`, default 5s | Reconcile and enforce deadlines *only*, while a broker mutation is outstanding |
+
+The strategy hypothesis is daily and its inputs change once per completed
+session, so re-deciding it every few seconds would add correlated records rather
+than information. An order deadline is 90 seconds for an entry and 120 for a
+close, and a check that runs every 300 seconds can enforce one 300 seconds late
+- by which time the unfilled order still occupies the single strategy slot and
+the market has moved away from its limit.
+
+The order clock decides whether to contact the broker from a local database
+read, so a quiet pass costs nothing, and it stands down ten minutes after a
+submission. An order still working past every deadline the policy declares has
+something wrong with it that five-second polling will not fix; the strategy loop
+keeps reconciling it. `--order-clock-interval 0` disables it.
+
+Health JSON carries `order_clock_actions`, so a worker that looks idle at tick
+granularity can be seen to have been busy at order granularity.
+
 ### 7.5 Schema migrations
 
 The schema is versioned with Alembic from 29 August 2026. Before that, the

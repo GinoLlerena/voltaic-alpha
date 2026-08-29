@@ -93,13 +93,17 @@ judge a completed-session rule against a price it cannot match. See `EV-023`.
 
 ### 2.3 Known engineering findings to resolve
 
-Status as of 29 August 2026. Findings 2 to 5 are closed under `EV-023`; finding 4
-turned out to be a crash rather than a data-fidelity issue.
+Status as of 29 August 2026. Findings 1 to 8 are closed under `EV-023` and
+`EV-024`; finding 4 turned out to be a crash rather than a data-fidelity issue.
+Finding 9 is documentation work and remains open.
 
-1. **Open.** Separate order-deadline enforcement from the five-minute strategy
-   loop. Enforcement now runs before observation and outside market hours, so a
-   data outage cannot defer it, but it is still driven by the strategy tick and
-   can overshoot a 90-second deadline by up to 300 seconds.
+1. **Closed.** Separate order-deadline enforcement from the five-minute strategy
+   loop. `TradingAgent.order_clock` reconciles and enforces deadlines on a
+   five-second cadence, driven from the worker's wait loop alongside the lease
+   heartbeat. It decides whether to contact the broker from a local read, and
+   stands down ten minutes after a submission - an order still working past
+   every declared deadline has something wrong with it that fast polling will
+   not fix, and the strategy loop keeps reconciling it.
 2. **Closed.** Reconcile even when a market-data observation fails.
    Reconciliation and deadline enforcement now precede observation.
 3. **Closed.** Compare exact broker leg symbol, side, and quantity rather than
@@ -112,12 +116,17 @@ turned out to be a crash rather than a data-fidelity issue.
    killed the tick on the first genuine multi-leg fill.
 5. **Closed.** Reconcile immediately after every submit, cancel, and ambiguous
    response.
-6. **Open.** Persist the observations and exit decisions used while a position is
-   open. This is Phase 1.
-7. **Open.** Pass deterministic risk-check details into live decision recording.
-   `record_decision` accepts `risk_checks`; the agent still does not supply it.
-8. **Open.** Add versioned database migrations before changing the hosted schema.
-   Alembic is installed but unconfigured; the schema is still `create_all`.
+6. **Closed.** Persist the observations and exit decisions used while a position
+   is open. `position_observations` and `exit_decisions` are written by the
+   management path: the mark before the policy runs, every evaluation including
+   `HOLD` and `UNMEASURABLE` after it.
+7. **Closed.** Pass deterministic risk-check details into live decision
+   recording. The governor is held for the pass that used it rather than built
+   inline and discarded.
+8. **Closed.** Add versioned database migrations before changing the hosted
+   schema. Alembic is configured with a baseline marker and the capture
+   revision; `create_schema` stamps head. See runbook section 7.5, including the
+   stated limitation that `upgrade head` does not build an empty database.
 9. **Open.** Reconcile documents that still describe the older, process-local
    lifecycle and the deployment runbook sections that disagree about worker
    deployment.
