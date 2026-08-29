@@ -56,11 +56,12 @@ zero decisions. Both results are reported as they happened. No alpha is claimed.
 
 | Artifact | Requirement | Status |
 |---|---|---|
-| Public GitHub repository | **Mandatory**; private "may lower your overall score" | Repository created private. **Must be flipped public before submitting** |
+| Public GitHub repository | **Mandatory** | **Done.** `github.com/GinoLlerena/voltaic-alpha` is public and was validated by an unauthenticated clean clone: 34 commits, both tags, and all nine validation gates pass from the clone. |
 | Application URL | No platform restriction (organizers, 29 Aug 2026) | **Done.** `http://47.84.108.130:8501` on Alibaba ECS ([runbook](./options_alpha_deployment_runbook_v0_1.md)). |
 | Video | MP4, **5 minutes maximum** | Beats drafted in the narrative §8; not yet recorded |
 | Slide deck | PDF | Ten-slide outline in the narrative §7; not yet exported |
 | Cover image | PNG or JPG, 16:9 | **Done.** `assets/cover.png`, 1920x1080. Source and regeneration steps in `assets/cover.html` |
+| Licence | Original and MIT-compliant (`F-F`) | **Done.** `LICENSE` at the repository root, declared in `pyproject.toml`. A public repository with no licence is all-rights-reserved by default, which is the opposite of MIT-compliant. |
 | Title, descriptions, tags | See §1 | Drafted above, within limits |
 
 ## 3. Rehearsal script
@@ -81,11 +82,7 @@ Run in this order; each has a known-good answer.
 
 ## 4. Open items owned by the team
 
-- [ ] Flip `github.com/GinoLlerena/voltaic-alpha` to **public** (`F-J`).
 - [ ] Record the MP4 (≤ 5 min) and export the deck PDF.
-- [ ] Ask the organizers whether the Submission Guidelines' "IBM Bob Report"
-      clause applies to this event. It reads as carried-over copy from another
-      sponsor but is marked mandatory.
 - [ ] Answer the three still-open questions (`F-02` pre-existing code, `F-04`
       autonomy, `F-05` account/leaderboard) and record each against the fallback
       it replaces.
