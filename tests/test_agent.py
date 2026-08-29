@@ -498,5 +498,43 @@ class ReconciliationHookTests(unittest.TestCase):
         self.assertEqual(len(broker.submits), 1)
 
 
+
+
+class EntryWindowTests(DurableAgentCase):
+    """Item 6: an open market is not the same as an eligible entry window."""
+
+    def calendar_with(self, close: str = "16:00"):
+        from options_alpha_lab.calendar import TradingCalendar
+
+        day = NOW.date().isoformat()
+        return TradingCalendar.from_payload(
+            {"sessions": [{"date": day, "open": "09:30", "close": close}]}
+        )
+
+    def test_an_entry_outside_the_window_is_refused_without_writing(self) -> None:
+        # NOW is 15:30 UTC, which is 11:30 ET on a 13:00 early close: past the
+        # 12:15 session-relative cutoff would be 12:16, so use a late clock.
+        agent = self.build(WRITE_ENV)
+        agent.calendar = self.calendar_with(close="11:00")
+        result = agent.tick()
+        self.assertEqual(result.action, "OUTSIDE_ENTRY_WINDOW")
+        self.assertEqual(self.broker.submits, [])
+
+    def test_an_entry_inside_the_window_proceeds(self) -> None:
+        agent = self.build(WRITE_ENV)
+        agent.calendar = self.calendar_with()
+        self.assertEqual(agent.tick().action, "ENTRY_SUBMITTED")
+
+    def test_an_open_position_is_still_managed_outside_the_window(self) -> None:
+        # Monitoring and risk reduction must remain available after the cutoff.
+        agent = self.build(
+            WRITE_ENV,
+            client=FakeClient(quotes={LONG: ("1.00", "1.10"), SHORT: ("0.20", "0.30")}),
+        )
+        agent.calendar = self.calendar_with(close="11:00")
+        self.open_position()
+        self.assertEqual(agent.tick().action, "CLOSE_SUBMITTED")
+
+
 if __name__ == "__main__":
     unittest.main()

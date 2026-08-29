@@ -30,6 +30,7 @@ from .architecture.contracts import (
     SpreadStrategy,
 )
 from .architecture.workflow import DecisionWorkflow
+from .calendar import TradingCalendar
 from .components import (
     DeterministicBaselineThesis,
     DeterministicRiskGovernor,
@@ -112,6 +113,7 @@ class TradingAgent:
         reconciler: Reconciler | None = None,
         store: LifecycleStore | None = None,
         deadlines: DeadlineEnforcer | None = None,
+        calendar: TradingCalendar | None = None,
         symbol: str = "SPY",
         clock: Callable[[], datetime] | None = None,
         operator_approval: str | None = None,
@@ -124,6 +126,7 @@ class TradingAgent:
         self.reconciler = reconciler
         self.store = store
         self.deadlines = deadlines
+        self.calendar = calendar
         self.symbol = symbol
         self.operator_approval = operator_approval
         self._clock = clock or (lambda: datetime.now(UTC))
@@ -256,6 +259,17 @@ class TradingAgent:
                 TickResult(now, "ENTRY_HALTED", report.summary(), snapshot.snapshot_id)
             )
 
+        # The market being open is not the same as the entry window being open
+        # (EXIT-012). Monitoring and risk reduction above already ran.
+        if self.calendar is not None:
+            window = self.calendar.evaluate_entry(now)
+            if not window.entry_permitted:
+                return self._record(
+                    TickResult(
+                        now, "OUTSIDE_ENTRY_WINDOW", window.reason, snapshot.snapshot_id
+                    )
+                )
+
         # Data quality governs the halt state too (EXIT-010).
         data_state = halt_state_for(snapshot)
         if data_state is not ExecutionState.NORMAL:
@@ -294,7 +308,12 @@ class TradingAgent:
         Counted from observed daily bars, which exist once per trading session,
         so weekends and market holidays are excluded without a separate calendar.
         """
-        if filled_at is None or not self._sessions:
+        if filled_at is None:
+            return 0
+        if self.calendar is not None and len(self.calendar):
+            # The authoritative source: it knows holidays and early closes.
+            return self.calendar.completed_sessions_between(filled_at, self._clock())
+        if not self._sessions:
             return 0
         entry_day = filled_at.astimezone(UTC).date()
         return sum(1 for session in self._sessions if session > entry_day)
@@ -686,6 +705,13 @@ def main(argv: Any = None) -> int:
     client.option_feed = client.detect_option_feed(args.symbol)
     client.stock_feed = client.detect_stock_feed(args.symbol)
 
+    today = datetime.now(UTC).date()
+    calendar = TradingCalendar.from_payload(
+        client.calendar(
+            (today - timedelta(days=30)).isoformat(), (today + timedelta(days=90)).isoformat()
+        ).payload
+    )
+
     synthesizer = None
     if settings.bot_mode is not BotMode.OBSERVE and env.get("OPENAI_API_KEY"):
         from .providers.openai_thesis import BoundedThesisSynthesizer, OpenAIResponsesTransport
@@ -722,6 +748,7 @@ def main(argv: Any = None) -> int:
         store=store,
         reconciler=reconciler,
         deadlines=deadlines,
+        calendar=calendar,
         symbol=args.symbol,
         operator_approval=args.approve,
     )

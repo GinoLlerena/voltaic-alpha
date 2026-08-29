@@ -195,6 +195,26 @@ class ReadOnlyAlpacaClient:
             payload=body,
         ).with_hash()
 
+    def calendar(self, start: str, end: str) -> ProviderRead:
+        """Trading sessions with their open and close times, in Eastern wall clock.
+
+        Only trading days are returned, so a date's absence is itself the answer
+        for weekends and holidays.
+        """
+        received = datetime.now(UTC)
+        body = self._get(
+            f"{PAPER_TRADING_HOST}/v2/calendar", {"start": start, "end": end}
+        )
+        return ProviderRead(
+            provider=self.provider,
+            endpoint="/v2/calendar",
+            feed="paper-trading",
+            source_time=received,
+            received_time=received,
+            pages=1,
+            payload={"sessions": body},
+        ).with_hash()
+
     def daily_bars(self, symbol: str, limit: int = 1000, lookback_days: int = 400) -> ProviderRead:
         received = datetime.now(UTC)
         # `start` is mandatory in practice: without it Alpaca returns only the
