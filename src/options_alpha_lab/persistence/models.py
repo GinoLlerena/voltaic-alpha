@@ -378,6 +378,28 @@ class Incident(Base):
     schema_version: Mapped[str] = _schema_version()
 
 
+class WorkerLease(Base):
+    """Single-writer lease.
+
+    Two workers reconciling the same position against the same broker would
+    fight, and both could submit. The lease makes "exactly one active worker" a
+    checked fact rather than an operational promise.
+    """
+
+    __tablename__ = "worker_leases"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner: Mapped[str] = mapped_column(String(128), nullable=False)
+    host: Mapped[str] = mapped_column(String(128), nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    heartbeat_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    released_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    schema_version: Mapped[str] = _schema_version()
+
+
 class AuditEvent(Base):
     """Every workflow transition, in order, with its correlation IDs."""
 

@@ -15,6 +15,7 @@
       "src/options_alpha_lab/architecture/contracts.py": "sha256:96cd1f9f1e009aab0c2e2eaa4d050b016dc49deb09033072ea264e2bed05682f",
       "src/options_alpha_lab/architecture/ports.py": "sha256:979fe77c8f82bb7df30af834f35e3277e70ea83577d0f66a4129efeeed624097",
       "src/options_alpha_lab/architecture/workflow.py": "sha256:00a3651fe2d1e981f8980d7f4325a4e2f9e5bf8f0e17eaf4e8e1448a73e51ada",
+      "src/options_alpha_lab/calendar.py": "sha256:4b479ebdcca608f334561c26a456e51b4c1b6b717ac83391cfab83cc116f9508",
       "src/options_alpha_lab/cli.py": "sha256:ea7a1869bc8c8030e105cf32559f560e1cd6ec817ba43c3e54ea5a9c7efbc05a",
       "src/options_alpha_lab/components.py": "sha256:1bf775a8c49d4b54d57adef4f640ef9f3a208e1e171ab39ea829d6eb2575b0f1",
       "src/options_alpha_lab/config.py": "sha256:1fade1426cff2c53d44870a8887365f992f08db532eb3ab5df900137dc737803",
@@ -33,7 +34,7 @@
       "src/options_alpha_lab/models.py": "sha256:7ecd96768d341af63f461fffb743c88bfd4f868afb787cc545f6ce02467b3e1f",
       "src/options_alpha_lab/orchestrator.py": "sha256:f77958773038cccd00ce2a8ddfe3bbfa9b37a9a69acd51410f77b774b2ae8f48",
       "src/options_alpha_lab/persistence/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "src/options_alpha_lab/persistence/models.py": "sha256:24648952a716c553405faa81bff9beca0bad0d540bb6b55dcc051d0d3a490ace",
+      "src/options_alpha_lab/persistence/models.py": "sha256:0401d55921edea8b041e11f776e6ffd7cc31143533f2cd93f89e3316f1d35e03",
       "src/options_alpha_lab/persistence/repository.py": "sha256:d2f25abedf929ae17692dc690f15c6ecbc7f500c0fc0baf1a58955946b496a9c",
       "src/options_alpha_lab/providers/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/providers/alpaca_readonly.py": "sha256:3bab4b14b3c40ced53e85b3a993228a4fbb558286739ba8c3a3d2c51b59eefd7",
@@ -77,8 +78,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:eb36000394fd5da65bcca6e2f0a9909c67c0c7517d22e497130595030c94d8a8"
     }
   },
-  "commit": "git:a987bb231861e0f15f491b7457504a1d79d4a17c",
-  "freeze_digest": "sha256:67e855c93ae3897208b4c829cb65dc880c90e3e4b3d89724a81edcaa7b3bd517",
-  "frozen_at": "2026-08-29T00:09:08.786387+00:00",
+  "commit": "git:b574b3051d3b8302f125f87da3715c18d28c7800",
+  "freeze_digest": "sha256:084aa25eb81c92581da17fa06d9a68d58b50c39d9e9272f5204e8d06a3d9910e",
+  "frozen_at": "2026-08-29T00:52:27.861850+00:00",
   "manifest_version": "release_freeze.v1"
 }
