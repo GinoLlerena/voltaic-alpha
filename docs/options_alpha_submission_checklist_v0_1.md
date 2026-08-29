@@ -83,9 +83,9 @@ Run in this order; each has a known-good answer.
 ## 4. Open items owned by the team
 
 - [ ] Record the MP4 (≤ 5 min) and export the deck PDF.
-- [ ] Answer the three still-open questions (`F-02` pre-existing code, `F-04`
-      autonomy, `F-05` account/leaderboard) and record each against the fallback
-      it replaces.
+- [ ] Answer the two still-open questions with the organizers: `F-04` autonomy,
+      and the account, equity and reset half of `F-05`. Both have binding
+      fallbacks, so neither blocks submission.
 
 ## 5. Freeze rule
 
