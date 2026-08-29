@@ -237,10 +237,11 @@ class Reconciler:
 
         # 3. A close is only complete when the broker confirms flat.
         if position.state is PositionState.CLOSING:
+            close_state = None
             if position.close_order_id is not None:
                 close_order = self._fetch_order(position.close_order_id, working_by_client_id)
                 if close_order is not None:
-                    self._store.apply_order_reconciliation(
+                    close_state = self._store.apply_order_reconciliation(
                         position.close_order_id,
                         broker_status=str(close_order.get("status")),
                         filled_quantity=self._filled_quantity(close_order),
@@ -248,11 +249,39 @@ class Reconciler:
                         legs=_leg_fills(close_order),
                         now=stamp,
                     )
+
+            if not broker_holds:
+                state = self._store.apply_close_outcome(
+                    position.position_id, broker_flat=True, remaining_quantity=0, now=stamp
+                )
+                report.positions_resolved.append(f"{position.position_id}:{state.value}")
+                return
+
+            # Still held. If the close order ended without flattening, the attempt
+            # failed: return the position to OPEN so it can be closed again rather
+            # than leaving it permanently CLOSING and unclosable.
+            if close_state is not None and close_state.is_terminal:
+                state = self._store.release_close(
+                    position.position_id, reason=close_state.value.lower(), now=stamp
+                )
+                report.positions_resolved.append(f"{position.position_id}:{state.value}")
+                report.incidents.append(
+                    self._store.open_incident(
+                        kind="close_did_not_flatten", severity="medium",
+                        detail=(
+                            f"close order for {position.position_id} reached "
+                            f"{close_state.value} while the broker still holds a leg; "
+                            "position returned to OPEN for another attempt"
+                        ),
+                        execution_state=ExecutionState.NORMAL,
+                        position_id=position.position_id, run_id=run_id, now=stamp,
+                    )
+                )
+                return
+
             state = self._store.apply_close_outcome(
-                position.position_id,
-                broker_flat=not broker_holds,
-                remaining_quantity=0 if not broker_holds else position.filled_quantity,
-                now=stamp,
+                position.position_id, broker_flat=False,
+                remaining_quantity=position.filled_quantity, now=stamp,
             )
             report.positions_resolved.append(f"{position.position_id}:{state.value}")
             return

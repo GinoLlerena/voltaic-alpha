@@ -486,6 +486,28 @@ class LifecycleStore:
             result = PositionState(position.lifecycle_status)
         return result
 
+    def release_close(self, position_id: str, *, reason: str,
+                      now: datetime | None = None) -> PositionState:
+        """Return a CLOSING position to OPEN when its close ended without flattening.
+
+        A canceled or expired close does not release exposure; it means the
+        attempt failed. The position goes back to OPEN so the next tick can try
+        again. Leaving it CLOSING forever would make it permanently unclosable,
+        which is the trapped-exposure failure wearing a different label.
+        """
+        stamp = now or datetime.now(UTC)
+        with self._session() as session:
+            position = session.get(Position, position_id)
+            if position is None:
+                raise LookupError(f"position {position_id} not found")
+            if position.lifecycle_status != PositionState.CLOSING.value:
+                return PositionState(position.lifecycle_status)
+            position.lifecycle_status = PositionState.OPEN.value
+            position.close_order_id = None
+            position.close_reason = f"close_released:{reason}"
+            position.opened_at = position.opened_at or stamp
+            return PositionState.OPEN
+
     def apply_close_outcome(
         self, position_id: str, *, broker_flat: bool, remaining_quantity: int,
         now: datetime | None = None,
@@ -641,7 +663,10 @@ class LifecycleStore:
                     opened_at=now or datetime.now(UTC),
                 )
             )
-            if position_id is not None:
+            # Only a halting incident moves the position into INCIDENT. An
+            # informational one (a partial fill, a close that needs retrying)
+            # records the fact without overwriting a state that is still correct.
+            if position_id is not None and execution_state is not ExecutionState.NORMAL:
                 position = session.get(Position, position_id)
                 if position is not None and position.lifecycle_status not in {
                     PositionState.CLOSED.value,

@@ -317,6 +317,19 @@ class TradingAgent:
                 snapshot.snapshot_id,
             )
 
+        # A close is already working. Evaluating the exit policy again here would
+        # submit a second close for the same exposure; responsibility is retained
+        # by monitoring, not by re-submitting (EXIT-006).
+        if position.state is PositionState.CLOSING:
+            return TickResult(
+                now,
+                "CLOSE_WORKING",
+                f"close order is working for {position.long_symbol}/"
+                f"{position.short_symbol}; ownership retained until the broker "
+                "confirms flat",
+                snapshot.snapshot_id,
+            )
+
         value = spread_value(snapshot, position.long_symbol, position.short_symbol)
         inputs = ExitInputs(
             direction=position.direction,

@@ -319,6 +319,31 @@ class ExitsBeforeEntriesTests(DurableAgentCase):
         self.assertIsNone(agent.active_position(), "PENDING is not managed exposure")
 
 
+class NoDuplicateCloseTests(DurableAgentCase):
+    """EXIT-006: a working close must not trigger a second one."""
+
+    def test_a_working_close_is_monitored_not_resubmitted(self) -> None:
+        agent = self.build(
+            WRITE_ENV,
+            client=FakeClient(quotes={LONG: ("1.00", "1.10"), SHORT: ("0.20", "0.30")}),
+        )
+        position_id = self.open_position()
+
+        first = agent.tick()
+        self.assertEqual(first.action, "CLOSE_SUBMITTED")
+        after_first = len(self.broker.submits)
+
+        second = agent.tick()
+        self.assertEqual(second.action, "CLOSE_WORKING")
+        self.assertEqual(len(self.broker.submits), after_first,
+                         "a working close must not produce a duplicate")
+
+        managed = self.store.get_position(position_id)
+        assert managed is not None
+        self.assertIs(managed.state, PositionState.CLOSING)
+        self.assertTrue(managed.has_confirmed_exposure, "still owned")
+
+
 class ApprovalGateTests(DurableAgentCase):
     def test_without_approval_an_entry_is_refused_and_creates_no_exposure(self) -> None:
         agent = self.build(WRITE_ENV, approval=None)
