@@ -135,6 +135,16 @@ def unrealized(state: ExitInputs) -> Decimal | None:
     ).quantize(Decimal("0.01"))
 
 
+def stop_level(state: ExitInputs) -> Decimal:
+    return (state.entry_debit * STOP_LOSS_FRACTION_OF_DEBIT).quantize(Decimal("0.01"))
+
+
+def profit_target(state: ExitInputs) -> Decimal:
+    return (
+        state.entry_debit + max_gain(state) * PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN
+    ).quantize(Decimal("0.01"))
+
+
 def invalidation_verifiable(state: ExitInputs) -> bool:
     """Whether the recorded rule can be judged against the observed price.
 
@@ -208,11 +218,11 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
         )
 
     # 3. Stop loss. Premium-dependent; skipped, not assumed safe, when unreadable.
-    stop_level = (state.entry_debit * STOP_LOSS_FRACTION_OF_DEBIT).quantize(Decimal("0.01"))
-    if state.current_value is not None and state.current_value <= stop_level:
+    stop = stop_level(state)
+    if state.current_value is not None and state.current_value <= stop:
         return close(
             ExitTrigger.STOP_LOSS,
-            f"value {state.current_value} is at or below the {stop_level} stop "
+            f"value {state.current_value} is at or below the {stop} stop "
             f"({STOP_LOSS_FRACTION_OF_DEBIT} of the {state.entry_debit} filled debit)",
         )
 
@@ -225,9 +235,7 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
         )
 
     # 5. Profit capture. Premium-dependent.
-    target = (
-        state.entry_debit + max_gain(state) * PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN
-    ).quantize(Decimal("0.01"))
+    target = profit_target(state)
     if state.current_value is not None and state.current_value >= target:
         return close(
             ExitTrigger.PROFIT_CAPTURE,
@@ -263,7 +271,7 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
     return ExitDecision(
         False,
         ExitTrigger.HOLD,
-        f"value {state.current_value} is between the {stop_level} stop and the "
+        f"value {state.current_value} is between the {stop} stop and the "
         f"{target} target, and {state.sessions_elapsed} of {SESSION_STOP} sessions "
         "have elapsed",
         POLICY_VERSION,
@@ -272,3 +280,60 @@ def evaluate_exit(state: ExitInputs) -> ExitDecision:
         False,
         False,
     )
+
+
+def evaluate_triggers(state: ExitInputs) -> tuple[dict[str, object], ...]:
+    """Every rule in `PRECEDENCE` order with what it returned on this pass.
+
+    `evaluate_exit` returns the winner, which is the right answer for acting and
+    the wrong record for tuning. A threshold is judged by how often it nearly
+    fired and on what, and a policy that stores only the evaluations that acted
+    looks decisive because its silences were discarded.
+
+    `fired` is `None` where a rule could not be evaluated at all - an unreadable
+    premium, an unmatched price source - which is deliberately distinct from
+    `False`. Recording those as "did not fire" is how a missing value becomes
+    indistinguishable from a healthy one.
+    """
+    rows: list[dict[str, object]] = []
+
+    def row(trigger: ExitTrigger, fired: bool | None, observed: str | None,
+            threshold: str | None, skipped: str | None = None) -> None:
+        rows.append({
+            "trigger": trigger.value, "fired": fired, "observed": observed,
+            "threshold": threshold, "skipped": skipped,
+        })
+
+    row(ExitTrigger.EXPIRY_GUARD, state.dte <= EXPIRY_GUARD_DTE,
+        str(state.dte), str(EXPIRY_GUARD_DTE))
+
+    if state.invalidation is None:
+        row(ExitTrigger.INVALIDATION_BREACHED, False, str(state.underlying_price), None,
+            "no invalidation rule is recorded for this position")
+    elif not invalidation_verifiable(state):
+        row(ExitTrigger.INVALIDATION_BREACHED, None, str(state.underlying_price),
+            str(state.invalidation.level),
+            f"rule reads {state.invalidation.source.value}; observed price is "
+            f"{state.underlying_source.value}")
+    else:
+        row(ExitTrigger.INVALIDATION_BREACHED, invalidation_breached(state),
+            str(state.underlying_price), str(state.invalidation.level))
+
+    if state.current_value is None:
+        row(ExitTrigger.STOP_LOSS, None, None, str(stop_level(state)),
+            "no readable premium")
+    else:
+        row(ExitTrigger.STOP_LOSS, state.current_value <= stop_level(state),
+            str(state.current_value), str(stop_level(state)))
+
+    row(ExitTrigger.SESSION_STOP, state.sessions_elapsed >= SESSION_STOP,
+        str(state.sessions_elapsed), str(SESSION_STOP))
+
+    if state.current_value is None:
+        row(ExitTrigger.PROFIT_CAPTURE, None, None, str(profit_target(state)),
+            "no readable premium")
+    else:
+        row(ExitTrigger.PROFIT_CAPTURE, state.current_value >= profit_target(state),
+            str(state.current_value), str(profit_target(state)))
+
+    return tuple(rows)

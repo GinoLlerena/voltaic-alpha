@@ -52,7 +52,17 @@ from .execution.lifecycle import (
 )
 from .execution.reconcile import Reconciler, ReconciliationReport
 from .execution.request import prepare_mleg_request
-from .exits import ExitDecision, ExitInputs, ExitTrigger, evaluate_exit
+from .exits import (
+    POLICY_VERSION as EXIT_POLICY_VERSION,
+)
+from .exits import (
+    PRECEDENCE,
+    ExitDecision,
+    ExitInputs,
+    ExitTrigger,
+    evaluate_exit,
+    evaluate_triggers,
+)
 from .providers.alpaca_readonly import ProviderError, ReadOnlyAlpacaClient
 
 DEFAULT_TICK_SECONDS = 300
@@ -129,6 +139,8 @@ class TradingAgent:
         self._sessions: list[date] = []
         #: Set by reconciliation. Entries are refused while this is not NORMAL.
         self.execution_state: ExecutionState = ExecutionState.NORMAL
+        #: Rebuilt by `workflow()` on every evaluation; holds that pass's checks.
+        self.risk_governor = DeterministicRiskGovernor(self.settings.policy_version)
 
     # -- reconciliation ----------------------------------------------------
     def reconcile(self) -> ReconciliationReport | None:
@@ -194,6 +206,11 @@ class TradingAgent:
         return snapshot, is_open
 
     def workflow(self) -> DecisionWorkflow:
+        # Held rather than discarded: the governor accumulates the individual
+        # risk checks it ran, and building it inline threw them away before the
+        # recorder could store them. A refusal whose reason codes survive but
+        # whose checks do not cannot be re-argued later.
+        self.risk_governor = DeterministicRiskGovernor(self.settings.policy_version)
         return DecisionWorkflow(
             setup_classifier=DeterministicSetupClassifier(),
             thesis_synthesizer=(
@@ -202,7 +219,7 @@ class TradingAgent:
                 else DeterministicBaselineThesis()
             ),
             options_selector=DeterministicSpreadSelector(),
-            risk_governor=DeterministicRiskGovernor(self.settings.policy_version),
+            risk_governor=self.risk_governor,
         )
 
     # -- the cycle ---------------------------------------------------------
@@ -395,19 +412,6 @@ class TradingAgent:
                 snapshot.snapshot_id,
             )
 
-        # A close is already working. Evaluating the exit policy again here would
-        # submit a second close for the same exposure; responsibility is retained
-        # by monitoring, not by re-submitting (EXIT-006).
-        if position.state is PositionState.CLOSING:
-            return TickResult(
-                now,
-                "CLOSE_WORKING",
-                f"close order is working for {position.long_symbol}/"
-                f"{position.short_symbol}; ownership retained until the broker "
-                "confirms flat",
-                snapshot.snapshot_id,
-            )
-
         value = spread_value(snapshot, position.long_symbol, position.short_symbol)
         inputs = ExitInputs(
             direction=position.direction,
@@ -423,6 +427,27 @@ class TradingAgent:
             as_of=now.date(),
             sessions_elapsed=self.sessions_since(position.entry_filled_at),
         )
+
+        # The mark is persisted *before* the policy runs, so it exists whether or
+        # not the decision that follows does anything, and whether or not the
+        # process survives to write the decision. Without it "stop loss at 1.40"
+        # is a console line with nothing behind it to check.
+        observation_id = self._record_observation(position, snapshot, inputs, now)
+
+        # A close is already working. Evaluating the exit policy again here would
+        # submit a second close for the same exposure; responsibility is retained
+        # by monitoring, not by re-submitting (EXIT-006). The observation above
+        # still ran: a position under a working close is still worth marking.
+        if position.state is PositionState.CLOSING:
+            return TickResult(
+                now,
+                "CLOSE_WORKING",
+                f"close order is working for {position.long_symbol}/"
+                f"{position.short_symbol}; ownership retained until the broker "
+                "confirms flat",
+                snapshot.snapshot_id,
+            )
+
         try:
             decision = evaluate_exit(inputs)
         except ValueError as exc:
@@ -469,23 +494,47 @@ class TradingAgent:
             )
             self._halt_new_risk()
 
-        if not decision.should_close:
-            action = (
-                "POSITION_REVIEW"
-                if decision.trigger is ExitTrigger.UNMEASURABLE
-                else "POSITION_HELD"
+        def record(disposition: str, close_order_id: str | None = None) -> None:
+            """Persist this evaluation, whatever the agent goes on to do.
+
+            `disposition` is what happens next, which is not always what the
+            decision said: write authority, an unpriceable close, and a failed
+            reconstruction all diverge from it. Every branch below records
+            before it acts.
+            """
+            if self.store is None or observation_id is None:
+                return
+            self.store.record_exit_decision(
+                position_id=position.position_id, observation_id=observation_id,
+                run_id=self.run_id, trigger=decision.trigger.value,
+                should_close=decision.should_close, reason=decision.reason,
+                evaluated=evaluate_triggers(inputs),
+                precedence=[trigger.value for trigger in PRECEDENCE],
+                value_unmeasurable=decision.value_unmeasurable,
+                invalidation_unverifiable=decision.invalidation_unverifiable,
+                unrealized=decision.unrealized,
+                suggested_limit=decision.suggested_limit,
+                disposition=disposition, close_order_id=close_order_id,
+                policy_version=decision.policy_version, decided_at=now,
             )
+
+        if not decision.should_close:
+            unmeasurable = decision.trigger is ExitTrigger.UNMEASURABLE
+            record("review" if unmeasurable else "held")
             return TickResult(
-                now, action, decision.reason, snapshot.snapshot_id, exit=decision
+                now, "POSITION_REVIEW" if unmeasurable else "POSITION_HELD",
+                decision.reason, snapshot.snapshot_id, exit=decision,
             )
 
         if self.gateway is None or not self.settings.may_write_orders:
+            record("signalled_without_authority")
             return TickResult(
                 now, "EXIT_SIGNALLED",
                 f"{decision.trigger.value}: {decision.reason} (no write authority)",
                 snapshot.snapshot_id, exit=decision,
             )
         if decision.suggested_limit is None:
+            record("blocked_unpriced")
             return TickResult(
                 now, "EXIT_BLOCKED",
                 f"{decision.trigger.value} fired but the close cannot be priced from "
@@ -495,6 +544,7 @@ class TradingAgent:
 
         entry_intent = self._entry_intent_for(position)
         if entry_intent is None:
+            record("blocked_unreconstructable")
             return TickResult(
                 now, "EXIT_BLOCKED",
                 "close intent cannot be reconstructed from durable records",
@@ -516,6 +566,10 @@ class TradingAgent:
                 intent=close_intent, request=request,
                 reason=decision.trigger.value, now=now,
             )
+        # Recorded before the mutation, and linked to the order it authorises, so
+        # a crash between here and the response still leaves the reason a close
+        # was attempted.
+        record("close_submitting", close_order_id)
         try:
             submission = self.gateway.submit(close_intent, request, reduces_risk=True)
         except ExecutionRefused as exc:
@@ -543,6 +597,36 @@ class TradingAgent:
             f"{decision.trigger.value}: {decision.reason}",
             snapshot.snapshot_id, exit=decision,
             submitted=submission.client_order_id,
+        )
+
+    def _record_observation(
+        self, position: ManagedPosition, snapshot: DecisionSnapshot,
+        inputs: ExitInputs, now: datetime,
+    ) -> str | None:
+        if self.store is None:
+            return None
+        quotes = {quote.contract_symbol: quote for quote in snapshot.option_chain}
+        long_leg = quotes.get(position.long_symbol)
+        short_leg = quotes.get(position.short_symbol)
+        session = snapshot.underlying_session
+        return self.store.record_observation(
+            position_id=position.position_id, run_id=self.run_id,
+            snapshot_id=snapshot.snapshot_id, observed_at=now,
+            source_time=snapshot.as_of,
+            long_bid=long_leg.bid if long_leg is not None else None,
+            short_ask=short_leg.ask if short_leg is not None else None,
+            spread_value=inputs.current_value,
+            underlying_price=snapshot.underlying_price,
+            underlying_source=snapshot.underlying_source.value,
+            underlying_session=(
+                datetime.combine(session, datetime.min.time(), tzinfo=UTC)
+                if session is not None
+                else None
+            ),
+            dte=inputs.dte, sessions_elapsed=inputs.sessions_elapsed,
+            quantity=position.filled_quantity,
+            data_quality=snapshot.data_quality.reason_codes,
+            policy_version=EXIT_POLICY_VERSION,
         )
 
     def _entry_intent_for(self, position: ManagedPosition) -> OrderIntent | None:
@@ -580,6 +664,7 @@ class TradingAgent:
                 outcome=outcome,
                 provider="alpaca",
                 feed=self.client.option_feed,
+                risk_checks=[dict(check) for check in self.risk_governor.last_checks],
                 classifier_name=DeterministicSetupClassifier.name,
                 synthesizer_name=getattr(self.synthesizer, "name", None)
                 or DeterministicBaselineThesis.name,

@@ -418,6 +418,108 @@ class AuditEvent(Base):
     schema_version: Mapped[str] = _schema_version()
 
 
+class PositionObservation(Base):
+    """The exact mark an exit decision was made on.
+
+    Written **before** the exit policy is evaluated, not after it acts. Without
+    this row the reason a position closed is reconstructable only from a console
+    line, and the mark that caused it is gone: "stop loss at 1.40" cannot be
+    checked against anything, and a threshold cannot be replayed against the
+    observations that actually occurred.
+
+    Append-only. Nothing amends an observation once it is written.
+    """
+
+    __tablename__ = "position_observations"
+
+    id: Mapped[str] = _pk()
+    position_id: Mapped[str] = mapped_column(
+        ForeignKey("positions.id"), nullable=False, index=True
+    )
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"), nullable=True)
+    #: The snapshot this mark was read from, so the full chain is recoverable.
+    snapshot_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    #: Provider time, distinct from the local time we noticed it.
+    source_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    long_bid: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    short_ask: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    #: What the spread could conservatively be closed for. Null when unreadable,
+    #: which is a recorded fact rather than a zero.
+    spread_value: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    underlying_price: Mapped[Any] = mapped_column(Numeric(18, 6), nullable=False)
+    #: See architecture.contracts.PriceSource. Stored so a later reader can tell
+    #: whether a structural rule was decidable on this observation at all.
+    underlying_source: Mapped[str] = mapped_column(String(32), nullable=False)
+    underlying_session: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dte: Mapped[int] = mapped_column(Integer, nullable=False)
+    sessions_elapsed: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    data_quality: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
+class ExitDecisionRecord(Base):
+    """Every exit evaluation, including the ones that did nothing.
+
+    `HOLD` and `UNMEASURABLE` are recorded on the same footing as a close. A
+    store that only keeps the decisions that acted cannot answer the question
+    that matters when tuning a threshold - how often it nearly fired, and on
+    what - and makes a policy look decisive by discarding its silences.
+
+    Written before any mutation, so a close that is submitted and a close that
+    is refused both have the same durable antecedent.
+    """
+
+    __tablename__ = "exit_decisions"
+
+    id: Mapped[str] = _pk()
+    position_id: Mapped[str] = mapped_column(
+        ForeignKey("positions.id"), nullable=False, index=True
+    )
+    observation_id: Mapped[str] = mapped_column(
+        ForeignKey("position_observations.id"), nullable=False
+    )
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"), nullable=True)
+    #: The governing trigger. See exits.ExitTrigger.
+    trigger: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    should_close: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Every trigger evaluated on this pass, and what each returned, so the
+    #: precedence that produced the governing one is checkable rather than
+    #: implied.
+    evaluated: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    #: The declared precedence order at the time of the decision.
+    precedence: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    value_unmeasurable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    invalidation_unverifiable: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    unrealized: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    suggested_limit: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    #: What the agent did with this decision, which is not always what the
+    #: decision said: write authority, pricing, and guards all intervene.
+    disposition: Mapped[str] = mapped_column(String(48), nullable=False)
+    #: The close order, when one was prepared for this decision.
+    close_order_id: Mapped[str | None] = mapped_column(
+        ForeignKey("broker_orders.id"), nullable=True
+    )
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
 #: Tables written only once execution exists. Phase 1 asserted these were empty;
 #: they are now written by the durable lifecycle store.
 EXECUTION_TABLES: frozenset[str] = frozenset(

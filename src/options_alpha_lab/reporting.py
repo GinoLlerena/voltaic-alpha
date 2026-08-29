@@ -24,11 +24,13 @@ from .persistence.models import (
     AuditEvent,
     BrokerOrder,
     Decision,
+    ExitDecisionRecord,
     Fill,
     Incident,
     MarketSnapshot,
     ModelCall,
     Position,
+    PositionObservation,
     Run,
     ThesisRecord,
 )
@@ -56,6 +58,12 @@ class AgentReport:
     incidents: list[dict[str, str]] = field(default_factory=list)
     snapshots: int = 0
     unique_input_hashes: int = 0
+    position_observations: int = 0
+    exit_evaluations: int = 0
+    #: Governing trigger counts, including the ones that did nothing. A report
+    #: that lists only the closes makes the policy look more decisive than it is.
+    exit_triggers: dict[str, int] = field(default_factory=dict)
+    exit_dispositions: dict[str, int] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -150,6 +158,23 @@ def build_report(engine: Engine, *, window_hours: int = 24) -> AgentReport:
         positions = list(session.scalars(select(Position)).all())
         report.positions = dict(Counter(p.lifecycle_status for p in positions))
 
+        report.position_observations = int(
+            session.scalar(
+                select(func.count())
+                .select_from(PositionObservation)
+                .where(PositionObservation.observed_at >= cutoff)
+            )
+            or 0
+        )
+        exits = list(
+            session.scalars(
+                select(ExitDecisionRecord).where(ExitDecisionRecord.decided_at >= cutoff)
+            ).all()
+        )
+        report.exit_evaluations = len(exits)
+        report.exit_triggers = dict(Counter(e.trigger for e in exits))
+        report.exit_dispositions = dict(Counter(e.disposition for e in exits))
+
         report.incidents = [
             {
                 "kind": i.kind,
@@ -213,6 +238,18 @@ def format_report(report: AgentReport) -> str:
         f"  fills               {report.fills}",
         f"  positions           {report.positions or '-'}",
     ]
+    if report.position_observations or report.exit_evaluations:
+        lines += [
+            "",
+            f"  position marks      {report.position_observations}",
+            f"  exit evaluations    {report.exit_evaluations}",
+        ]
+        for trigger, count in sorted(report.exit_triggers.items()):
+            lines.append(f"    {trigger:<18}{count}")
+        if report.exit_dispositions:
+            lines.append("  exit dispositions")
+            for disposition, count in sorted(report.exit_dispositions.items()):
+                lines.append(f"    {disposition:<24} {count}")
     if report.incidents:
         lines.append(f"  OPEN INCIDENTS      {len(report.incidents)}")
         for incident in report.incidents:

@@ -13,6 +13,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, event, select
@@ -67,8 +68,36 @@ def build_engine(settings: Settings, *, echo: bool = False) -> Engine:
     return engine
 
 
-def create_schema(engine: Engine) -> None:
+def alembic_config(engine: Engine) -> Any:
+    """Alembic configuration bound to an already-open engine."""
+    from alembic.config import Config
+
+    config = Config(str(Path(__file__).resolve().parents[3] / "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", str(engine.url))
+    return config
+
+
+def create_schema(engine: Engine, *, stamp: bool = True) -> None:
+    """Create the schema from the model metadata and mark it current.
+
+    Stamping matters: without it a freshly created database has no
+    `alembic_version` row, and the next `alembic upgrade head` would try to
+    create tables that already exist. The metadata is the source of truth for a
+    new database; migrations move existing ones forward.
+    """
     Base.metadata.create_all(engine)
+    if not stamp:
+        return
+    from alembic import command
+
+    command.stamp(alembic_config(engine), "head")
+
+
+def upgrade_schema(engine: Engine, revision: str = "head") -> None:
+    """Run migrations against an existing database."""
+    from alembic import command
+
+    command.upgrade(alembic_config(engine), revision)
 
 
 class DecisionRecorder:

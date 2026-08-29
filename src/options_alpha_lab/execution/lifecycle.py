@@ -36,9 +36,11 @@ from ..architecture.contracts import (
 )
 from ..persistence.models import (
     BrokerOrder,
+    ExitDecisionRecord,
     Fill,
     Incident,
     Position,
+    PositionObservation,
     PreparedOrderRequest,
 )
 from ..persistence.models import (
@@ -661,6 +663,138 @@ class LifecycleStore:
         )
 
     # -- incidents ---------------------------------------------------------
+    # -- learning-quality capture -----------------------------------------
+    def record_observation(
+        self,
+        *,
+        position_id: str,
+        observed_at: datetime,
+        underlying_price: Decimal,
+        underlying_source: str,
+        dte: int,
+        sessions_elapsed: int,
+        quantity: int,
+        policy_version: str,
+        run_id: str | None = None,
+        snapshot_id: str | None = None,
+        source_time: datetime | None = None,
+        underlying_session: datetime | None = None,
+        long_bid: Decimal | None = None,
+        short_ask: Decimal | None = None,
+        spread_value: Decimal | None = None,
+        data_quality: Sequence[str] = (),
+    ) -> str:
+        """Persist the mark a management decision is about to be made on.
+
+        Called before the exit policy runs, so the observation exists whether or
+        not the decision that follows does anything - and whether or not the
+        process survives to write the decision.
+        """
+        observation_id = _new_id()
+        with self._session() as session:
+            session.add(
+                PositionObservation(
+                    id=observation_id,
+                    position_id=position_id,
+                    run_id=run_id,
+                    snapshot_id=snapshot_id,
+                    observed_at=observed_at,
+                    source_time=source_time,
+                    long_bid=long_bid,
+                    short_ask=short_ask,
+                    spread_value=spread_value,
+                    underlying_price=underlying_price,
+                    underlying_source=underlying_source,
+                    underlying_session=underlying_session,
+                    dte=dte,
+                    sessions_elapsed=sessions_elapsed,
+                    quantity=quantity,
+                    data_quality=list(data_quality),
+                    policy_version=policy_version,
+                )
+            )
+        return observation_id
+
+    def record_exit_decision(
+        self,
+        *,
+        position_id: str,
+        observation_id: str,
+        trigger: str,
+        should_close: bool,
+        reason: str,
+        evaluated: Sequence[dict[str, Any]],
+        precedence: Sequence[str],
+        disposition: str,
+        policy_version: str,
+        decided_at: datetime,
+        run_id: str | None = None,
+        value_unmeasurable: bool = False,
+        invalidation_unverifiable: bool = False,
+        unrealized: Decimal | None = None,
+        suggested_limit: Decimal | None = None,
+        close_order_id: str | None = None,
+    ) -> str:
+        """Persist an exit evaluation, including `HOLD` and `UNMEASURABLE`.
+
+        `disposition` is what the agent is about to do, which is not always what
+        the decision said: write authority, an unpriceable close, and a
+        reconstruction failure all diverge from it. Recorded before the mutation
+        so the antecedent of a close survives a crash mid-submit.
+        """
+        decision_id = _new_id()
+        with self._session() as session:
+            session.add(
+                ExitDecisionRecord(
+                    id=decision_id,
+                    position_id=position_id,
+                    observation_id=observation_id,
+                    run_id=run_id,
+                    trigger=trigger,
+                    should_close=should_close,
+                    reason=reason,
+                    evaluated=[dict(item) for item in evaluated],
+                    precedence=list(precedence),
+                    value_unmeasurable=value_unmeasurable,
+                    invalidation_unverifiable=invalidation_unverifiable,
+                    unrealized=unrealized,
+                    suggested_limit=suggested_limit,
+                    disposition=disposition,
+                    close_order_id=close_order_id,
+                    policy_version=policy_version,
+                    decided_at=decided_at,
+                )
+            )
+        return decision_id
+
+    def observations_for(self, position_id: str) -> list[PositionObservation]:
+        """Oldest first. Detached copies would be safer, but reporting reads
+        these inside its own session and the tests assert on plain columns."""
+        with self._session() as session:
+            rows = list(
+                session.scalars(
+                    select(PositionObservation)
+                    .where(PositionObservation.position_id == position_id)
+                    .order_by(PositionObservation.observed_at)
+                ).all()
+            )
+            for row in rows:
+                session.expunge(row)
+            return rows
+
+    def exit_decisions_for(self, position_id: str) -> list[ExitDecisionRecord]:
+        with self._session() as session:
+            rows = list(
+                session.scalars(
+                    select(ExitDecisionRecord)
+                    .where(ExitDecisionRecord.position_id == position_id)
+                    .order_by(ExitDecisionRecord.decided_at)
+                ).all()
+            )
+            for row in rows:
+                session.expunge(row)
+            return rows
+
     def open_incident(
         self, *, kind: str, detail: str, severity: str = "high",
         execution_state: ExecutionState = ExecutionState.NO_NEW_RISK,

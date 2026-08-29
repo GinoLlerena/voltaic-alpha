@@ -176,6 +176,45 @@ showing frozen evidence honestly labelled.
   the read-only adapter imports it at module scope. The dashboard had never
   exposed this because it does not import the provider modules.
 
+### 7.5 Schema migrations
+
+The schema is versioned with Alembic from 29 August 2026. Before that, the
+hosted PostgreSQL was created by `create_schema`, which calls `create_all` and
+left no `alembic_version` row. Adding the Phase 1 capture tables
+(`position_observations`, `exit_decisions`) is the first change to reach it, so
+the existing database has to be told where it already stands before it can be
+moved forward:
+
+```bash
+# Once, on the worker host. Records that the h0.1 schema is already present.
+uv run alembic stamp 0001_h0_baseline
+# Then, and on every later deployment.
+uv run alembic upgrade head
+uv run alembic current   # expect: 0002_learning_capture (head)
+```
+
+Stop the worker service before upgrading and start it afterwards. The migration
+only adds tables, so it does not rewrite anything the running worker holds, but
+a single writer is the invariant the lease exists to protect and a schema change
+is not the moment to make an exception to it.
+
+Rollback is `uv run alembic downgrade 0001_h0_baseline`, which drops the two
+tables. It discards the observations and exit decisions captured since the
+upgrade; there is no earlier shape to preserve them into, and pretending
+otherwise would be the more dangerous option.
+
+`alembic.ini` carries no database URL. `migrations/env.py` takes `-x url=` first,
+then a URL set programmatically by `create_schema`/`upgrade_schema`, and only
+then falls back to the application's own `Settings` - so a migration cannot be
+run against a database the application itself would refuse to open.
+
+**Known limitation, stated rather than discovered later:** `alembic upgrade head`
+against a genuinely empty database does not build the schema. Revision
+`0001_h0_baseline` is a marker, not a transcription of the seventeen h0.1
+tables. A new database is created by `create_schema`, which builds it from the
+model metadata and stamps head; migrations exist to move existing databases
+forward.
+
 ### 7.5 Cost and teardown
 
 Two `ecs.e-c1m2.large` instances now bill. Release both after the event:

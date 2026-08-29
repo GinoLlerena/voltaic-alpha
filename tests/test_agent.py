@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from options_alpha_lab.agent import (
@@ -831,3 +832,42 @@ class InvalidationSourceTests(DurableAgentCase):
             [i.kind for i in self.store.open_incidents()],
         )
         self.assertIs(agent.execution_state, ExecutionState.NO_NEW_RISK)
+
+
+class RiskCheckRecordingTests(DurableAgentCase):
+    """Finding 7: the governor's individual checks must reach the recorder.
+
+    Replay already stored them. The live agent built a governor inline and
+    discarded it, so a decision made in production kept its reason codes and
+    lost the arithmetic behind them - which is the half you need to re-argue a
+    refusal months later.
+    """
+
+    def checks_for_the_only_decision(self) -> list[dict[str, Any]]:
+        from options_alpha_lab.persistence.models import RiskDecisionRecord
+
+        with Session(self.store._engine) as session:
+            rows = list(session.scalars(select(RiskDecisionRecord)).all())
+        # The fixture replay in build() records one; the tick records the other.
+        return [row.checks for row in rows]
+
+    def test_a_live_decision_stores_the_checks_not_only_the_reason_codes(self) -> None:
+        agent = self.build(WRITE_ENV)
+        result = agent.tick()
+        self.assertIn(result.action, {"ENTRY_SUBMITTED", "TRADE_CANDIDATE"})
+
+        recorded = self.checks_for_the_only_decision()
+        self.assertTrue(recorded, "a risk decision must have been recorded")
+        live = recorded[-1]
+        self.assertTrue(live, "the live path stored an empty check list")
+        for check in live:
+            self.assertIn("check", check)
+
+    def test_the_checks_match_the_governor_that_actually_decided(self) -> None:
+        agent = self.build(WRITE_ENV)
+        agent.tick()
+        stored = self.checks_for_the_only_decision()[-1]
+        self.assertEqual(
+            [c["check"] for c in stored],
+            [c["check"] for c in agent.risk_governor.last_checks],
+        )
