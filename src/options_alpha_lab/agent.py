@@ -71,6 +71,9 @@ DEFAULT_TICK_SECONDS = 300
 DEFAULT_ORDER_CLOCK_SECONDS = 5
 #: How long after a submission the fast clock keeps watching one order.
 ORDER_CLOCK_WINDOW = timedelta(minutes=10)
+#: The position clock's cadence. A stop loss evaluated once per strategy tick is
+#: enforced up to five minutes after the mark that tripped it.
+DEFAULT_POSITION_CLOCK_SECONDS = 60
 CHAIN_DTE_LOW = 10
 CHAIN_DTE_HIGH = 60
 
@@ -184,6 +187,9 @@ class TradingAgent:
         self._sessions: list[date] = []
         #: Set by reconciliation. Entries are refused while this is not NORMAL.
         self.execution_state: ExecutionState = ExecutionState.NORMAL
+        #: Last observation failure seen by the position clock, which stays quiet
+        #: about it because the strategy tick is what reports an outage.
+        self.last_observation_error: str | None = None
         #: Rebuilt by `workflow()` on every evaluation; holds that pass's checks.
         self.risk_governor = DeterministicRiskGovernor(self.settings.policy_version)
 
@@ -416,6 +422,51 @@ class TradingAgent:
         self.reconcile()
         result = self._enforce_deadlines(now)
         return self._record(result) if result is not None else None
+
+    # -- the position clock ------------------------------------------------
+    def position_clock(self) -> TickResult | None:
+        """Value and manage an open position between strategy ticks.
+
+        The strategy hypothesis is daily, so re-deciding it every minute would
+        add correlated records rather than information. The *value* of an open
+        spread is not daily: a stop loss judged once per five-minute tick is
+        enforced against a mark up to five minutes stale, and the observation
+        series that MFE and MAE are computed from has five-minute resolution -
+        which is to say it cannot see the excursion it exists to measure.
+
+        Entries are deliberately not considered here. This clock exists while
+        exposure exists, and the single strategy slot is already spoken for.
+
+        Returns `None` on a quiet pass: no position, no market, or nothing to
+        say. Gated on a local read first, so a flat agent never calls a provider
+        on this cadence.
+        """
+        now = self._clock()
+        if self.active_position() is None:
+            return None
+
+        # Broker first, as everywhere else. Reconciliation may resolve the
+        # position out from under us - a close that filled, an exposure that
+        # vanished - so re-read it rather than managing a stale object.
+        self.reconcile()
+        managed = self.active_position()
+        if managed is None:
+            return None
+
+        try:
+            snapshot, market_open = self.observe()
+        except (ProviderError, ValueError) as exc:
+            # Reconciliation already ran and its state stands. The strategy tick
+            # reports the outage; repeating it every minute would bury the log
+            # in one fact.
+            self.last_observation_error = f"{type(exc).__name__}: {exc}"
+            return None
+        if not market_open:
+            # A mark taken when nothing is trading is not a valuation, and the
+            # completed-session rules are judged on the strategy tick.
+            return None
+
+        return self._record(self._manage_open_position(managed, snapshot, now))
 
     def _halt_new_risk(self) -> None:
         """Stop new risk here *and* at the gateway, which is what must refuse."""

@@ -49,7 +49,7 @@ exists, and the entry preconditions stand as follows:
 | 1 | Protected Paper-only provider secrets with no live fallback | Met - `/etc/options-alpha.env`, mode 600, root-owned; `ALPACA_PAPER_TRADE=true` |
 | 2 | Durable hosted database and migrations for intents, orders, fills, positions, execution state, and incidents | Met - PostgreSQL 16 plus Alembic (section 7.6) |
 | 3 | One database-backed worker lease and an authoritative market calendar | Met - lease with heartbeat/TTL (section 7.2); calendar-derived entry window |
-| 4 | Startup reconciliation before the decision loop, plus periodic reconciliation while any order or exposure exists | Met - `startup()` precedes any new risk; reconciliation opens every tick and the order clock |
+| 4 | Startup reconciliation before the decision loop, plus periodic reconciliation while any order or exposure exists | Met - `startup()` precedes any new risk; reconciliation opens every strategy tick, every position-clock pass while exposure exists, and every order-clock pass while a mutation is outstanding |
 | 5 | Durable pending/partial/open/closing/flat states based on actual fills | Met - acceptance is `SUBMITTED`, never `FILLED`; state comes from reconciled fills |
 | 6 | Health checks and alerts for broker/local mismatch, stale reconciliation, database failure, worker death, and an unmanaged position | Partial - health JSON and durable incidents exist; there is no alerting |
 | 7 | Backup, restore, forced-restart, credential-rotation, and rollback evidence | Partial - forced restart and migration rollback are evidenced; backup and restore are not (section 7.7) |
@@ -194,14 +194,30 @@ showing frozen evidence honestly labelled.
   the read-only adapter imports it at module scope. The dashboard had never
   exposed this because it does not import the provider modules.
 
-### 7.5 The order clock
+### 7.5 The three clocks
 
-The worker runs two cadences, because the questions have different timescales.
+The worker runs three cadences, because the questions have different timescales.
 
-| Clock | Cadence | What it does |
-|---|---|---|
-| Strategy | `--interval`, default 300s | Reconcile, enforce deadlines, manage exits, consider entries |
-| Order | `--order-clock-interval`, default 5s | Reconcile and enforce deadlines *only*, while a broker mutation is outstanding |
+| Clock | Cadence | What it does | Runs when |
+|---|---|---|---|
+| Strategy | `--interval`, default 300s | Reconcile, enforce deadlines, manage exits, consider entries | always |
+| Position | `--position-clock-interval`, default 60s | Reconcile, value the open spread, evaluate exits. Never considers an entry | a position is OPEN or CLOSING, and the market is open |
+| Order | `--order-clock-interval`, default 5s | Reconcile and enforce deadlines *only* | a broker mutation is outstanding |
+
+Each is gated on a local database read first, so a flat, idle worker makes no
+provider call on either fast cadence. Each is due independently: a quiet pass on
+one must not skip the other, and an earlier version of the loop had exactly that
+bug latent in it - the order clock's `continue` would have skipped the position
+clock for that second. They are not alternatives; a worker can need both at
+once.
+
+**The position clock exists because value is not a daily question.** The
+strategy hypothesis changes once per completed session, so re-deciding it every
+minute would add correlated records rather than information. The value of an
+open spread does not: a stop loss judged once per 300-second tick is enforced
+against a mark up to 300 seconds stale, and the observation series MFE and MAE
+are computed from has 300-second resolution - too coarse to see the excursion it
+exists to measure.
 
 The strategy hypothesis is daily and its inputs change once per completed
 session, so re-deciding it every few seconds would add correlated records rather
@@ -216,8 +232,10 @@ submission. An order still working past every deadline the policy declares has
 something wrong with it that five-second polling will not fix; the strategy loop
 keeps reconciling it. `--order-clock-interval 0` disables it.
 
-Health JSON carries `order_clock_actions`, so a worker that looks idle at tick
-granularity can be seen to have been busy at order granularity.
+Health JSON carries `order_clock_actions` and `position_clock_actions`, so a
+worker that looks idle at tick granularity can be seen to have been busy at
+order and position granularity. A worker holding a spread should show the
+position count climbing; a flat one never will.
 
 ### 7.6 Schema migrations
 

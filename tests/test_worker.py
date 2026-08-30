@@ -236,20 +236,47 @@ if __name__ == "__main__":
 class OrderClockWiringTests(unittest.TestCase):
     """The fast clock has to actually be driven, not merely exist."""
 
-    def test_the_wait_loop_runs_the_order_clock_on_its_own_cadence(self) -> None:
+    def wait_loop(self) -> str:
         # Reading the loop rather than running it: `main` needs credentials, a
-        # broker and a lease. What is asserted here is the wiring - that the
-        # order clock is called from inside the wait, alongside the heartbeat,
-        # rather than once per strategy tick.
+        # broker and a lease. What is asserted is the wiring.
         import inspect
 
         from options_alpha_lab import worker
 
-        source = inspect.getsource(worker.main)
-        wait_loop = source.split("while waited < args.interval")[1]
-        self.assertIn("agent.order_clock()", wait_loop,
+        return inspect.getsource(worker.main).split("while waited < args.interval")[1]
+
+    def test_the_wait_loop_runs_the_order_clock_on_its_own_cadence(self) -> None:
+        loop = self.wait_loop()
+        self.assertIn("agent.order_clock", loop,
                       "the order clock must run inside the wait, not once per tick")
-        self.assertIn("lease.heartbeat()", wait_loop)
+        self.assertIn("lease.heartbeat()", loop)
+
+    def test_the_wait_loop_also_runs_the_position_clock(self) -> None:
+        loop = self.wait_loop()
+        self.assertIn("agent.position_clock", loop,
+                      "an open spread is valued between ticks, not only on them")
+
+    def test_neither_clock_can_skip_the_other(self) -> None:
+        # The original form guarded the order clock with `continue`, which is
+        # correct for one clock and silently wrong for two: a quiet order-clock
+        # pass would have skipped the position clock for that whole second, and
+        # the two are not alternatives. A worker can need both at once.
+        loop = self.wait_loop()
+        order_at = loop.index("agent.order_clock")
+        position_at = loop.index("agent.position_clock")
+        between = loop[order_at:position_at]
+        self.assertNotIn("continue", between,
+                         "the first clock must not be able to skip the second")
+
+    def test_a_clock_failure_is_recorded_rather_than_silently_quiet(self) -> None:
+        # A clock that raised used to leave the loop exactly as one that had
+        # nothing to do. Those are different facts and the health file says so.
+        import inspect
+
+        from options_alpha_lab import worker
+
+        self.assertIn("_failed", inspect.getsource(worker.main))
+        self.assertIn("position_clock_actions", inspect.getsource(worker.WorkerHealth))
 
     def test_the_cadence_is_well_inside_the_shortest_deadline(self) -> None:
         from options_alpha_lab.agent import DEFAULT_ORDER_CLOCK_SECONDS
@@ -258,9 +285,26 @@ class OrderClockWiringTests(unittest.TestCase):
         shortest = min(ENTRY_DEADLINE, CLOSE_DEADLINE).total_seconds()
         self.assertLess(DEFAULT_ORDER_CLOCK_SECONDS, shortest / 10)
 
-    def test_a_zero_interval_disables_the_clock_rather_than_dividing_by_it(self) -> None:
-        import inspect
+    def test_a_zero_interval_disables_each_clock_rather_than_dividing_by_it(self) -> None:
+        loop = self.wait_loop()
+        for name in ("order_clock_interval", "position_clock_interval"):
+            with self.subTest(clock=name):
+                self.assertIn(f"args.{name} > 0", loop)
 
-        from options_alpha_lab import worker
+    def test_the_position_cadence_matches_the_declared_valuation_window(self) -> None:
+        # The cadence table asks for a valuation every 60-120 seconds while
+        # exposure exists.
+        from options_alpha_lab.agent import DEFAULT_POSITION_CLOCK_SECONDS
 
-        self.assertIn("args.order_clock_interval <= 0", inspect.getsource(worker.main))
+        self.assertGreaterEqual(DEFAULT_POSITION_CLOCK_SECONDS, 60)
+        self.assertLessEqual(DEFAULT_POSITION_CLOCK_SECONDS, 120)
+
+    def test_the_position_clock_is_slower_than_the_order_clock(self) -> None:
+        # They answer different questions. Valuing a spread every five seconds
+        # would spend the rate limit the deadline checks need.
+        from options_alpha_lab.agent import (
+            DEFAULT_ORDER_CLOCK_SECONDS,
+            DEFAULT_POSITION_CLOCK_SECONDS,
+        )
+
+        self.assertGreater(DEFAULT_POSITION_CLOCK_SECONDS, DEFAULT_ORDER_CLOCK_SECONDS)

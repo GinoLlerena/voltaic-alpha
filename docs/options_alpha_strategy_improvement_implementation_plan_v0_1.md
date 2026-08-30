@@ -154,7 +154,7 @@ daylight-saving changes.
 | Entry opportunity scan | Every 15 minutes from 09:45 to 15:15 ET, only while flat | Option quotes and IV can change while the daily setup remains fixed; more frequent full decisions add correlated records rather than new signal information. |
 | Immediate post-submit check | Immediately after submission | Establish accepted, rejected, filled, or ambiguous state without waiting for the strategy loop. |
 | Pending entry monitoring | Every 5-10 seconds until terminal or the 90-second candidate deadline | The order clock must be faster than the deadline it enforces. |
-| Position valuation | Every 60-120 seconds while exposure exists | Suitable starting cadence for a multi-session spread without claiming high-frequency reaction. |
+| Position valuation | Every 60-120 seconds while exposure exists | Suitable starting cadence for a multi-session spread without claiming high-frequency reaction. **Implemented 30 August 2026** as `TradingAgent.position_clock`, default 60s. See `EV-026`. |
 | Structural invalidation | After the completed daily bar is finalized | The current invalidation is a completed-session close rule. |
 | Broker reconciliation while flat | Every 15 minutes and immediately before an entry | Lower urgency when no order or exposure exists. |
 | Broker reconciliation with an order or exposure | Every 60 seconds | Detect fills, leg imbalance, quantity drift, missing exposure, or broker/local disagreement. |

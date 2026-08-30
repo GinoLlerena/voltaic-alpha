@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import socket
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -156,6 +156,9 @@ class WorkerHealth:
     #: that looks idle at tick granularity may have been busy at order
     #: granularity, and a monitor should be able to see that.
     order_clock_actions: int = 0
+    #: Valuations taken by the position clock between strategy ticks. A worker
+    #: holding a spread should show these climbing; a flat one never will.
+    position_clock_actions: int = 0
     last_tick_at: datetime | None = None
     last_action: str | None = None
     last_error: str | None = None
@@ -166,6 +169,7 @@ class WorkerHealth:
             "started_at": self.started_at.isoformat(),
             "ticks": self.ticks,
             "order_clock_actions": self.order_clock_actions,
+            "position_clock_actions": self.position_clock_actions,
             "last_tick_at": self.last_tick_at.isoformat() if self.last_tick_at else None,
             "last_action": self.last_action,
             "last_error": self.last_error,
@@ -195,7 +199,12 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
     from datetime import timedelta as _td
     from types import FrameType
 
-    from .agent import DEFAULT_ORDER_CLOCK_SECONDS, TradingAgent
+    from .agent import (
+        DEFAULT_ORDER_CLOCK_SECONDS,
+        DEFAULT_POSITION_CLOCK_SECONDS,
+        TickResult,
+        TradingAgent,
+    )
     from .architecture.contracts import BotMode
     from .calendar import TradingCalendar
     from .config import ConfigurationError, load_settings, resolved_env
@@ -216,6 +225,10 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
     parser.add_argument(
         "--order-clock-interval", type=int, default=DEFAULT_ORDER_CLOCK_SECONDS,
         help="seconds between deadline checks while a broker mutation is outstanding",
+    )
+    parser.add_argument(
+        "--position-clock-interval", type=int, default=DEFAULT_POSITION_CLOCK_SECONDS,
+        help="seconds between valuations of an open position; 0 disables it",
     )
     parser.add_argument("--approve", default=None, metavar="TOKEN")
     parser.add_argument("--health-file", default="/var/run/options-alpha/health.json")
@@ -301,6 +314,32 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
               flush=True)
         stopping["now"] = True
 
+    def run_clock(name: str, call: Callable[[], TickResult | None]) -> None:
+        """Run one between-tick clock. A failure is recorded, never fatal.
+
+        A clock that raised used to be indistinguishable from one that had
+        nothing to do, because both left the loop the same way.
+        """
+        try:
+            result = call()
+        except Exception as exc:  # noqa: BLE001 - as for a tick, never fatal
+            health.last_error = f"{name}: {type(exc).__name__}: {exc}"
+            print(json.dumps({"event": f"{name}_failed", "error": health.last_error}),
+                  file=sys.stderr, flush=True)
+            return
+        if result is None:
+            return
+        if name == "order_clock":
+            health.order_clock_actions += 1
+        else:
+            health.position_clock_actions += 1
+        health.last_action = result.action
+        print(json.dumps({
+            "event": name, "at": result.at.isoformat(),
+            "action": result.action, "detail": result.detail,
+        }), flush=True)
+        health.write(args.health_file)
+
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
@@ -312,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         "feed": client.option_feed, "sessions_loaded": len(calendar),
         "interval_seconds": args.interval,
         "order_clock_seconds": args.order_clock_interval,
+        "position_clock_seconds": args.position_clock_interval,
     }), flush=True)
 
     # Reconcile before the agent is permitted to consider any new risk.
@@ -363,28 +403,19 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                     print(json.dumps({"event": "lease_lost", "action": "stopping"}),
                           flush=True)
                     return 4
-                # 0 disables the fast clock, and guards the modulo below.
-                if args.order_clock_interval <= 0:
-                    continue
-                if waited % args.order_clock_interval:
-                    continue
-                try:
-                    fast = agent.order_clock()
-                except Exception as exc:  # noqa: BLE001 - as for a tick, never fatal
-                    health.last_error = f"order_clock: {type(exc).__name__}: {exc}"
-                    print(json.dumps({"event": "order_clock_failed",
-                                      "error": health.last_error}),
-                          file=sys.stderr, flush=True)
-                    continue
-                if fast is None:
-                    continue
-                health.order_clock_actions += 1
-                health.last_action = fast.action
-                print(json.dumps({
-                    "event": "order_clock", "at": fast.at.isoformat(),
-                    "action": fast.action, "detail": fast.detail,
-                }), flush=True)
-                health.write(args.health_file)
+                # Each clock is due independently, and a zero interval
+                # disables one without disabling the other. Written as calls
+                # rather than inline blocks because the earlier `continue`
+                # form made the first clock's quiet pass skip the second
+                # one entirely - the two are not alternatives.
+                if args.order_clock_interval > 0 and (
+                    waited % args.order_clock_interval == 0
+                ):
+                    run_clock("order_clock", agent.order_clock)
+                if args.position_clock_interval > 0 and (
+                    waited % args.position_clock_interval == 0
+                ):
+                    run_clock("position_clock", agent.position_clock)
     finally:
         recorder.end_run(agent.run_id, "ok" if not health.last_error else "degraded")
         lease.release()

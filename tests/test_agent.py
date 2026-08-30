@@ -78,6 +78,9 @@ class FakeClient:
         #: A readable but stale clock: `is_open` is trustworthy as a fact about
         #: some past moment, and not as a fact about now.
         self.clock_age_seconds = clock_age_seconds
+        #: Provider reads made. Lets a test assert that a clock which should
+        #: have decided from a local read did not talk to a provider at all.
+        self.calls = 0
         # `quotes or {...}` would swallow an intentionally empty chain, since an
         # empty dict is falsy. The empty case is exactly what one test needs.
         self.quotes = (
@@ -85,6 +88,7 @@ class FakeClient:
         )
 
     def clock(self) -> ProviderRead:
+        self.calls += 1
         if self.fail:
             raise self.fail
         payload = self.clock_payload
@@ -99,12 +103,14 @@ class FakeClient:
         return read(payload)
 
     def account(self) -> ProviderRead:
+        self.calls += 1
         return read({
             "account_number": "PA-TEST-REDACTED", "status": "ACTIVE",
             "equity": "100000", "options_buying_power": "50000",
         })
 
     def daily_bars(self, symbol: str) -> ProviderRead:
+        self.calls += 1
         # Bars must run up to the current session, or the freshness rule flags
         # them stale and the decision terminates before any setup is considered.
         start = NOW.date() - timedelta(days=120)
@@ -118,6 +124,7 @@ class FakeClient:
 
     def option_chain(self, symbol: str, *, expiration_gte: str, expiration_lte: str
                      ) -> ProviderRead:
+        self.calls += 1
         deltas = {LONG: 0.60, SHORT: 0.32}
         snaps = {
             sym: {
@@ -870,6 +877,104 @@ class RiskCheckRecordingTests(DurableAgentCase):
         self.assertEqual(
             [c["check"] for c in stored],
             [c["check"] for c in agent.risk_governor.last_checks],
+        )
+
+
+class PositionClockTests(DurableAgentCase):
+    """An open spread is valued on its own cadence, not the strategy's.
+
+    A stop loss judged once per 300-second tick is enforced against a mark up to
+    300 seconds stale, and the observation series MFE and MAE are computed from
+    has 300-second resolution - which is to say it cannot see the excursion it
+    exists to measure.
+    """
+
+    def flat_agent(self):
+        return self.with_recon(self.build(BASE_ENV), [])
+
+    def held_agent(self, positions=None):
+        agent = self.with_recon(
+            self.build(BASE_ENV),
+            positions if positions is not None else [
+                {"symbol": LONG, "qty": "1", "side": "long"},
+                {"symbol": SHORT, "qty": "1", "side": "short"},
+            ],
+        )
+        return agent
+
+    def test_a_flat_agent_never_calls_a_provider_on_this_cadence(self) -> None:
+        # It runs every 60 seconds. If being flat did not short-circuit it
+        # locally, an idle worker would spend its rate limit on nothing.
+        client = FakeClient()
+        agent = self.with_recon(self.build(BASE_ENV, client=client), [])
+        client.calls = 0
+        self.assertIsNone(agent.position_clock())
+        self.assertEqual(client.calls, 0, "a flat agent must not reach a provider")
+
+    def test_an_open_position_is_valued_between_ticks(self) -> None:
+        agent = self.held_agent()
+        self.open_position()
+        result = agent.position_clock()
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertNotEqual(result.action, "MARKET_CLOSED")
+
+    def test_it_records_an_observation_every_pass(self) -> None:
+        agent = self.held_agent()
+        position_id = self.open_position()
+        for _ in range(3):
+            agent.position_clock()
+        observations = self.store.observations_for(position_id)
+        self.assertEqual(len(observations), 3, "MFE and MAE need an unbroken series")
+
+    def test_it_never_considers_an_entry(self) -> None:
+        # The single strategy slot is already spoken for, and re-deciding a
+        # daily hypothesis every minute adds correlated records, not signal.
+        agent = self.held_agent()
+        self.open_position()
+        result = agent.position_clock()
+        assert result is not None
+        self.assertNotIn(
+            result.action,
+            {"ENTRY_SUBMITTED", "TRADE_CANDIDATE", "NO_TRADE", "ENTRY_REFUSED"},
+        )
+
+    def test_a_closed_market_is_a_quiet_pass(self) -> None:
+        # A mark taken when nothing is trading is not a valuation.
+        agent = self.with_recon(
+            self.build(BASE_ENV, client=FakeClient(market_open=False)),
+            [{"symbol": LONG, "qty": "1", "side": "long"},
+             {"symbol": SHORT, "qty": "1", "side": "short"}],
+        )
+        position_id = self.open_position()
+        self.assertIsNone(agent.position_clock())
+        self.assertEqual(self.store.observations_for(position_id), [])
+
+    def test_an_observation_failure_is_recorded_without_flooding_the_log(self) -> None:
+        # Reconciliation already ran and its state stands. The strategy tick is
+        # what reports an outage; repeating it every minute buries the log.
+        class Broken(FakeClient):
+            def option_chain(self, *a, **k):
+                raise ProviderError("chain unavailable")
+
+        agent = self.with_recon(
+            self.build(BASE_ENV, client=Broken()),
+            [{"symbol": LONG, "qty": "1", "side": "long"},
+             {"symbol": SHORT, "qty": "1", "side": "short"}],
+        )
+        self.open_position()
+        self.assertIsNone(agent.position_clock())
+        self.assertIsNotNone(agent.last_observation_error)
+
+    def test_reconciliation_runs_before_the_position_is_read(self) -> None:
+        # A close that filled resolves the position out from under us. Managing
+        # the object we read first would evaluate exits on exposure we no
+        # longer have.
+        agent = self.with_recon(self.build(BASE_ENV), [])
+        self.open_position()
+        result = agent.position_clock()
+        self.assertIsNone(
+            result, "the broker reports nothing held, so there is nothing to value"
         )
 
 
