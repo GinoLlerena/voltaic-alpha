@@ -274,6 +274,7 @@ class DecisionRecorder:
                         input_tokens=model_call.input_tokens,
                         output_tokens=model_call.output_tokens,
                         input_hash=model_call.input_hash,
+                        reasoning_effort=getattr(model_call, "reasoning_effort", None),
                     )
                 )
                 session.flush()

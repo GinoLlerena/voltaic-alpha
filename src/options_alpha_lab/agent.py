@@ -1009,6 +1009,7 @@ def main(argv: Any = None) -> int:
         synthesizer = BoundedThesisSynthesizer(
             OpenAIResponsesTransport(env["OPENAI_API_KEY"]),
             model=env.get("OPENAI_MODEL", "gpt-5.6-terra"),
+            reasoning_effort=env.get("OPENAI_REASONING_EFFORT", "medium"),
         )
 
     # The broker is constructed for reconciliation in every mode, not only when

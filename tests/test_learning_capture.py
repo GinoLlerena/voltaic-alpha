@@ -193,7 +193,7 @@ class MigrationTests(unittest.TestCase):
             stamped = session.execute(
                 text("select version_num from alembic_version")
             ).scalar_one()
-        self.assertEqual(stamped, "0002_learning_capture")
+        self.assertEqual(stamped, "0003_reasoning_effort")
 
         upgrade_schema(self.engine)  # must not raise on an already-current database
         self.assertIn("exit_decisions", inspect(self.engine).get_table_names())
@@ -216,3 +216,23 @@ class MigrationTests(unittest.TestCase):
         names = inspect(self.engine).get_table_names()
         self.assertIn("exit_decisions", names)
         self.assertIn("position_observations", names)
+
+    def test_the_reasoning_effort_column_is_added_and_can_be_rolled_back(self) -> None:
+        from alembic import command
+
+        from options_alpha_lab.persistence.repository import alembic_config
+
+        create_schema(self.engine)
+        config = alembic_config(self.engine)
+
+        def columns() -> set[str]:
+            return {c["name"] for c in inspect(self.engine).get_columns("model_calls")}
+
+        self.assertIn("reasoning_effort", columns())
+
+        command.downgrade(config, "0002_learning_capture")
+        self.assertNotIn("reasoning_effort", columns())
+        self.assertIn("input_hash", columns(), "the rollback must not touch the rest")
+
+        command.upgrade(config, "head")
+        self.assertIn("reasoning_effort", columns())

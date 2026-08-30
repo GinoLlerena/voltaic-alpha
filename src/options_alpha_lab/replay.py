@@ -185,6 +185,7 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
         synthesizer = BoundedThesisSynthesizer(
             OpenAIResponsesTransport(api_key),
             model=env.get("OPENAI_MODEL", "gpt-5.6-terra"),
+            reasoning_effort=env.get("OPENAI_REASONING_EFFORT", "medium"),
         )
 
     results = replay_paths(args.snapshots, settings, synthesizer=synthesizer)

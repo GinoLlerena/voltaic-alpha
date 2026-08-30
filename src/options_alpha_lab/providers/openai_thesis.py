@@ -39,6 +39,16 @@ DEFAULT_MODEL = "gpt-5.6-terra"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_OUTPUT_TOKENS = 700
 
+#: Reasoning effort levels the GPT-5.6 family accepts. Validated here rather
+#: than left to the provider, because an unknown value fails at the far end of a
+#: network call, inside the blanket `except` in `synthesize`, and comes back
+#: indistinguishable from an outage.
+REASONING_EFFORTS = ("none", "low", "medium", "high", "xhigh", "max")
+#: The provider's own default. Sent explicitly anyway: a setting that changes the
+#: output must be recorded with the decision it produced, and "whatever the
+#: provider defaulted to that day" is not a record.
+DEFAULT_REASONING_EFFORT = "medium"
+
 DEVELOPER_INSTRUCTIONS = (
     "You are a research analyst writing a short memo about a US equity index ETF "
     "setup that deterministic code has already qualified. You are not a trader and "
@@ -93,6 +103,7 @@ class ModelCall:
     input_tokens: int | None
     output_tokens: int | None
     input_hash: str
+    reasoning_effort: str = DEFAULT_REASONING_EFFORT
     reason_codes: tuple[str, ...] = ()
 
 
@@ -148,10 +159,17 @@ class BoundedThesisSynthesizer:
         *,
         model: str = DEFAULT_MODEL,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        reasoning_effort: str = DEFAULT_REASONING_EFFORT,
     ) -> None:
+        if reasoning_effort not in REASONING_EFFORTS:
+            raise ValueError(
+                f"unknown reasoning effort {reasoning_effort!r}; "
+                f"expected one of {', '.join(REASONING_EFFORTS)}"
+            )
         self._transport = transport
         self.model = model
         self.timeout = timeout
+        self.reasoning_effort = reasoning_effort
         self.last_call: ModelCall | None = None
 
     # -- prompt ------------------------------------------------------------
@@ -181,6 +199,7 @@ class BoundedThesisSynthesizer:
             # Never retain project evidence on the provider side.
             "store": False,
             "max_output_tokens": MAX_OUTPUT_TOKENS,
+            "reasoning": {"effort": self.reasoning_effort},
             "input": [
                 {"role": "developer", "content": DEVELOPER_INSTRUCTIONS},
                 {"role": "user", "content": json.dumps(model_input, sort_keys=True)},
@@ -280,6 +299,7 @@ class BoundedThesisSynthesizer:
             input_tokens=usage.get("input_tokens"),
             output_tokens=usage.get("output_tokens"),
             input_hash=input_hash,
+            reasoning_effort=self.reasoning_effort,
             reason_codes=tuple(reasons),
         )
 
@@ -312,6 +332,7 @@ class BoundedThesisSynthesizer:
             input_tokens=None,
             output_tokens=None,
             input_hash=input_hash,
+            reasoning_effort=self.reasoning_effort,
             reason_codes=reasons,
         )
         return Thesis(

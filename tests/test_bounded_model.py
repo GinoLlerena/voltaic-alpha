@@ -26,6 +26,8 @@ from options_alpha_lab.components import (
     DeterministicSpreadSelector,
 )
 from options_alpha_lab.providers.openai_thesis import (
+    DEFAULT_REASONING_EFFORT,
+    REASONING_EFFORTS,
     BoundedThesisSynthesizer,
     ModelTransport,
 )
@@ -165,6 +167,70 @@ class PromptBoundaryTests(unittest.TestCase):
         self.assertIs(transport.seen["store"], False)
         self.assertEqual(transport.seen["text"]["format"]["type"], "json_schema")
         self.assertTrue(transport.seen["text"]["format"]["strict"])
+
+
+class ReasoningEffortTests(unittest.TestCase):
+    """The setting that changes the answer must travel with the answer."""
+
+    def test_the_effort_is_sent_explicitly_rather_than_left_to_the_provider(self) -> None:
+        # Relying on the provider's default means the recorded decision says
+        # nothing about the setting that produced it, and the default can move
+        # under us without a single line of this repository changing.
+        transport = ScriptedTransport(good_memo())
+        snap = snapshot()
+        BoundedThesisSynthesizer(transport).synthesize(snap, setup_for(snap))
+        assert transport.seen is not None
+        self.assertEqual(
+            transport.seen["reasoning"], {"effort": DEFAULT_REASONING_EFFORT}
+        )
+
+    def test_every_supported_level_reaches_the_provider(self) -> None:
+        snap = snapshot()
+        for effort in REASONING_EFFORTS:
+            with self.subTest(effort=effort):
+                transport = ScriptedTransport(good_memo())
+                BoundedThesisSynthesizer(
+                    transport, reasoning_effort=effort
+                ).synthesize(snap, setup_for(snap))
+                assert transport.seen is not None
+                self.assertEqual(transport.seen["reasoning"]["effort"], effort)
+
+    def test_an_unknown_level_is_refused_before_the_network(self) -> None:
+        # Otherwise it fails at the far end of an HTTP call, inside the blanket
+        # except in synthesize(), and comes back as a model outage - which is
+        # the one diagnosis guaranteed to send someone looking in the wrong
+        # place.
+        with self.assertRaises(ValueError):
+            BoundedThesisSynthesizer(ScriptedTransport(good_memo()), reasoning_effort="maximum")
+
+    def test_the_call_record_carries_the_effort_it_ran_at(self) -> None:
+        snap = snapshot()
+        synth = BoundedThesisSynthesizer(ScriptedTransport(good_memo()), reasoning_effort="high")
+        synth.synthesize(snap, setup_for(snap))
+        assert synth.last_call is not None
+        self.assertEqual(synth.last_call.reasoning_effort, "high")
+
+    def test_a_failed_call_still_records_the_effort(self) -> None:
+        # A failure at high effort and a failure at none are different facts.
+        snap = snapshot()
+        synth = BoundedThesisSynthesizer(
+            ScriptedTransport(None, raises=RuntimeError("boom")), reasoning_effort="xhigh"
+        )
+        synth.synthesize(snap, setup_for(snap))
+        assert synth.last_call is not None
+        self.assertEqual(synth.last_call.status, "failed")
+        self.assertEqual(synth.last_call.reasoning_effort, "xhigh")
+
+    def test_effort_cannot_change_the_decision_it_only_changes_the_memo(self) -> None:
+        # The seat is still the seat. A reversal at max effort is still coerced.
+        snap = snapshot()
+        memo = good_memo()
+        memo["direction"] = "bearish"
+        synth = BoundedThesisSynthesizer(ScriptedTransport(memo), reasoning_effort="max")
+        thesis = synth.synthesize(snap, setup_for(snap))
+        self.assertIs(thesis.direction, Direction.NEUTRAL)
+        assert synth.last_call is not None
+        self.assertIn("model_attempted_direction_reversal", synth.last_call.reason_codes)
 
 
 class BoundedOutputTests(unittest.TestCase):

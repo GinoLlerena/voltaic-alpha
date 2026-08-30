@@ -175,6 +175,7 @@ def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None
         synthesizer = BoundedThesisSynthesizer(
             OpenAIResponsesTransport(api_key),
             model=source.get("OPENAI_MODEL", "gpt-5.6-terra"),
+            reasoning_effort=source.get("OPENAI_REASONING_EFFORT", "medium"),
         )
 
     try:

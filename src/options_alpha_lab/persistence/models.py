@@ -146,6 +146,11 @@ class ModelCall(Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     input_hash: Mapped[str] = mapped_column(String(80), nullable=False)
+    #: Nullable because rows written before this column existed cannot be
+    #: assigned a value honestly: they ran at whatever the provider defaulted
+    #: to, and back-filling a guess would make an unrecorded setting look
+    #: recorded.
+    reasoning_effort: Mapped[str | None] = mapped_column(String(16), nullable=True)
     recorded_at: Mapped[datetime] = _recorded_at()
     schema_version: Mapped[str] = _schema_version()
 

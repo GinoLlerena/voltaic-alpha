@@ -233,13 +233,21 @@ moved forward:
 uv run alembic stamp 0001_h0_baseline
 # Then, and on every later deployment.
 uv run alembic upgrade head
-uv run alembic current   # expect: 0002_learning_capture (head)
+uv run alembic current   # expect: 0003_reasoning_effort (head)
 ```
 
 Stop the worker service before upgrading and start it afterwards. The migration
-only adds tables, so it does not rewrite anything the running worker holds, but
-a single writer is the invariant the lease exists to protect and a schema change
-is not the moment to make an exception to it.
+only adds tables and columns, so it does not rewrite anything the running worker
+holds, but a single writer is the invariant the lease exists to protect and a
+schema change is not the moment to make an exception to it.
+
+**Migrate before deploying code that reads the new shape, including the
+dashboard.** The dashboard queries through the same ORM models, so a model with
+a column its database lacks fails the whole page with `no such column`, not just
+the field. This is not hypothetical: adding `model_calls.reasoning_effort`
+(revision `0003`) broke every dashboard render against the committed evidence
+database until it was rebuilt. Order is: stop the worker, `alembic upgrade
+head`, start the worker, then deploy the dashboard.
 
 Rollback is `uv run alembic downgrade 0001_h0_baseline`, which drops the two
 tables. It discards the observations and exit decisions captured since the

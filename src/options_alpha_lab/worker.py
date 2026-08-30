@@ -271,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         synthesizer = BoundedThesisSynthesizer(
             OpenAIResponsesTransport(env["OPENAI_API_KEY"]),
             model=env.get("OPENAI_MODEL", "gpt-5.6-terra"),
+            reasoning_effort=env.get("OPENAI_REASONING_EFFORT", "medium"),
         )
 
     # Constructed in every mode: reconciliation is a read, and a position opened

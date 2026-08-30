@@ -30,6 +30,8 @@ from .components import (
 )
 from .config import resolved_env
 from .providers.openai_thesis import (
+    DEFAULT_REASONING_EFFORT,
+    REASONING_EFFORTS,
     BoundedThesisSynthesizer,
     ModelCall,
     OpenAIResponsesTransport,
@@ -219,6 +221,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("snapshots", nargs="+", help="Frozen snapshot JSON paths")
     parser.add_argument("--model", default=None)
+    parser.add_argument(
+        "--reasoning-effort", default=None, choices=list(REASONING_EFFORTS),
+        help="provider reasoning effort (default: OPENAI_REASONING_EFFORT, else medium)",
+    )
     parser.add_argument("--output", default=None, type=Path, help="Write the JSON report here")
     args = parser.parse_args(argv)
 
@@ -228,10 +234,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("OPENAI_API_KEY is not set; cannot run the model arm", file=sys.stderr)
         return 2
 
-    synthesizer = BoundedThesisSynthesizer(
-        OpenAIResponsesTransport(api_key),
-        model=args.model or env.get("OPENAI_MODEL", "gpt-5.6-terra"),
-    )
+    try:
+        synthesizer = BoundedThesisSynthesizer(
+            OpenAIResponsesTransport(api_key),
+            model=args.model or env.get("OPENAI_MODEL", "gpt-5.6-terra"),
+            reasoning_effort=(
+                args.reasoning_effort
+                or env.get("OPENAI_REASONING_EFFORT", DEFAULT_REASONING_EFFORT)
+            ),
+        )
+    except ValueError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
     snapshots = [load_snapshot(path) for path in args.snapshots]
     report = run_ablation(snapshots, synthesizer)
 
