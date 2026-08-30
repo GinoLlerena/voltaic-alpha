@@ -36,10 +36,17 @@ correct about a version that no longer exists.
 | `EXIT-012` | **Closed.** The entry window is derived from the authoritative calendar, including a market holiday and an early close. | `EV-023` |
 | `EXIT-013` | **Partial.** A credentialed worker with hosted PostgreSQL, a single-writer lease, startup reconciliation and migrations is deployed on a host separate from the public dashboard, with forced-restart evidence. Monitoring, alerting, backup and restore are **not** done, so `EXIT-AC-16` is unmet. | `EV-024`, runbook section 7 |
 
-Autonomous Paper entry remains disabled. The lifecycle machinery this review
-demanded now exists; what is missing is policy evidence - threshold sensitivity
-and `DEC-008` - and hosted backup and alerting. Those are the reasons entry is
-still off, and they are different reasons from the ones below.
+The lifecycle machinery this review demanded now exists. What is missing is
+policy evidence - threshold sensitivity and `DEC-008` - and hosted backup and
+alerting.
+
+**Armed 30 August 2026.** Autonomous Paper entry was enabled deliberately, on
+the owner's instruction, to produce live decision evidence for the hackathon
+demonstration. It was **not** enabled because these conditions were met: the
+thresholds remain `PROVISIONAL` without sensitivity evidence and `DEC-008` is
+open. Disarm with `scripts/disarm_worker.sh`. The findings below are closed on their own terms; arming does
+not close them, and nothing in this review should be read as approving the
+threshold values.
 
 ## 1. Strongest argument against enabling autonomous entry
 

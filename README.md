@@ -228,14 +228,18 @@ an explicit `--approve` token whenever `REQUIRE_OPERATOR_APPROVAL` is set. Close
 are deliberately exempt: blocking an exit traps exposure at the moment it most
 needs reducing.
 
-**Current safety status:** autonomous Paper entry is disabled, and the reason
-has changed. Broker acceptance is now recorded as `SUBMITTED` and never as
-`FILLED`; position state is durable, reconstructed at startup, and driven by
-reconciled fills, so a restart does not lose exit ownership. What is still
-missing is *policy* evidence, not machinery: the exit thresholds in `exits.py`
-are `PROVISIONAL` with no sensitivity analysis, `DEC-008` is open, and the
-hosted database has no backup or alerting. Those are the reasons entry stays
-off.
+**Current safety status:** autonomous Paper entry is **armed** as of 30 August
+2026, on the deployed worker, for the hackathon demonstration. It was not armed
+because the preconditions were met - the exit thresholds in `exits.py` are
+`PROVISIONAL` with no sensitivity analysis, `DEC-008` is open, and the hosted
+database has no backup or alerting. Treat any performance it produces as
+evidence that the mechanism runs, never that the thresholds are right.
+
+The machinery underneath is sound: broker acceptance is recorded as `SUBMITTED`
+and never as `FILLED`, position state is durable and reconstructed at startup
+from reconciled fills, and it stays bounded to Paper, one strategy at a time,
+0.5% of equity per trade, SPY only, inside a calendar-derived entry window.
+Disarm with `scripts/disarm_worker.sh`.
 
 `exits.py` contains provisional expiry, missing-value, stop-loss, invalidation,
 profit-capture, and DTE rules with testable precedence. Those rules are not yet

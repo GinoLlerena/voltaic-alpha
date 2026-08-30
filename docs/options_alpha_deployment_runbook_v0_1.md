@@ -147,12 +147,35 @@ repository. Delete the key pair when the instance is released.
 
 ### 7.1 Authority boundary
 
-The worker runs in `recommend` mode: it observes, decides, reconciles, enforces
-deadlines, and manages exits, with `ALPACA_TRADING_ENABLED=false` and
-`REQUIRE_OPERATOR_APPROVAL=true`. **It cannot open a position.** Enabling
-autonomous entry is a deliberate two-step change - `--mode paper_execute` plus
-`--approve` - and should wait until the exit thresholds have sensitivity
-evidence and `DEC-008` is closed.
+**Armed for autonomous Paper entry on 30 August 2026.** This reverses the
+position held throughout the project, deliberately and with the owner's
+instruction, to produce live decision evidence for the hackathon
+demonstration. It was **not** done because the preconditions were met: the
+exit thresholds remain `PROVISIONAL` with no sensitivity evidence and
+`DEC-008` is open. Read every threshold claim accordingly.
+
+The worker runs `--mode paper_execute` with `ALPACA_TRADING_ENABLED=true` and
+an `--approve` token, applied as a systemd drop-in
+(`10-paper-execute.conf`) rather than an edit to the unit, so the change is
+removed whole rather than half-reverted.
+
+**Disarm:** `bash scripts/disarm_worker.sh`, or on the host
+`systemctl revert options-alpha-worker`. Either returns it to `recommend`,
+where it still observes, decides, reconciles, enforces deadlines and manages
+exits but cannot open new risk. Neither closes an open position; the worker
+keeps managing one under the same exit policy.
+
+What still bounds it, none of which is affected by arming:
+
+| Bound | Value |
+|---|---|
+| Endpoint | Paper only, verified against the client about to be used, not the flag that configured it |
+| Concurrent strategies | 1 |
+| Risk budget per trade | 0.5% of equity ≈ $500 |
+| Underlying allowlist | SPY |
+| Entry window | 09:45-15:15 ET, calendar-derived |
+| Operator approval | still required; the token is in the drop-in |
+| Exit management | position clock at 60s, order deadlines at 5s |
 
 ### 7.2 Single writer
 
