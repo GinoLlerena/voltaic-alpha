@@ -57,7 +57,7 @@ zero decisions. Both results are reported as they happened. No alpha is claimed.
 | Artifact | Requirement | Status |
 |---|---|---|
 | Public GitHub repository | **Mandatory** | **Done.** `github.com/GinoLlerena/voltaic-alpha` is public and was validated by an unauthenticated clean clone: 34 commits, both tags, and all nine validation gates pass from the clone. |
-| Application URL | No platform restriction (organizers, 29 Aug 2026) | **Blocked on the address, not the platform.** `47.84.108.130` was released when the instance was stopped and does not come back; a pay-as-you-go public IP belongs to a running instance, an Elastic IP to the account. Run `scripts/restore_hosted_demo.sh --apply` to bind one, migrate and serve on port 80, then paste the address it prints. No domain is required: `F-K` was superseded. See [runbook](./options_alpha_deployment_runbook_v0_1.md) section 8. |
+| Application URL | No platform restriction (organizers, 29 Aug 2026) | **Done, 30 August 2026.** `http://47.236.50.157` - an Elastic IP bound to the dashboard host, so it survives the instance being stopped, unlike the pay-as-you-go address it replaces. Port 80, no port number in the URL; `:8501` still serves as a fallback. All five views verified rendering from the public internet with zero console errors. No domain is required: `F-K` was superseded. See [runbook](./options_alpha_deployment_runbook_v0_1.md) section 8. |
 | Video | MP4, **5 minutes maximum** | Beats drafted in the narrative §8; not yet recorded |
 | Slide deck | PDF | Ten-slide outline in the narrative §7; not yet exported |
 | Cover image | PNG or JPG, 16:9 | **Done.** `assets/cover.png`, 1920x1080. Source and regeneration steps in `assets/cover.html` |

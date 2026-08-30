@@ -81,6 +81,12 @@ wait_for_status() {  # wait_for_status <instance-id> <status> <seconds>
 
 remote() {  # remote <instance-id> <script text> - Cloud Assistant, no inbound port needed
   local id="$1" script="$2" invoke
+  # Cloud Assistant executes RunShellScript with /bin/sh, which on Ubuntu is
+  # dash: `set -o pipefail` is a bash builtin and dash exits 2 on it. An
+  # explicit shebang is the difference between the script running and the
+  # migration failing on its first line.
+  script="#!/bin/bash
+$script"
   if [ "$APPLY" != 1 ]; then note "would run on $id:"; sed 's/^/      /' <<<"$script"; return 0; fi
   invoke=$(aliyun ecs RunCommand --RegionId "$REGION" --Type RunShellScript \
     --InstanceId.1 "$id" --ContentEncoding Base64 \
@@ -107,6 +113,32 @@ if status not in ('Running', 'Pending', 'Invoked'):
     esac
   done
   die "remote command on $id did not finish within 300s"
+}
+
+ship() {  # ship <instance-id> <tar-source...> - push files with no inbound port
+  # Cloud Assistant caps CommandContent at roughly 18 KB after encoding, and a
+  # base64 tarball of the migrations is most of that on its own, so it goes up
+  # in chunks and is reassembled on the host. SSH would be simpler and needs a
+  # private key this script deliberately does not want.
+  local id="$1"; shift
+  local payload chunk i=0
+  payload=$(tar --exclude='__pycache__' -czf - "$@" | base64 | tr -d '\n')
+  [ "$APPLY" = 1 ] || { note "would ship $* to $id (${#payload} encoded chars)"; return 0; }
+  note "shipping $* to $id (${#payload} encoded chars)"
+  while [ -n "$payload" ]; do
+    chunk=${payload:0:5000}
+    payload=${payload:5000}
+    if [ "$i" = 0 ]; then
+      remote "$id" "printf '%s' '$chunk' > /tmp/oa_ship.b64"
+    else
+      remote "$id" "printf '%s' '$chunk' >> /tmp/oa_ship.b64"
+    fi
+    i=$((i + 1))
+  done
+  remote "$id" "set -eu
+base64 -d /tmp/oa_ship.b64 | tar -xzf - -C /opt/options-alpha
+rm -f /tmp/oa_ship.b64
+echo 'extracted:'; ls /opt/options-alpha"
 }
 
 # --- preflight ---------------------------------------------------------------
@@ -191,28 +223,56 @@ fi
 # --- migrate -----------------------------------------------------------------
 if wants migrate; then
   say "4. Migrate the worker database"
+  # The migrations were never in the worker payload, so they have to get there
+  # before anything can be upgraded. Shipping them is idempotent: same files,
+  # extracted over the same paths.
+  ship "$WORKER" alembic.ini migrations
+
   # Stop the writer first. The migration only adds a table and a column, so it
   # does not rewrite what a running worker holds, but a single writer is the
   # invariant the lease exists to protect and a schema change is not the moment
   # to make an exception to it.
   remote "$WORKER" 'set -euo pipefail
+ROOT=/opt/options-alpha
+ALEMBIC="$ROOT/.venv/bin/alembic"
+PY="$ROOT/.venv/bin/python"
+# There is no uv on this host: the service runs a plain venv. Asserting the
+# binary exists is the difference between a clear failure and the previous
+# behaviour, where a missing command was indistinguishable from an unversioned
+# database - and would have stamped a database that was already at 0002 back
+# down to the baseline.
+test -x "$ALEMBIC" || { echo "alembic not found at $ALEMBIC" >&2; exit 1; }
+
 systemctl stop options-alpha-worker || true
-cd /opt/options-alpha
+cd "$ROOT"
 set -a; . /etc/options-alpha.env; set +a
-current="$(uv run alembic current 2>/dev/null | tr -d "[:space:]" || true)"
-if [ -z "$current" ]; then
-  # Created by create_schema before Alembic existed, so it has no version row.
-  # Stamping records that the h0.1 shape is already present; upgrading without
-  # it would try to create tables that already exist.
-  echo "no alembic_version: stamping the baseline"
-  uv run alembic stamp 0001_h0_baseline
-else
-  echo "already at: $current"
+
+state=$("$PY" - <<'"'"'EOF'"'"'
+import os
+from sqlalchemy import create_engine, inspect
+engine = create_engine(os.environ["DATABASE_URL"])
+print("HAS_VERSION" if "alembic_version" in inspect(engine).get_table_names() else "NO_VERSION")
+EOF
+)
+echo "version table: $state"
+# -x url= is the first thing migrations/env.py consults, and it is what makes
+# this work at all: /etc/options-alpha.env carries DATABASE_URL but not
+# BOT_MODE, because the unit passes the mode as a command-line flag. Falling
+# through to load_settings() therefore raises ConfigurationError. Addressing
+# the database directly is also narrower - a migration should not need the
+# full application configuration to be valid.
+AL() { "$ALEMBIC" -x "url=$DATABASE_URL" "$@"; }
+if [ "$state" = "NO_VERSION" ]; then
+  # Built by create_schema before Alembic existed, so it carries no version
+  # row. Stamping records that the h0.1 shape is already present; upgrading
+  # without it would try to create tables that already exist.
+  echo "stamping the baseline"
+  AL stamp 0001_h0_baseline
 fi
-uv run alembic upgrade head
-uv run alembic current
+AL upgrade head
+AL current
 systemctl start options-alpha-worker
-sleep 5
+sleep 8
 systemctl is-active options-alpha-worker'
 fi
 
@@ -228,10 +288,11 @@ if wants port80; then
     --Description "judge dashboard, plain HTTP"
 
   remote "$DEMO" "set -euo pipefail
-iptables -t nat -C PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT 2>/dev/null \\
-  || iptables -t nat -A PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT
 # Survive a reboot. A rule that vanishes on restart is worse than no rule: the
-# URL works until the one time it matters.
+# URL works until the one time it matters. The unit is the single owner of the
+# rule - adding one by hand as well leaves a duplicate and a unit that reports
+# inactive while the redirect works, which is the kind of disagreement that
+# gets discovered during a demo.
 cat >/etc/systemd/system/options-alpha-port80.service <<'UNIT'
 [Unit]
 Description=Redirect 80 to the Streamlit dashboard on 8501
@@ -249,7 +310,14 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 systemctl enable options-alpha-port80
-iptables -t nat -L PREROUTING -n | grep -c 'redir ports $STREAMLIT_PORT'"
+# Idempotent: drop every copy of the rule first, so re-running does not stack
+# duplicates, then let the unit add exactly one.
+while iptables -t nat -C PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT 2>/dev/null; do
+  iptables -t nat -D PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT
+done
+systemctl restart options-alpha-port80
+echo \"unit: \$(systemctl is-enabled options-alpha-port80) / \$(systemctl is-active options-alpha-port80)\"
+echo \"rules: \$(iptables -t nat -S PREROUTING | grep -c -- '--dport $PUBLIC_PORT -j REDIRECT')\""
 fi
 
 # --- verify ------------------------------------------------------------------

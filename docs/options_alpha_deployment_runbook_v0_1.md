@@ -6,7 +6,7 @@
 |---|---|
 | Version | v0.1.1 |
 | Provider | Alibaba Cloud ECS, region `ap-southeast-1` (Singapore) |
-| Application URL | `http://47.84.108.130:8501` |
+| Application URL | `http://47.236.50.157` (Elastic IP, port 80; `:8501` still serves) |
 | Instance | `i-t4n88bkfwsq0lhzmfjii`, name `options-alpha-demo`, `ecs.e-c1m2.large` (2 vCPU / 4 GB), Ubuntu 24.04 |
 | Security group | `sg-t4naetmr3bp6sry6lw7a`, dedicated. **Only** 8501/tcp is open |
 | Service | systemd unit `options-alpha`, `Restart=always`, enabled at boot |
@@ -76,12 +76,13 @@ and Vercel as suggestions. This deployment is the submission URL.
   nothing sensitive crosses the wire, but a judge will see the warning.
 - **Bare IP address.** No DNS name is attached.
 - **Single instance.** No load balancer and no redundancy.
-- **The recorded addresses are not reserved.** `47.84.108.130` and
-  `43.98.206.148` were assigned at creation. Both instances have since been
-  stopped to stop the meter, which releases a pay-as-you-go public address, so
-  they will not come back on restart. The dashboard address is the submission
-  URL, so allocate an Elastic IP and bind it before submitting; until then,
-  treat every address in this document as historical.
+- **Addressing, resolved 30 August 2026.** The original `47.84.108.130` and
+  `43.98.206.148` were pay-as-you-go addresses and were released when the
+  instances were stopped, exactly as documented. The dashboard now holds
+  **Elastic IP `47.236.50.157`**, which belongs to the account rather than to a
+  running instance and therefore survives the next stop. The worker's address
+  is still auto-assigned and still disposable, which is correct: nothing
+  addresses it from outside, and no inbound port is open.
 
 ## 4. Operating it
 
@@ -136,7 +137,7 @@ repository. Delete the key pair when the instance is released.
 | Field | Value |
 |---|---|
 | Instance | `i-t4nfdbjx66so1we0aysh`, `options-alpha-worker`, `ecs.e-c1m2.large`, Ubuntu 24.04 |
-| Public IP | `43.98.206.148` (no inbound port is open) |
+| Public IP | `47.237.17.140`, auto-assigned and disposable (no inbound port is open) |
 | Private IP | `192.168.1.215` |
 | Security group | `sg-t4n6kaxrojixmg4ivuh8`: **only** 5432 from `192.168.0.0/16`. Nothing is reachable from the internet |
 | Database | PostgreSQL 16, bound to loopback and the private address only |

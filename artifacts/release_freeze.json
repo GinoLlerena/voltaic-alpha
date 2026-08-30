@@ -7,6 +7,7 @@
       "scripts/configure_secrets.py": "sha256:6c70749aa83394d9d2260226948629cd6e1ed450771c275e37a035dd287af4e5",
       "scripts/deploy_worker.sh": "sha256:1790f4bec929d38e6369e459b4063c257da875bb1807e246427bc9d068c8179f",
       "scripts/freeze_release.py": "sha256:c02e29f887795fed40c788d4bbd2d57d04d1b7e99b295a1917d671f224080c55",
+      "scripts/restore_hosted_demo.sh": "sha256:ecbf4b59db92c3dbacc7720a4a0fba84442f379f3ae7625af0f6755b25d0c3e0",
       "scripts/run_h0_validation.sh": "sha256:15269f3d9ada84f7c5aff93bde84024e35315f5ead7764dc7274c88ab51054fd",
       "src/options_alpha_lab/__init__.py": "sha256:dbcf1d6180ae5bd78b04786746c7f7735dd043e738aaab2bef618392a30d2e67",
       "src/options_alpha_lab/ablation.py": "sha256:a21fbd4d7bd63897f7d35858182cb2bd4f28b4bbfddc108ccb8d0edd328871f0",
@@ -82,8 +83,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:2cb8d621afd5addb2346c9f6e13163eed5ae483b",
-  "freeze_digest": "sha256:ca33a832aed32e4ce46ae1ccad01707aaf1a1377061cab503f295ef229591967",
-  "frozen_at": "2026-08-30T03:44:31.260363+00:00",
+  "commit": "git:f8b842c6759ffb0ea1d6e209ad5b891ad80356ee",
+  "freeze_digest": "sha256:08c80447972bf787a12c855dbbadd43e9dcba00475254404da8eabf777b045fb",
+  "frozen_at": "2026-08-30T04:13:09.767344+00:00",
   "manifest_version": "release_freeze.v1"
 }
