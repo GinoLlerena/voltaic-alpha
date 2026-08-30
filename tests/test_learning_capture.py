@@ -217,6 +217,22 @@ class MigrationTests(unittest.TestCase):
         self.assertIn("exit_decisions", names)
         self.assertIn("position_observations", names)
 
+    def test_the_alembic_url_carries_the_real_password_not_a_mask(self) -> None:
+        # `str(URL)` renders the password as `***`. Passing that to Alembic hands
+        # it a literal `***` to authenticate with, which fails as "password
+        # authentication failed" - indistinguishable from a wrong credential.
+        # Every other test here uses SQLite, which has no password to mask, so
+        # only an explicitly password-bearing URL can catch this.
+        from sqlalchemy import create_engine
+
+        from options_alpha_lab.persistence.repository import alembic_config
+
+        engine = create_engine("postgresql+psycopg://u:s3cr3t@example.invalid:5432/db")
+        url = alembic_config(engine).get_main_option("sqlalchemy.url")
+        assert url is not None
+        self.assertIn("s3cr3t", url)
+        self.assertNotIn("***", url)
+
     def test_the_reasoning_effort_column_is_added_and_can_be_rolled_back(self) -> None:
         from alembic import command
 

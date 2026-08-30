@@ -73,7 +73,14 @@ def alembic_config(engine: Engine) -> Any:
     from alembic.config import Config
 
     config = Config(str(Path(__file__).resolve().parents[3] / "alembic.ini"))
-    config.set_main_option("sqlalchemy.url", str(engine.url))
+    # `str(URL)` renders the password as `***`, so passing it here handed Alembic
+    # a literal `***` to authenticate with. Every test uses SQLite, which has no
+    # password to mask, so this failed for the first time against the hosted
+    # PostgreSQL - as `password authentication failed`, which reads like a
+    # credential problem rather than a string-formatting one.
+    config.set_main_option(
+        "sqlalchemy.url", engine.url.render_as_string(hide_password=False)
+    )
     return config
 
 

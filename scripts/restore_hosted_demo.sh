@@ -23,7 +23,7 @@ STREAMLIT_PORT=8501
 PUBLIC_PORT=80
 
 APPLY=0
-PHASES="preflight eip start migrate port80 verify"
+PHASES="preflight eip start code migrate port80 verify"
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1 ;;
@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     -h|--help)
       sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
       echo; echo "usage: $0 [--apply] [--only \"phase phase\"]"
-      echo "phases: preflight eip start migrate port80 verify"
+      echo "phases: preflight eip start code migrate port80 verify"
       exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -218,6 +218,28 @@ if wants start; then
   done
   # Cloud Assistant needs a moment after the instance reports Running.
   [ "$APPLY" = 1 ] && sleep 20 || true
+fi
+
+# --- code --------------------------------------------------------------------
+if wants code; then
+  say "3b. Ship the current source to the worker"
+  # Cloud Assistant rather than scp, so this needs no private key. The worker
+  # runs a plain venv, and nothing in this payload adds a dependency, so no
+  # reinstall is required - but the service has to restart to pick it up.
+  ship "$WORKER" src app.py
+  remote "$WORKER" 'set -euo pipefail
+cd /opt/options-alpha
+# The package was installed non-editable, so site-packages held a *copy* and
+# /opt/options-alpha/src was never imported: shipping source appeared to work
+# and changed nothing. Reinstalling editable makes src authoritative, so every
+# later ship takes effect on restart with no reinstall at all. --no-deps
+# because nothing here adds a dependency and a resolver run needs the network.
+./.venv/bin/pip install -q --no-deps -e . 2>&1 | tail -3
+./.venv/bin/python -c "import options_alpha_lab as m; print(\"imports from:\", m.__file__)"
+systemctl restart options-alpha-worker
+sleep 10
+systemctl is-active options-alpha-worker
+journalctl -u options-alpha-worker -n 3 --no-pager -o cat'
 fi
 
 # --- migrate -----------------------------------------------------------------
