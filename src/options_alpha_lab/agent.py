@@ -19,7 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Protocol
 
 from .architecture.contracts import (
     BotMode,
@@ -63,7 +63,7 @@ from .exits import (
     evaluate_exit,
     evaluate_triggers,
 )
-from .providers.alpaca_readonly import ProviderError, ReadOnlyAlpacaClient
+from .providers.alpaca_readonly import ProviderError, ProviderRead, ReadOnlyAlpacaClient
 
 DEFAULT_TICK_SECONDS = 300
 #: The order clock's cadence. Must be well inside the shortest deadline it
@@ -93,6 +93,42 @@ class TickResult:
         return "  ".join(parts)
 
 
+@dataclass(frozen=True)
+class Observation:
+    """What one pass of observation established, whatever produced it.
+
+    The agent needs three things from an observation and no more: the snapshot
+    to decide from, whether the market is open, and which sessions have
+    completed. Naming them lets a non-live source supply them without the agent
+    knowing the difference - and without a flag anywhere in the trading path
+    that says "pretend the market is open", which is a thing no production
+    branch should be able to read.
+    """
+
+    snapshot: DecisionSnapshot
+    market_open: bool
+    sessions: list[date]
+
+
+class MarketDataClient(Protocol):
+    """The read surface the agent uses. `ReadOnlyAlpacaClient` satisfies it.
+
+    Named so an observation source can supply a stand-in that refuses every
+    read, without the type system having to be told to look the other way.
+    """
+
+    option_feed: str
+
+    def clock(self) -> ProviderRead: ...
+    def account(self) -> ProviderRead: ...
+    def daily_bars(
+        self, symbol: str, limit: int = ..., lookback_days: int = ...
+    ) -> ProviderRead: ...
+    def option_chain(
+        self, underlying: str, *, expiration_gte: str, expiration_lte: str
+    ) -> ProviderRead: ...
+
+
 def spread_value(snapshot: DecisionSnapshot, long_symbol: str, short_symbol: str) -> Decimal | None:
     """Conservative closing value: sell the long at the bid, buy the short at the ask."""
     quotes = {q.contract_symbol: q for q in snapshot.option_chain}
@@ -111,7 +147,7 @@ class TradingAgent:
         self,
         settings: Settings,
         *,
-        client: ReadOnlyAlpacaClient,
+        client: MarketDataClient,
         gateway: ExecutionGateway | None = None,
         synthesizer: Any = None,
         recorder: Any = None,
@@ -119,6 +155,7 @@ class TradingAgent:
         store: LifecycleStore | None = None,
         deadlines: DeadlineEnforcer | None = None,
         calendar: TradingCalendar | None = None,
+        observer: Callable[[datetime], Observation] | None = None,
         symbol: str = "SPY",
         clock: Callable[[], datetime] | None = None,
         operator_approval: str | None = None,
@@ -132,6 +169,9 @@ class TradingAgent:
         self.store = store
         self.deadlines = deadlines
         self.calendar = calendar
+        #: Supplies observations instead of the provider. Rehearsal only; the
+        #: live worker leaves it None and reads Alpaca.
+        self.observer = observer
         self.symbol = symbol
         self.operator_approval = operator_approval
         self._clock = clock or (lambda: datetime.now(UTC))
@@ -180,6 +220,11 @@ class TradingAgent:
 
     # -- observation -------------------------------------------------------
     def observe(self) -> tuple[DecisionSnapshot, bool]:
+        if self.observer is not None:
+            observation = self.observer(self._clock())
+            self._sessions = list(observation.sessions)
+            return observation.snapshot, observation.market_open
+
         # EXIT-009: the injected clock, not the host date. Two time sources in
         # one method means replay and production disagree.
         today = self._clock().date()
