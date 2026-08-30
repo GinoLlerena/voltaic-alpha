@@ -12,6 +12,35 @@
 | Scope | Exit evaluation, autonomous agent, execution gateway, persistence models/repository, manual lifecycle artifact, related tests, entry timing, and deployed worker boundary |
 | Governing requirements | `CLR-020`, `RISK-017` to `RISK-021`, `OPS-001` to `OPS-005`, `QA-009`, `QA-010`, `QA-014` |
 
+## 0. Disposition as of 29 August 2026
+
+**This review is a historical record and is deliberately not rewritten.** Its
+findings were accurate when written on 28 August 2026; the prose below still
+describes the code as it was that day. What follows is the current status of
+each finding, so a reader does not have to infer it from a document that was
+correct about a version that no longer exists.
+
+| ID | Disposition | Where it closed |
+|---|---|---|
+| `EXIT-001` | **Closed.** Broker acceptance is recorded as `SUBMITTED`, never as `FILLED`. Only reconciled fills establish the position basis or release monitoring responsibility. | `EV-020` to `EV-022` |
+| `EXIT-002` | **Closed.** Position ownership is durable and reconstructed from the database and the broker at startup; a mismatch raises an incident and halts new risk. | `EV-020` to `EV-022` |
+| `EXIT-003` | **Closed.** The time stop counts completed trading sessions from the first reconciled fill using the authoritative calendar; DTE remains a separate expiry control. | `EV-021`, `EV-023` |
+| `EXIT-004` | **Closed.** Every rule is evaluated independently; one that cannot be evaluated stores `fired: null` rather than `false`, raises a durable incident, halts new risk, and retains exit ownership. | `EV-023`, `EV-024` |
+| `EXIT-005` | **Closed.** The invalidation is a typed rule carrying level, direction and price source, persisted before entry; the prose is written from the rule rather than parsed back out of it, and a completed-session rule is refused against a price it cannot match. | `EV-023` |
+| `EXIT-006` | **Partial, by decision.** The close has a bounded submit/deadline/cancel/reconcile lifecycle with an enforced 120-second deadline and a fast order clock. Limit staging, maximum concession and an attempt budget are deliberately **not** implemented: replace-and-chase has real economic cost and stays provisional until there is evidence for its parameters. | `EV-024`; see `exits.py` header |
+| `EXIT-007` | **Open.** Early-close and calendar handling closed with `EXIT-012`. Scheduled-event disposition, unexpected-exposure policy beyond the incident path, and assignment risk have no explicit rule; expiry safety is handled only by the DTE guard. | - |
+| `EXIT-008` | **Closed as a documentation action.** The status correction was applied and has been maintained: thresholds remain `PROVISIONAL` and `DEC-008` remains open. | this section |
+| `EXIT-009` | **Closed.** `observe()` uses the injected clock throughout; replay and production share temporal semantics. | `EV-021` |
+| `EXIT-010` | **Closed.** Data-quality and reconciliation state drive a durable execution-state transition, and entries halt while reconciled risk-reducing closes remain available. | `EV-023` |
+| `EXIT-011` | **Closed.** Accepted entry orders are reconciled until terminal, partial fills are managed, and an owner-approved deadline cancels rather than replaces. A separate five-second order clock enforces the deadline on its own timescale. | `EV-024` |
+| `EXIT-012` | **Closed.** The entry window is derived from the authoritative calendar, including a market holiday and an early close. | `EV-023` |
+| `EXIT-013` | **Partial.** A credentialed worker with hosted PostgreSQL, a single-writer lease, startup reconciliation and migrations is deployed on a host separate from the public dashboard, with forced-restart evidence. Monitoring, alerting, backup and restore are **not** done, so `EXIT-AC-16` is unmet. | `EV-024`, runbook section 7 |
+
+Autonomous Paper entry remains disabled. The lifecycle machinery this review
+demanded now exists; what is missing is policy evidence - threshold sensitivity
+and `DEC-008` - and hosted backup and alerting. Those are the reasons entry is
+still off, and they are different reasons from the ones below.
+
 ## 1. Strongest argument against enabling autonomous entry
 
 The strongest objection is not that the numerical thresholds might be suboptimal. It is that the agent does not have a reliable fact model for whether it owns a position at all.

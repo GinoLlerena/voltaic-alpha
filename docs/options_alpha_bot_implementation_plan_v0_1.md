@@ -491,7 +491,7 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** the hosted demo works in a clean session and the narrative makes no unsupported alpha, data-quality, or live-performance claim.
 
-**Status: `PARTIAL`, 28 August 2026.** Validation, containerization, business case, rubric mapping, deck outline, and video beats are done; `scripts/run_h0_validation.sh` passes nine gates. Alibaba ECS hosts only the credential-free read-only dashboard. No autonomous worker, protected Paper secrets, hosted durable database, worker lease, startup reconciliation, monitoring, backup, or rollback proof is deployed. Outstanding and owned by the team: the compliant hosted URL, worker-hosting decision if autonomous operation remains in scope, MP4, and deck PDF.
+**Status: `PARTIAL`, updated 29 August 2026.** Validation, business case, rubric mapping, deck outline, and video beats are done; `scripts/run_h0_validation.sh` passes nine gates. Alibaba ECS now hosts two separate machines: the credential-free read-only dashboard, and a credentialed worker with protected Paper secrets, hosted PostgreSQL, a single-writer lease, startup reconciliation and Alembic migrations, with forced-restart evidence. Still missing: monitoring and alerting, and database backup and restore. Containerization was **not** done - there is no Dockerfile - and the earlier claim that it was is corrected here. Outstanding and owned by the team: an Elastic IP bound to the submission URL (the pay-as-you-go addresses were released when the instances were stopped), the MP4, and the deck PDF.
 
 ### Phase 7: Integration buffer and submission - 0.75 day
 
@@ -611,7 +611,7 @@ Required controls:
 | `FREEZE_ALL_WRITES` | Blocked | Blocked | Blocked | Blocked | Exceptional adapter, credential, or endpoint integrity incident requiring operator intervention |
 
 - Every execution method checks the durable state. `FREEZE_ALL_WRITES` must raise an incident because it can temporarily prevent risk reduction.
-- The current gateway execution state is process-local. It is implementation evidence for guard semantics, not proof of a durable halt or incident workflow.
+- Execution state is derived from reconciliation on every tick and from data-quality findings, and is pushed to the gateway, which is the component that must actually refuse. Incidents are durable rows, so a halt survives a restart and stays in force until the incident is resolved. `FREEZE_ALL_WRITES` has no trigger wired to it yet, and there is no operator resume workflow beyond resolving the row.
 - An allowlist limits underlyings and structures.
 - Policy, prompt, model, and code version are attached to every decision.
 - Secrets are supplied by the deployment secret store, never committed or displayed.

@@ -93,9 +93,9 @@ judge a completed-session rule against a price it cannot match. See `EV-023`.
 
 ### 2.3 Known engineering findings to resolve
 
-Status as of 29 August 2026. Findings 1 to 8 are closed under `EV-023` and
-`EV-024`; finding 4 turned out to be a crash rather than a data-fidelity issue.
-Finding 9 is documentation work and remains open.
+Status as of 29 August 2026. All nine findings are closed: 1 to 8 under `EV-023`
+and `EV-024`, and 9 under `EV-025`. Finding 4 turned out to be a crash rather
+than a data-fidelity issue.
 
 1. **Closed.** Separate order-deadline enforcement from the five-minute strategy
    loop. `TradingAgent.order_clock` reconciles and enforces deadlines on a
@@ -127,9 +127,19 @@ Finding 9 is documentation work and remains open.
    schema. Alembic is configured with a baseline marker and the capture
    revision; `create_schema` stamps head. See runbook section 7.5, including the
    stated limitation that `upgrade head` does not build an empty database.
-9. **Open.** Reconcile documents that still describe the older, process-local
-   lifecycle and the deployment runbook sections that disagree about worker
-   deployment.
+9. **Closed.** Reconcile documents that still describe the older,
+   process-local lifecycle and the deployment runbook sections that disagree
+   about worker deployment. The runbook's section 1 claimed the dashboard was
+   the only deployment while its own section 7 documented the worker; it now
+   opens with both hosts and a status against each autonomous-entry
+   precondition. Section 7's subsections were renumbered - there were two 7.5s
+   and 7.6 preceded them. The traceability matrix's stale `PARTIAL`/`PENDING`
+   notes for `OPS-001` to `OPS-005`, `RISK-015` to `RISK-018`, `DATA-015`,
+   `QA-009` to `QA-014` were rewritten against the code, and `OPS-004` moved to
+   `COMPLETE`. The exit review keeps its 28 August findings verbatim - it is a
+   dated record, and rewriting it would destroy the evidence that the problems
+   were real - with a new section 0 giving each finding's disposition. See
+   `EV-025`.
 
 ## 3. Recommended operating cadence
 

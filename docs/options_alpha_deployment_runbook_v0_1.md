@@ -14,42 +14,54 @@
 
 ## 1. What is deployed, and what is not
 
-The dashboard only. It serves the committed evidence database and has no code
-path to a broker or a model provider.
+Two hosts, deliberately separate. **This section describes the public dashboard
+host.** The credentialed worker was added on 29 August 2026 and is documented in
+section 7; the split is the point, so read both before concluding what the
+system can do.
 
-The service environment contains **no Alpaca or OpenAI credential**, verified
-after start by reading the process environment. The upload was produced with
-`git archive`, so only tracked files were shipped and `.env` could not be
+| Host | Section | Credentials | Can place an order |
+|---|---|---|---|
+| `options-alpha-demo` (public, 8501/tcp) | this section | none | no |
+| `options-alpha-worker` (no inbound port) | [section 7](#7-credentialed-worker-added-29-august-2026) | Alpaca Paper, OpenAI | no - `recommend` mode, writes disabled |
+
+The dashboard serves evidence and has no code path to a broker or a model
+provider. Its service environment contains **no Alpaca or OpenAI credential**,
+verified after start by reading the process environment. The upload was produced
+with `git archive`, so only tracked files were shipped and `.env` could not be
 included even by accident.
 
 The decision worker, the execution gateway, and the freeze tooling are **not**
-deployed. Nothing on this host can place an order.
+deployed *on this host*. Nothing on the dashboard host can place an order.
 
 ### 1.1 Autonomous-worker gate
 
 The dashboard deployment is not an autonomous-agent deployment. Do not add
 Alpaca/OpenAI credentials or start `options_alpha_lab.agent` on this service as
 a convenience change. That would expand the host from public evidence viewer to
-broker authority and invalidate its current security claim.
+broker authority and invalidate its current security claim. The worker exists
+precisely so that this does not have to happen.
 
-If autonomous Paper operation remains in scope, deploy a separate worker
-boundary and require all of the following before enabling entry:
+Autonomous Paper *entry* remains disabled. The separate worker boundary now
+exists, and the entry preconditions stand as follows:
 
-1. protected Paper-only provider secrets with no live fallback;
-2. a durable hosted database and migrations for intents, orders, fills,
-   positions, execution state, and incidents;
-3. one database-backed worker lease and an authoritative market calendar;
-4. startup reconciliation before the decision loop plus periodic reconciliation
-   while any order or exposure exists;
-5. durable pending/partial/open/closing/flat states based on actual fills;
-6. health checks and alerts for broker/local mismatch, stale reconciliation,
-   database failure, worker death, and an unmanaged position;
-7. backup, restore, forced-restart, credential-rotation, and rollback evidence.
+| # | Precondition | Status |
+|---|---|---|
+| 1 | Protected Paper-only provider secrets with no live fallback | Met - `/etc/options-alpha.env`, mode 600, root-owned; `ALPACA_PAPER_TRADE=true` |
+| 2 | Durable hosted database and migrations for intents, orders, fills, positions, execution state, and incidents | Met - PostgreSQL 16 plus Alembic (section 7.6) |
+| 3 | One database-backed worker lease and an authoritative market calendar | Met - lease with heartbeat/TTL (section 7.2); calendar-derived entry window |
+| 4 | Startup reconciliation before the decision loop, plus periodic reconciliation while any order or exposure exists | Met - `startup()` precedes any new risk; reconciliation opens every tick and the order clock |
+| 5 | Durable pending/partial/open/closing/flat states based on actual fills | Met - acceptance is `SUBMITTED`, never `FILLED`; state comes from reconciled fills |
+| 6 | Health checks and alerts for broker/local mismatch, stale reconciliation, database failure, worker death, and an unmanaged position | Partial - health JSON and durable incidents exist; there is no alerting |
+| 7 | Backup, restore, forced-restart, credential-rotation, and rollback evidence | Partial - forced restart and migration rollback are evidenced; backup and restore are not (section 7.7) |
 
-The public dashboard may read redacted evidence exported by that worker, but it
-must not share broker-write credentials or expose control actions. Until this
-gate passes, the hosted system demonstrates the judge experience only, not
-unattended trading.
+Two further conditions are policy rather than plumbing, and neither is met:
+exit thresholds are still `PROVISIONAL` without sensitivity evidence, and
+`DEC-008` is open. **Until 6 and 7 close and `DEC-008` is answered, entry stays
+disabled.** The switch is deliberately two steps - `--mode paper_execute` plus
+`--approve` - so that it cannot be flipped by editing one line.
+
+The public dashboard reads the worker's database through a `SELECT`-only role
+and holds no broker-write credential and no control actions (section 7.3).
 
 ## 2. Platform
 
@@ -64,6 +76,12 @@ and Vercel as suggestions. This deployment is the submission URL.
   nothing sensitive crosses the wire, but a judge will see the warning.
 - **Bare IP address.** No DNS name is attached.
 - **Single instance.** No load balancer and no redundancy.
+- **The recorded addresses are not reserved.** `47.84.108.130` and
+  `43.98.206.148` were assigned at creation. Both instances have since been
+  stopped to stop the meter, which releases a pay-as-you-go public address, so
+  they will not come back on restart. The dashboard address is the submission
+  URL, so allocate an Elastic IP and bind it before submitting; until then,
+  treat every address in this document as historical.
 
 ## 4. Operating it
 
@@ -176,7 +194,7 @@ showing frozen evidence honestly labelled.
   the read-only adapter imports it at module scope. The dashboard had never
   exposed this because it does not import the provider modules.
 
-### 7.6 The order clock
+### 7.5 The order clock
 
 The worker runs two cadences, because the questions have different timescales.
 
@@ -201,7 +219,7 @@ keeps reconciling it. `--order-clock-interval 0` disables it.
 Health JSON carries `order_clock_actions`, so a worker that looks idle at tick
 granularity can be seen to have been busy at order granularity.
 
-### 7.5 Schema migrations
+### 7.6 Schema migrations
 
 The schema is versioned with Alembic from 29 August 2026. Before that, the
 hosted PostgreSQL was created by `create_schema`, which calls `create_all` and
@@ -240,7 +258,7 @@ tables. A new database is created by `create_schema`, which builds it from the
 model metadata and stamps head; migrations exist to move existing databases
 forward.
 
-### 7.5 Cost and teardown
+### 7.7 Cost and teardown
 
 Two `ecs.e-c1m2.large` instances now bill. Release both after the event:
 
@@ -252,3 +270,42 @@ aliyun ecs DeleteInstance --RegionId ap-southeast-1 --InstanceId i-t4n88bkfwsq0l
 There is no database backup yet. `EXIT-AC-16` asks for backup and rollback
 evidence, and that part is **not** satisfied: a `pg_dump` timer is the remaining
 work.
+
+## 8. Rehearsing the loop outside market hours
+
+The worker is only interesting while the exchange is open. Every other hour of
+the week `tick()` reaches the market-open check and stops, which is correct
+behaviour and a useless demonstration: reconciliation, the decision workflow,
+the risk governor and the execution firewall never run where anyone can see
+them. A demonstration recorded on a Saturday would show one line saying
+`MARKET_CLOSED`.
+
+```bash
+uv run python -m options_alpha_lab.rehearsal            # baseline thesis
+uv run python -m options_alpha_lab.rehearsal --arm model # bounded model memo
+```
+
+This drives `TradingAgent.tick()` - the same method the worker calls, not a
+copy - from the committed H0 snapshots. Nothing tells the agent to pretend the
+market is open; the observation comes from a recording taken while it was, which
+is what a rehearsal is. Output is the worker's JSON event shape, one `tick`
+event per snapshot, at `--interval` seconds apart so a screen recording is
+readable.
+
+Three properties keep it from becoming a second, quieter trading path:
+
+- **No gateway is constructed.** A qualified setup reaches `TRADE_CANDIDATE` and
+  stops, which is what the deployed `recommend` worker does.
+- **No provider client exists.** `RehearsalClient` raises on every read, so a
+  future change that reached past the observation source would fail loudly
+  rather than quietly go live.
+- **The production database is not addressable.** Rehearsal accepts SQLite only
+  and overrides the ambient `DATABASE_URL`, so running it on the worker host
+  cannot append rehearsal rows to the authoritative store. If the inherited
+  configuration was write-capable, the start-up event says
+  `inherited_config: overridden` rather than downgrading in silence.
+
+The rows it writes identify themselves: their snapshot ids are the committed
+fixture ids (`spy-qualified-2026-08-27`), not the `spy-agent-<stamp>` ids the
+live agent mints. A rehearsal trace is a demonstration of the loop, not a record
+of anything that happened, and `rehearsal/` is git-ignored for that reason.

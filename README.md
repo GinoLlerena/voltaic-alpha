@@ -35,9 +35,11 @@ submits no order.
 
 ## What exists at this commit
 
-No order submission and no broker write path. There is now a durable audit
-schema and a replayable decision path. There is no hosted interface yet.
-Underneath sit two deliberately separate layers:
+A durable audit schema, a replayable decision path, and a deterministic
+execution gateway that is the only code permitted to express a broker write.
+Two hosts are deployed: a credential-free judge dashboard, and a credentialed
+worker running `recommend` mode with order writes disabled. Underneath sit two
+deliberately separate layers:
 
 1. the original synthetic interaction lab, which tests spread and risk feedback;
 2. a production-facing architecture slice with timestamped contracts, provider
@@ -207,7 +209,15 @@ uv run python -m options_alpha_lab.agent --mode recommend --ticks 1
 
 # Paper-write configuration exists, but autonomous entry is not release-approved.
 # Do not enable it until the exit-lifecycle acceptance matrix passes.
+
+# Outside market hours the cycle stops at MARKET_CLOSED, which demonstrates
+# nothing. Rehearsal drives the same tick() from committed snapshots instead:
+uv run python -m options_alpha_lab.rehearsal
 ```
+
+Rehearsal has no gateway, no provider client, and no route to the production
+database - it writes SQLite only. It is a demonstration of the loop, not a
+record of anything that happened; see runbook section 8.
 
 Each tick observes, then **manages the open position before considering a new
 one**. A tick that entered first could hold a losing position through its own
@@ -218,15 +228,19 @@ an explicit `--approve` token whenever `REQUIRE_OPERATOR_APPROVAL` is set. Close
 are deliberately exempt: blocking an exit traps exposure at the moment it most
 needs reducing.
 
-**Current safety status:** keep autonomous Paper entry disabled. The manual MLeg
-transport lifecycle is valid evidence, but the agent currently treats broker
-acceptance as opened or closed before fill reconciliation and keeps its managed
-position only in process memory. A restart can therefore lose exit ownership.
+**Current safety status:** autonomous Paper entry is disabled, and the reason
+has changed. Broker acceptance is now recorded as `SUBMITTED` and never as
+`FILLED`; position state is durable, reconstructed at startup, and driven by
+reconciled fills, so a restart does not lose exit ownership. What is still
+missing is *policy* evidence, not machinery: the exit thresholds in `exits.py`
+are `PROVISIONAL` with no sensitivity analysis, `DEC-008` is open, and the
+hosted database has no backup or alerting. Those are the reasons entry stays
+off.
 
 `exits.py` contains provisional expiry, missing-value, stop-loss, invalidation,
 profit-capture, and DTE rules with testable precedence. Those rules are not yet
-an approved exit policy. The required lifecycle remediation and acceptance
-tests are in the
+an approved exit policy. The disposition of every lifecycle finding is in
+section 0 of the
 [Exit Policy and Position-Lifecycle Review](docs/options_alpha_exit_policy_review_v0_1.md).
 
 ## The judge dashboard
