@@ -286,7 +286,13 @@ forward.
 
 ### 7.7 Cost and teardown
 
-Two `ecs.e-c1m2.large` instances now bill. Release both after the event:
+Verified rates (`aliyun ecs DescribePrice`, `ap-southeast-1`, USD):
+`ecs.e-c1m2.large` compute $0.0356/hr, 40 GB `cloud_essd` $0.010128/hr,
+bandwidth pay-by-traffic. Both instances are currently `Stopped` in
+`StopCharging` mode, so **compute is not billing and only the disks are** -
+$0.49/day for the pair. Running both costs $2.20/day.
+
+Release both after the event:
 
 ```bash
 aliyun ecs DeleteInstance --RegionId ap-southeast-1 --InstanceId i-t4nfdbjx66so1we0aysh --Force true
@@ -297,7 +303,64 @@ There is no database backup yet. `EXIT-AC-16` asks for backup and rollback
 evidence, and that part is **not** satisfied: a `pg_dump` timer is the remaining
 work.
 
-## 8. Rehearsing the loop outside market hours
+## 8. Bringing the deployment back
+
+Both instances were stopped in `StopCharging` mode, which releases a
+pay-as-you-go public address. **Every IP written in this document is
+historical.** They do not come back on start.
+
+```bash
+bash scripts/restore_hosted_demo.sh              # prints the plan, changes nothing
+bash scripts/restore_hosted_demo.sh --apply
+bash scripts/restore_hosted_demo.sh --apply --only "migrate verify"
+```
+
+Six idempotent phases. Re-running after a partial failure resumes rather than
+duplicating: an unbound EIP already allocated is reused rather than a second one
+allocated, a running instance is left alone, an already-stamped database is not
+re-stamped.
+
+| Phase | What it does |
+|---|---|
+| `preflight` | CLI present, account balance, instance states |
+| `eip` | Allocate or reuse an Elastic IP and bind it to the dashboard host |
+| `start` | Start both instances and wait for `Running` |
+| `migrate` | Stop the worker, stamp if unversioned, `upgrade head`, restart, confirm active |
+| `port80` | Open 80/tcp and redirect it to Streamlit on 8501, persisted across reboot |
+| `verify` | `HTTP 200` on `/`, `/_stcore/health`, and the original port |
+
+### 8.1 Why an Elastic IP rather than the address it had
+
+The dashboard address is the submission URL. A pay-as-you-go public IP belongs
+to a *running instance*; an Elastic IP belongs to the *account*. Stopping the
+instance to save money is a thing that will be done again, and the second time
+it must not silently invalidate the URL a judge was given. It bills a small
+reservation fee while held and unbound, which is the cost of the address
+surviving, and is the point.
+
+### 8.2 Why a redirect rather than moving Streamlit to port 80
+
+`http://<ip>:8501` is blocked on some corporate and guest networks, and a judge
+who cannot reach the page does not file a bug. Redirecting 80 to 8501 in the NAT
+table needs no change to the systemd unit, no capability grant to bind a
+privileged port, and is undone by deleting one rule. Port 8501 stays open, so a
+rollback requires no change at all. The rule is reapplied at boot by a oneshot
+unit: a rule that vanishes on restart is worse than no rule, because the URL
+works until the one time it matters.
+
+### 8.3 Order, and the one thing that cannot be redone
+
+Migrate before deploying anything that reads the new schema (section 7.6), and
+**record the MP4 only after the address is final**. The video shows the URL. An
+address changed after recording makes the submission video wrong, and there is
+no re-recording it the morning of the deadline.
+
+`scripts/deploy_worker.sh` no longer hardcodes either address. It resolves the
+host from the instance ID, prefers a bound Elastic IP, and refuses to run
+against a stopped instance rather than opening the security group and then
+hanging on a connection to an address somebody else now holds.
+
+## 9. Rehearsing the loop outside market hours
 
 The worker is only interesting while the exchange is open. Every other hour of
 the week `tick()` reaches the market-open check and stops, which is correct

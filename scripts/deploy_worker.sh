@@ -16,17 +16,42 @@ KEY="${OPTIONS_ALPHA_KEY:?set OPTIONS_ALPHA_KEY to the deploy private key path}"
 
 case "$TARGET" in
   worker)
-    SG=sg-t4n6kaxrojixmg4ivuh8; HOST=43.98.206.148
+    SG=sg-t4n6kaxrojixmg4ivuh8; INSTANCE=i-t4nfdbjx66so1we0aysh
     SERVICE=options-alpha-worker
     PATHS="app.py requirements.txt pyproject.toml README.md src"
     ;;
   dashboard)
-    SG=sg-t4naetmr3bp6sry6lw7a; HOST=47.84.108.130
+    SG=sg-t4naetmr3bp6sry6lw7a; INSTANCE=i-t4n88bkfwsq0lhzmfjii
     SERVICE=options-alpha
     PATHS="app.py requirements.txt pyproject.toml README.md src demo artifacts .streamlit"
     ;;
   *) echo "usage: $0 [worker|dashboard]" >&2; exit 2 ;;
 esac
+
+# Resolved, never hardcoded. Both addresses were written into this script as
+# literals and both went stale the moment the instances were stopped: a
+# pay-as-you-go public IP is released on stop, so the script would have opened
+# SSH to the security group and then hung connecting to somebody else's host.
+# An Elastic IP is preferred when one is bound, because that is the address
+# that survives the next stop.
+HOST=$(aliyun ecs DescribeInstances --RegionId "$REGION" --InstanceIds "[\"$INSTANCE\"]" \
+  | python3 -c "
+import json, sys
+items = json.load(sys.stdin)['Instances']['Instance']
+if not items:
+    sys.exit('instance $INSTANCE not found in $REGION')
+i = items[0]
+if i.get('Status') != 'Running':
+    sys.exit('instance $INSTANCE is %s; start it first' % i.get('Status'))
+eip = i.get('EipAddress', {}).get('IpAddress') or ''
+pub = (i.get('PublicIpAddress', {}).get('IpAddress') or [''])[0]
+addr = eip or pub
+if not addr:
+    sys.exit('instance $INSTANCE has no public address; bind an Elastic IP '
+             '(scripts/restore_hosted_demo.sh --apply --only eip)')
+print(addr)
+")
+echo "target $TARGET at $HOST"
 
 CIDR="$(curl -s --max-time 15 https://api.ipify.org | cut -d. -f1-3).0/24"
 SSH_OPTS=(-i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
