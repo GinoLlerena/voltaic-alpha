@@ -39,7 +39,7 @@ from .components import (
     DeterministicSpreadSelector,
 )
 from .config import Settings
-from .evidence import build_snapshot, parse_bars, parse_occ_symbol
+from .evidence import PARTICIPATION_SYMBOL, build_snapshot, parse_bars, parse_occ_symbol
 from .execution.deadline import DeadlineEnforcer, DeadlineOutcome, deadline_for
 from .execution.gateway import AmbiguousSubmission, ExecutionGateway, ExecutionRefused
 from .execution.intent import IntentLeg, OrderIntent, build_close_intent, build_open_intent
@@ -237,6 +237,14 @@ class TradingAgent:
         clock_read = self.client.clock()
         account = self.client.account()
         bars = self.client.daily_bars(self.symbol)
+        # Breadth, from a genuinely different instrument. A failure here costs
+        # the setup one possible confirmer and nothing else: an outage on a
+        # second symbol must not halt the strategy on the first.
+        participation = None
+        try:
+            participation = self.client.daily_bars(PARTICIPATION_SYMBOL)
+        except ProviderError:
+            participation = None
         chain = self.client.option_chain(
             self.symbol,
             expiration_gte=(today + timedelta(days=CHAIN_DTE_LOW)).isoformat(),
@@ -257,6 +265,7 @@ class TradingAgent:
             clock_read=clock_read,
             bars_read=bars,
             chain_read=chain,
+            participation_read=participation,
             as_of=self._clock(),
         )
         return snapshot, is_open

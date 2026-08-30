@@ -84,11 +84,33 @@ independent. H0 therefore takes its confirmation from a **different instrument**
 | Signal | Family | Source | Rule |
 |---|---|---|---|
 | Volatility regime | `volatility_options` | ATM implied volatility from the option chain | Aligned when IV ≤ 0.22; opposes when IV ≥ 0.32; silent between |
+| Participation breadth | `participation` | `RSP` (equal-weight S&P 500) against the cap-weighted index, 10 completed sessions | Bullish when the ratio rises, bearish when it falls, silent inside ±0.002 |
 | Momentum divergence | `momentum` | 5-session vs 20-session return | Opposing signal when the short-horizon return runs against the trend |
 
 The volatility signal is derived from the option market's own pricing, not from
 the bars that produced the structure signal. The momentum signal exists only to
 generate **counter-evidence**; it can never qualify a setup on its own.
+
+**Breadth, added 30 August 2026.** `SPY` is cap-weighted and `RSP` holds the same
+500 companies equally, so the ratio between them answers the question breadth is
+actually asking: is the average constituent participating, or is a shrinking
+group of large names carrying the move? A rising ratio is broad strength and a
+falling ratio is narrow. It is a different instrument rather than another
+transformation of `SPY`'s own price, which is what `CLR-010` requires.
+
+Three properties are deliberate. Sessions pair **by date, not by position**,
+because the two series can disagree about which days exist and index pairing
+would silently compare different days. Movement inside the noise band emits
+**nothing** rather than a neutral signal, so an unmeasured signal cannot be
+mistaken for a considered one. And breadth is **optional everywhere**: an
+unreadable `RSP` read costs the setup one possible confirmer and never fails a
+decision, because an outage on a second symbol must not halt the strategy on the
+first.
+
+The ten-session window and the ±0.002 band are `PROVISIONAL`. On 28 August
+closes the same series read −0.00034 over ten sessions, −0.00912 over five and
++0.03396 over sixty; the window length changes the answer, which is precisely
+why it needs sensitivity evidence before anyone calls it approved.
 
 A qualified setup requires structure **plus** at least one aligned signal from a
 different family. An opposing signal at strength ≥ 0.70 vetoes the setup outright,

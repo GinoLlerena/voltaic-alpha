@@ -20,12 +20,14 @@ from options_alpha_lab.architecture.contracts import (
 )
 from options_alpha_lab.components import DeterministicSpreadSelector
 from options_alpha_lab.evidence import (
+    PARTICIPATION_SESSIONS,
     Bar,
     build_option_chain,
     build_signals,
     ema,
     parse_bars,
     parse_occ_symbol,
+    participation_signal,
 )
 from options_alpha_lab.providers.alpaca_readonly import (
     EntitlementError,
@@ -200,6 +202,92 @@ class SignalTests(unittest.TestCase):
 
     def test_ema_returns_none_below_its_period(self) -> None:
         self.assertIsNone(ema([Decimal(1), Decimal(2)], 5))
+
+
+class ParticipationBreadthTests(unittest.TestCase):
+    """Breadth, from equal-weight against cap-weight.
+
+    This existed in the committed fixtures for two days before it existed in
+    the live path: `sig-participation-breadth` appeared in every demo snapshot
+    while `build_signals` could not produce one from real data. A judge reading
+    the evidence would have seen a setup confirmed by a signal the running
+    system never generates.
+    """
+
+    def series(self, closes: list[float]) -> list[Bar]:
+        base = date(2026, 1, 1)
+        return [
+            Bar(base + timedelta(days=i), Decimal(str(c)), Decimal(str(c)),
+                Decimal(str(c)), Decimal(str(c)), Decimal("1000000"))
+            for i, c in enumerate(closes)
+        ]
+
+    def test_the_average_stock_keeping_up_reads_as_broadening(self) -> None:
+        n = PARTICIPATION_SESSIONS + 5
+        index = self.series([100.0 + i for i in range(n)])
+        # Equal-weight outruns cap-weight: the move is shared.
+        breadth = self.series([100.0 + i * 1.5 for i in range(n)])
+        signal = participation_signal(index, breadth, AS_OF)
+        assert signal is not None
+        self.assertIs(signal.family, SignalFamily.PARTICIPATION)
+        self.assertIs(signal.direction, Direction.BULLISH)
+        self.assertIn("broadening", signal.summary)
+
+    def test_a_move_carried_by_mega_caps_reads_as_narrowing(self) -> None:
+        n = PARTICIPATION_SESSIONS + 5
+        index = self.series([100.0 + i * 1.5 for i in range(n)])
+        breadth = self.series([100.0 + i * 0.2 for i in range(n)])
+        signal = participation_signal(index, breadth, AS_OF)
+        assert signal is not None
+        self.assertIs(signal.direction, Direction.BEARISH)
+        self.assertIn("narrowing", signal.summary)
+
+    def test_movement_inside_the_noise_band_says_nothing(self) -> None:
+        # An unmeasured signal must not be able to count as a considered one.
+        n = PARTICIPATION_SESSIONS + 5
+        flat = self.series([100.0 + i for i in range(n)])
+        self.assertIsNone(participation_signal(flat, flat, AS_OF))
+
+    def test_it_declines_rather_than_guessing_without_history(self) -> None:
+        short = self.series([100.0, 101.0, 102.0])
+        long = self.series([100.0 + i for i in range(PARTICIPATION_SESSIONS + 5)])
+        self.assertIsNone(participation_signal(long, short, AS_OF))
+        self.assertIsNone(participation_signal(short, long, AS_OF))
+
+    def test_sessions_are_paired_by_date_not_by_position(self) -> None:
+        # The two series can disagree about which days exist - a halt, a late
+        # bar, a provider gap. Pairing by index would compare different days
+        # and report a divergence that never happened.
+        n = PARTICIPATION_SESSIONS + 6
+        index = self.series([100.0 + i for i in range(n)])
+        breadth = self.series([100.0 + i for i in range(n)])
+        gapped = [b for b in breadth if b.session != breadth[3].session]
+        self.assertIsNone(
+            participation_signal(index, gapped, AS_OF),
+            "identical series with one missing day must still read as no divergence",
+        )
+
+    def test_breadth_reaches_the_live_signal_set(self) -> None:
+        # The gap itself: build_signals must be able to emit it.
+        bars = parse_bars(bars_read(rising(120)), as_of=AS_OF, market_open=False)
+        breadth = self.series(
+            [float(b.close) * (1.0 + 0.0006 * i) for i, b in enumerate(bars)]
+        )
+        breadth = [
+            Bar(b.session, b.open, b.high, b.low, c.close, b.volume)
+            for b, c in zip(bars, breadth, strict=False)
+        ]
+        signals = build_signals(bars, Decimal("0.15"), AS_OF, breadth)
+        families = {s.family for s in signals}
+        self.assertIn(SignalFamily.PARTICIPATION, families)
+
+    def test_absent_breadth_costs_a_confirmer_and_never_fails_the_decision(self) -> None:
+        # An outage on a second symbol must not halt the strategy on the first.
+        bars = parse_bars(bars_read(rising(120)), as_of=AS_OF, market_open=False)
+        with_none = build_signals(bars, Decimal("0.15"), AS_OF, None)
+        with_empty = build_signals(bars, Decimal("0.15"), AS_OF, [])
+        self.assertEqual([s.signal_id for s in with_none], [s.signal_id for s in with_empty])
+        self.assertTrue(any(s.family is SignalFamily.STRUCTURE for s in with_none))
 
 
 class SelectorPolicyTests(unittest.TestCase):

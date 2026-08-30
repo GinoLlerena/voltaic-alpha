@@ -45,6 +45,14 @@ RETEST_TOLERANCE = Decimal("0.010")
 MIN_EMA_SEPARATION = Decimal("0.002")
 MOMENTUM_SHORT_SESSIONS = 5
 MOMENTUM_LONG_SESSIONS = 20
+#: Participation breadth, measured as equal-weight against cap-weight. SPY is
+#: cap-weighted and RSP holds the same 500 companies equally, so the ratio
+#: between them answers "is the average stock participating, or are a handful of
+#: mega-caps carrying this?" - which is what breadth means. It is a different
+#: instrument rather than another transformation of SPY's own price (`CLR-010`).
+PARTICIPATION_SYMBOL = "RSP"
+PARTICIPATION_SESSIONS = 10
+MIN_PARTICIPATION_DIVERGENCE = Decimal("0.002")
 CALM_ATM_IV = Decimal("0.22")
 STRESSED_ATM_IV = Decimal("0.32")
 MIN_BARS_REQUIRED = SLOW_EMA + MOMENTUM_LONG_SESSIONS
@@ -135,7 +143,79 @@ def _clamp(value: Decimal) -> Decimal:
     return max(Decimal("0"), min(Decimal("1"), value)).quantize(Decimal("0.01"))
 
 
-def build_signals(bars: list[Bar], atm_iv: Decimal | None, as_of: datetime) -> list[Signal]:
+def participation_signal(
+    bars: list[Bar],
+    participation_bars: list[Bar],
+    as_of: datetime,
+) -> Signal | None:
+    """Breadth from equal-weight against cap-weight. ``None`` when unmeasurable.
+
+    A rising RSP/SPY ratio means the average constituent is keeping up with or
+    beating the index, so the move is broad. A falling ratio means it is
+    concentrated in a shrinking group of large names. The signal reports what
+    breadth says; whether that confirms or contradicts is the classifier's
+    decision, not this function's.
+
+    Returns ``None`` rather than a neutral signal when breadth cannot be
+    measured: an absent confirmation must not be mistaken for a measured one.
+    """
+    if len(bars) <= PARTICIPATION_SESSIONS or len(participation_bars) <= PARTICIPATION_SESSIONS:
+        return None
+
+    # Align on session, not position. The two series can disagree about which
+    # days exist - a halt, a late bar, a provider gap - and pairing by index
+    # would then silently compare different days.
+    by_session = {bar.session: bar.close for bar in participation_bars}
+    paired = [
+        (bar.close, by_session[bar.session]) for bar in bars if bar.session in by_session
+    ]
+    if len(paired) <= PARTICIPATION_SESSIONS:
+        return None
+
+    index_now, breadth_now = paired[-1]
+    index_then, breadth_then = paired[-1 - PARTICIPATION_SESSIONS]
+    if index_now <= 0 or index_then <= 0 or breadth_then <= 0:
+        return None
+
+    ratio_now = breadth_now / index_now
+    ratio_then = breadth_then / index_then
+    change = (ratio_now - ratio_then) / ratio_then
+    if abs(change) < MIN_PARTICIPATION_DIVERGENCE:
+        # Inside the noise band. Saying nothing is honest; emitting "neutral"
+        # would let an unmeasured signal count as a considered one.
+        return None
+
+    broadening = change > 0
+    carried = (
+        "shared by the average constituent"
+        if broadening
+        else "carried by a shrinking group of large names"
+    )
+    return Signal(
+        signal_id="sig-participation-breadth",
+        family=SignalFamily.PARTICIPATION,
+        direction=Direction.BULLISH if broadening else Direction.BEARISH,
+        strength=_clamp(Decimal("0.50") + abs(change) * Decimal("25")),
+        as_of=as_of,
+        source=(
+            f"alpaca:daily_bars:{PARTICIPATION_SYMBOL}_vs_index_"
+            f"{PARTICIPATION_SESSIONS}_session_ratio"
+        ),
+        summary=(
+            f"Equal-weight {PARTICIPATION_SYMBOL} has moved {change:+.4f} against the "
+            f"cap-weighted index over {PARTICIPATION_SESSIONS} completed sessions, so "
+            f"participation is {'broadening' if broadening else 'narrowing'}: the move is "
+            f"{carried}."
+        ),
+    )
+
+
+def build_signals(
+    bars: list[Bar],
+    atm_iv: Decimal | None,
+    as_of: datetime,
+    participation_bars: list[Bar] | None = None,
+) -> list[Signal]:
     """Derive the H0 signal set. Returns ``[]`` when structure does not qualify."""
     if len(bars) < MIN_BARS_REQUIRED:
         return []
@@ -225,6 +305,14 @@ def build_signals(bars: list[Bar], atm_iv: Decimal | None, as_of: datetime) -> l
                     ),
                 )
             )
+
+    # Participation breadth. Emitted whether it agrees or not: the classifier
+    # needs confirmation from a different family to qualify a setup, and it
+    # needs contradictions to veto one. Breadth can supply either.
+    if participation_bars:
+        breadth = participation_signal(bars, participation_bars, as_of)
+        if breadth is not None:
+            signals.append(breadth)
 
     # Explicit counter-evidence: short-horizon momentum against the trend.
     if len(closes) > MOMENTUM_LONG_SESSIONS:
@@ -326,6 +414,7 @@ def build_snapshot(
     clock_read: ProviderRead,
     bars_read: ProviderRead,
     chain_read: ProviderRead,
+    participation_read: ProviderRead | None = None,
     as_of: datetime | None = None,
 ) -> DecisionSnapshot:
     """Assemble the production snapshot, recording every data-quality finding."""
@@ -386,7 +475,21 @@ def build_snapshot(
     if chain_stale and not quotes:
         stale.extend(chain_stale[:5])
 
-    signals = build_signals(bars, atm_iv, now) if not missing else []
+    # Breadth is optional by design: it must never be able to fail a decision
+    # that would otherwise be sound. A missing or broken participation read
+    # costs the setup one possible confirmer, which is a smaller harm than an
+    # outage on a second symbol halting the strategy.
+    participation_bars: list[Bar] = []
+    if participation_read is not None:
+        try:
+            participation_bars = parse_bars(
+                participation_read, as_of=now, market_open=market_open
+            )
+        except EvidenceError:
+            errors.append(f"{PARTICIPATION_SYMBOL.lower()}:bars_unreadable")
+    signals = (
+        build_signals(bars, atm_iv, now, participation_bars) if not missing else []
+    )
 
     return DecisionSnapshot(
         snapshot_id=snapshot_id,
