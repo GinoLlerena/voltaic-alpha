@@ -23,7 +23,7 @@ STREAMLIT_PORT=8501
 PUBLIC_PORT=80
 
 APPLY=0
-PHASES="preflight eip start code migrate port80 verify"
+PHASES="preflight eip start code migrate ops port80 verify"
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1 ;;
@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     -h|--help)
       sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
       echo; echo "usage: $0 [--apply] [--only \"phase phase\"]"
-      echo "phases: preflight eip start code migrate port80 verify"
+      echo "phases: preflight eip start code migrate ops port80 verify"
       exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -296,6 +296,76 @@ AL current
 systemctl start options-alpha-worker
 sleep 8
 systemctl is-active options-alpha-worker'
+fi
+
+# --- ops: backup and watchdog timers -----------------------------------------
+if wants ops; then
+  say "4b. Install the backup and watchdog timers"
+  # EXIT-AC-16. Both are oneshot units driven by timers rather than daemons, so
+  # a crash is a failed run that systemd records rather than a monitor that
+  # silently stopped being one.
+  # `src` as well as `scripts`: the watchdog is a module in the package, so the
+  # timer would install cleanly and then fail on every run with no such module.
+  ship "$WORKER" src scripts
+  remote "$WORKER" 'set -euo pipefail
+install -d -m 700 -o postgres -g postgres /var/backups/options-alpha
+install -d -m 755 /var/run/options-alpha
+chmod +x /opt/options-alpha/scripts/backup_database.sh
+
+cat > /etc/systemd/system/options-alpha-backup.service <<"UNIT"
+[Unit]
+Description=Options Alpha database backup, verified by restoring it
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/options-alpha/scripts/backup_database.sh
+# The dump is a full copy of the decision record, so it stays on the host and
+# readable only by root. Shipping it anywhere is a separate decision.
+UMask=0077
+UNIT
+
+cat > /etc/systemd/system/options-alpha-backup.timer <<"UNIT"
+[Unit]
+Description=Hourly verified backup of the Options Alpha database
+
+[Timer]
+OnCalendar=hourly
+# Run a missed backup after a reboot rather than waiting for the next hour.
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+cat > /etc/systemd/system/options-alpha-watchdog.service <<"UNIT"
+[Unit]
+Description=Check that the Options Alpha worker is still working
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/options-alpha.env
+WorkingDirectory=/opt/options-alpha
+ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.watchdog --record
+UNIT
+
+cat > /etc/systemd/system/options-alpha-watchdog.timer <<"UNIT"
+[Unit]
+Description=Run the Options Alpha watchdog every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now options-alpha-backup.timer options-alpha-watchdog.timer
+systemctl list-timers --no-pager options-alpha-\* | head -5'
 fi
 
 # --- port 80 -----------------------------------------------------------------

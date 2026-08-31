@@ -41,8 +41,11 @@ a convenience change. That would expand the host from public evidence viewer to
 broker authority and invalidate its current security claim. The worker exists
 precisely so that this does not have to happen.
 
-Autonomous Paper *entry* remains disabled. The separate worker boundary now
-exists, and the entry preconditions stand as follows:
+Autonomous Paper *entry* was **armed on 30 August 2026** on the owner's
+instruction, to produce live decision evidence for the demonstration. It was
+not armed because these preconditions were met; two of them were open at the
+time, and the distinction is recorded rather than smoothed over (`EV-028`). The
+preconditions now stand as follows:
 
 | # | Precondition | Status |
 |---|---|---|
@@ -51,14 +54,15 @@ exists, and the entry preconditions stand as follows:
 | 3 | One database-backed worker lease and an authoritative market calendar | Met - lease with heartbeat/TTL (section 7.2); calendar-derived entry window |
 | 4 | Startup reconciliation before the decision loop, plus periodic reconciliation while any order or exposure exists | Met - `startup()` precedes any new risk; reconciliation opens every strategy tick, every position-clock pass while exposure exists, and every order-clock pass while a mutation is outstanding |
 | 5 | Durable pending/partial/open/closing/flat states based on actual fills | Met - acceptance is `SUBMITTED`, never `FILLED`; state comes from reconciled fills |
-| 6 | Health checks and alerts for broker/local mismatch, stale reconciliation, database failure, worker death, and an unmanaged position | Partial - health JSON and durable incidents exist; there is no alerting |
-| 7 | Backup, restore, forced-restart, credential-rotation, and rollback evidence | Partial - forced restart and migration rollback are evidenced; backup and restore are not (section 7.7) |
+| 6 | Health checks and alerts for broker/local mismatch, stale reconciliation, database failure, worker death, and an unmanaged position | Met - `options_alpha_lab.watchdog` on a five-minute timer, raising a durable incident the dashboard renders (section 10). One qualification, stated plainly: with no webhook configured this detects and records but pages nobody |
+| 7 | Backup, restore, forced-restart, credential-rotation, and rollback evidence | Met for backup, restore, forced restart and rollback - hourly dumps, each proved by restoring it (section 10); forced restart and migration rollback evidenced in sections 7.4 and 7.6. Credential rotation is still undocumented |
 
-Two further conditions are policy rather than plumbing, and neither is met:
-exit thresholds are still `PROVISIONAL` without sensitivity evidence, and
-`DEC-008` is open. **Until 6 and 7 close and `DEC-008` is answered, entry stays
-disabled.** The switch is deliberately two steps - `--mode paper_execute` plus
-`--approve` - so that it cannot be flipped by editing one line.
+Two further conditions are policy rather than plumbing. Exit thresholds are
+still `PROVISIONAL` without sensitivity evidence and `DEC-008` is open, so
+**`G2` is not passed for autonomous entry even now that 6 and 7 are closed**.
+Entry is nevertheless armed, deliberately and on instruction. The switch is
+still two steps - `--mode paper_execute` plus `--approve` - so it cannot be
+flipped by editing one line, and `scripts/disarm_worker.sh` reverses it.
 
 The public dashboard reads the worker's database through a `SELECT`-only role
 and holds no broker-write credential and no control actions (section 7.3).
@@ -422,3 +426,100 @@ The rows it writes identify themselves: their snapshot ids are the committed
 fixture ids (`spy-qualified-2026-08-27`), not the `spy-agent-<stamp>` ids the
 live agent mints. A rehearsal trace is a demonstration of the loop, not a record
 of anything that happened, and `rehearsal/` is git-ignored for that reason.
+
+## 10. Backup, restore, and the watchdog (added 31 August 2026)
+
+`EXIT-AC-16` asked for health, alert, backup and rollback evidence. This section
+is the first three; rollback is section 7.6.
+
+### 10.1 A dump is not a backup until it has been restored
+
+`scripts/backup_database.sh` runs hourly under `options-alpha-backup.timer`. It
+dumps, and then **restores what it just dumped into a scratch database** and
+checks the result before it will report success:
+
+- `pg_restore` completes without error;
+- the restored copy has the same number of tables as the source;
+- `alembic_version` in the copy matches the source, so the dump is not from a
+  schema nobody can run;
+- every table's row count is `0 < restored <= source`. The source is live - the
+  worker keeps ticking through the backup - so a restored count may legitimately
+  lag, but it must never exceed the source and a table with rows must not come
+  back empty. That catches a truncated restore without asserting a consistency
+  the dump never claimed.
+
+The scratch database is dropped on the way out, including on failure: a
+half-restored copy of production sitting on the same server is its own hazard.
+Anything that fails writes `verified: false` with the reason and exits non-zero.
+
+Dumps live in `/var/backups/options-alpha`, mode 700, owned by `postgres`,
+each file 600. Forty-eight are kept, which is two days at hourly.
+
+The job authenticates as `postgres` over local peer auth, **not** as the
+application role. Verifying a restore means creating a database; the application
+role deliberately has neither superuser nor `CREATEDB`, and it stays that way.
+
+Nothing ships the dump off the host. That is a deliberate limit, not an
+oversight: the dump is a complete copy of the decision record, and moving it
+somewhere is a separate decision with its own exposure.
+
+### 10.2 Restoring for real
+
+The hourly job proves restorability. This is the procedure for actually using it:
+
+```bash
+systemctl stop options-alpha-worker            # single writer: stop it first
+ls -lt /var/backups/options-alpha/             # pick a dump
+sudo -u postgres createdb options_alpha_new
+sudo -u postgres pg_restore --no-owner --no-privileges \
+  -d options_alpha_new /var/backups/options-alpha/<dump>
+sudo -u postgres psql -d options_alpha_new -c 'select version_num from alembic_version'
+# swap only once the copy has been looked at
+sudo -u postgres psql -c 'alter database options_alpha rename to options_alpha_old'
+sudo -u postgres psql -c 'alter database options_alpha_new rename to options_alpha'
+systemctl start options-alpha-worker           # startup reconcile runs before any new risk
+```
+
+The worker is stopped first because it is the single writer, and started last
+because `startup()` reconciles against the broker before it will open anything -
+which is exactly what you want after restoring a database that may be behind
+the broker's view of the world. The old database is renamed, never dropped.
+
+### 10.3 The watchdog
+
+`options_alpha_lab.watchdog` runs every five minutes under
+`options-alpha-watchdog.timer` and checks eight things: the health file is
+readable; the last tick is under 900 seconds old; the worker records no error;
+it has not lost its lease; the last backup is verified and under 2.2 hours old;
+the database is readable; the lease row is present, unreleased and unexpired;
+and nothing else has an unresolved incident.
+
+Every check **fails closed**. Anything it cannot read is a failure, never a
+pass - a monitor that reports "no incidents found" when the database is
+unreachable would have reported a healthy worker straight through the 30 August
+crash loop.
+
+It checks the *backup* as well as the worker, because a dump job that quietly
+stopped is precisely the failure nobody notices until they need the dump.
+
+With `--record` it opens a durable `worker_unhealthy` incident, which the
+dashboard renders in its annunciator and its open-incidents panel. It owns both
+ends of that alarm: it resolves the incident once the checks pass again, and it
+excludes its own kind from the incident check - otherwise one transient failure
+would latch it into permanent failure, its own alarm tripping the alarm.
+
+Exit status is the machine-readable form: 0 healthy, 1 not, so a failed run is
+recorded by systemd whether or not the database was reachable.
+
+### 10.4 What this still does not do
+
+**Nothing pages anyone.** Set `WATCHDOG_WEBHOOK_URL` in `/etc/options-alpha.env`
+to post failures to an endpoint; it is unset, so today this is monitoring rather
+than alerting. Only `http`/`https` are accepted - the URL comes from the
+environment, and a `file:` scheme handed to `urlopen` would turn an alerting
+hook into an arbitrary-read primitive on the one host holding the broker
+credentials.
+
+Backups are local to the worker. Losing the instance loses them with it.
+
+Credential rotation is still undocumented, so precondition 7 is not wholly met.
