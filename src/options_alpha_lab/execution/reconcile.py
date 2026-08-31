@@ -97,6 +97,22 @@ def _expected_exposure(position: ManagedPosition) -> dict[str, int]:
     return {position.long_symbol: quantity, position.short_symbol: -quantity}
 
 
+def _consume(remaining: dict[str, int], claimed: dict[str, int]) -> None:
+    """Deduct exposure a position accounts for, so nothing is counted twice.
+
+    Only same-signed exposure is consumed and never past zero: a long leg
+    cannot cancel out a short one, and claiming more than the broker holds
+    would hide exposure rather than explain it.
+    """
+    for symbol, quantity in claimed.items():
+        held = remaining.get(symbol, 0)
+        if quantity == 0 or held == 0 or (held > 0) != (quantity > 0):
+            continue
+        remaining[symbol] = held - (
+            min(held, quantity) if held > 0 else max(held, quantity)
+        )
+
+
 def _describe(exposure: dict[str, int]) -> str:
     return ", ".join(f"{symbol} {qty:+d}" for symbol, qty in sorted(exposure.items()))
 
@@ -162,11 +178,24 @@ class Reconciler:
         report.positions_checked = len(managed)
         claimed_symbols: set[str] = set()
 
-        for position in managed:
+        # Broker exposure is *claimed*, not merely matched. Two positions can
+        # carry the identical contracts - abandon an entry that never filled,
+        # re-enter the same spread minutes later, and both rows name the same
+        # two legs - so judging each position against the same untouched map
+        # attributes the live position's exposure to the dead one as well and
+        # reports a late fill that never happened. Live positions are therefore
+        # settled first and their exposure is deducted; an abandoned position
+        # sees only what is genuinely left over.
+        remaining = dict(held)
+        for position in sorted(
+            managed, key=lambda p: p.state is PositionState.ABANDONED
+        ):
             claimed_symbols.update({position.long_symbol, position.short_symbol})
             self._reconcile_one(
-                position, held, working_by_client_id, report, run_id, stamp
+                position, remaining, working_by_client_id, report, run_id, stamp
             )
+            if position.state is not PositionState.ABANDONED:
+                _consume(remaining, _expected_exposure(position))
 
         # Exposure the broker reports that no local record claims.
         unexpected = sorted(

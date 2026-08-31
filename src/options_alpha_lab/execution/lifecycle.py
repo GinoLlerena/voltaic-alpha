@@ -801,24 +801,51 @@ class LifecycleStore:
         position_id: str | None = None, run_id: str | None = None,
         now: datetime | None = None,
     ) -> str:
-        """Record a durable incident. A console line is not an incident."""
+        """Record a durable incident. A console line is not an incident.
+
+        Idempotent on an unresolved incident with the same kind, position and
+        detail. Reconciliation runs on a clock, so a condition it cannot fix by
+        itself is re-observed every cycle; inserting a row each time turns one
+        open problem into a page of identical rows and buries whatever else is
+        open. The existing incident's id is returned instead, so it stays a
+        single durable item until something resolves it.
+        """
         incident_id = _new_id()
         with self._session() as session:
-            session.add(
-                Incident(
-                    id=incident_id,
-                    run_id=run_id,
-                    position_id=position_id,
-                    kind=kind,
-                    severity=severity,
-                    detail=detail,
-                    execution_state=execution_state.value,
-                    opened_at=now or datetime.now(UTC),
+            existing = session.scalar(
+                select(Incident.id).where(
+                    Incident.resolved_at.is_(None),
+                    Incident.kind == kind,
+                    Incident.detail == detail,
+                    Incident.position_id.is_(None)
+                    if position_id is None
+                    else Incident.position_id == position_id,
                 )
             )
+            if existing is None:
+                session.add(
+                    Incident(
+                        id=incident_id,
+                        run_id=run_id,
+                        position_id=position_id,
+                        kind=kind,
+                        severity=severity,
+                        detail=detail,
+                        execution_state=execution_state.value,
+                        opened_at=now or datetime.now(UTC),
+                    )
+                )
+            else:
+                incident_id = existing
             # Only a halting incident moves the position into INCIDENT. An
             # informational one (a partial fill, a close that needs retrying)
             # records the fact without overwriting a state that is still correct.
+            #
+            # This runs whether or not the row was new. Suppressing the
+            # duplicate row must not also suppress the state transition: a
+            # condition healed at the top of a tick and re-observed at the
+            # bottom has to be marked again, or deduplicating the record would
+            # quietly leave the position looking healthy.
             if position_id is not None and execution_state is not ExecutionState.NORMAL:
                 position = session.get(Position, position_id)
                 if position is not None and position.lifecycle_status not in {

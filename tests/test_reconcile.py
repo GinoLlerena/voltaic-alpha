@@ -29,7 +29,7 @@ from options_alpha_lab.execution.lifecycle import (
 )
 from options_alpha_lab.execution.reconcile import Reconciler
 from options_alpha_lab.execution.request import prepare_mleg_request
-from options_alpha_lab.persistence.models import Decision, Incident
+from options_alpha_lab.persistence.models import Decision, Incident, Position
 from options_alpha_lab.persistence.repository import build_engine, create_schema
 from options_alpha_lab.replay import replay_paths
 
@@ -37,9 +37,9 @@ NOW = datetime(2026, 8, 28, 15, 30, tzinfo=UTC)
 LONG, SHORT = "SPY260918C00640000", "SPY260918C00645000"
 
 
-def entry_intent(qty: int = 1) -> OrderIntent:
+def entry_intent(qty: int = 1, decision_hash: str = "sha256:x") -> OrderIntent:
     return OrderIntent(
-        decision_hash="sha256:x", strategy=SpreadStrategy.BULL_CALL_DEBIT_SPREAD,
+        decision_hash=decision_hash, strategy=SpreadStrategy.BULL_CALL_DEBIT_SPREAD,
         legs=(IntentLeg(LONG, 1, "buy", "buy_to_open"),
               IntentLeg(SHORT, 1, "sell", "sell_to_open")),
         strategy_quantity=qty, limit_price=Decimal("3.39"),
@@ -126,9 +126,11 @@ class ReconcileCase(unittest.TestCase):
         )
         return order_id, position_id, intent
 
-    def open_position(self) -> tuple[str, OrderIntent]:
-        order_id, position_id, intent = self.prepare()
-        self.store.record_submission(order_id, broker_order_id="brk-1",
+    def open_position(
+        self, intent: OrderIntent | None = None, broker_order_id: str = "brk-1"
+    ) -> tuple[str, OrderIntent]:
+        order_id, position_id, intent = self.prepare(intent)
+        self.store.record_submission(order_id, broker_order_id=broker_order_id,
                                      broker_status="accepted", now=NOW)
         self.store.apply_order_reconciliation(
             order_id, broker_status="filled", filled_quantity=1,
@@ -214,6 +216,167 @@ class MismatchTests(ReconcileCase):
         Reconciler(broker, store).reconcile(now=NOW)
         second = Reconciler(broker, store).reconcile(now=NOW)
         self.assertIs(second.execution_state, ExecutionState.NO_NEW_RISK)
+
+
+class ReentryOnTheSameContractsTests(ReconcileCase):
+    """The 2026-08-31 case: abandon an entry, re-enter the same spread.
+
+    The live worker submitted a SPY 765/775 call debit spread at 09:51 ET, the
+    order never filled, and the deadline cancelled it - so the position went to
+    ABANDONED. It re-entered the identical spread at 11:05 ET and that one
+    filled. Both rows then named the same two contracts, and every reconcile
+    cycle read the live position's legs as evidence that the abandoned order
+    had filled late, raising a false `late_fill_after_terminal` incident once a
+    minute until the table was mostly noise.
+    """
+
+    def abandoned_then_open(self) -> tuple[str, str]:
+        dead_order, dead_position, intent = self.prepare()
+        self.store.record_submission(dead_order, broker_order_id="brk-dead",
+                                     broker_status="accepted", now=NOW)
+        self.store.apply_order_reconciliation(
+            dead_order, broker_status="canceled", filled_quantity=0,
+            filled_avg_price=None, now=NOW,
+        )
+        self.store.apply_entry_outcome(dead_position, state=OrderState.CANCELED,
+                                       filled_quantity=0, avg_debit=None, now=NOW)
+        # A re-entry is a different decision, so it carries a different intent
+        # and a different client order id; the duplicate guard would refuse a
+        # literal resubmission of the same approved authority.
+        live_position, _ = self.open_position(
+            entry_intent(decision_hash="sha256:reentry"), broker_order_id="brk-live"
+        )
+        return dead_position, live_position
+
+    def held_by_the_broker(self) -> FakeBroker:
+        return FakeBroker(positions=[{"symbol": LONG, "qty": "1"},
+                                     {"symbol": SHORT, "qty": "-1"}])
+
+    def test_the_live_position_claims_the_exposure_not_the_abandoned_one(self) -> None:
+        dead_position, live_position = self.abandoned_then_open()
+        report = Reconciler(self.held_by_the_broker(), self.store).reconcile(now=NOW)
+
+        self.assertTrue(report.clean, report.mismatches)
+        self.assertNotIn("late_fill_after_terminal", [i.kind for i in self.incidents()])
+        dead = self.store.get_position(dead_position)
+        live = self.store.get_position(live_position)
+        assert dead is not None and live is not None
+        self.assertIs(dead.state, PositionState.ABANDONED)
+        self.assertIs(live.state, PositionState.OPEN)
+
+    def test_exposure_beyond_what_the_live_position_explains_is_still_reported(self) -> None:
+        """Consuming exposure must not become a way to hide it."""
+        self.abandoned_then_open()
+        broker = FakeBroker(positions=[{"symbol": LONG, "qty": "2"},
+                                       {"symbol": SHORT, "qty": "-2"}])
+        report = Reconciler(broker, self.store).reconcile(now=NOW)
+
+        self.assertFalse(report.clean)
+        self.assertIn("late_fill_after_terminal", [i.kind for i in self.incidents()])
+
+    def test_a_genuine_late_fill_is_still_caught_with_no_live_position(self) -> None:
+        dead_order, dead_position, _ = self.prepare()
+        self.store.record_submission(dead_order, broker_order_id="brk-dead",
+                                     broker_status="accepted", now=NOW)
+        self.store.apply_order_reconciliation(
+            dead_order, broker_status="canceled", filled_quantity=0,
+            filled_avg_price=None, now=NOW,
+        )
+        self.store.apply_entry_outcome(dead_position, state=OrderState.CANCELED,
+                                       filled_quantity=0, avg_debit=None, now=NOW)
+        report = Reconciler(self.held_by_the_broker(), self.store).reconcile(now=NOW)
+
+        self.assertFalse(report.clean)
+        self.assertIn("late_fill_after_terminal", [i.kind for i in self.incidents()])
+
+
+class IncidentsDoNotRepeatTests(ReconcileCase):
+    """One open problem is one incident, however many times it is re-observed.
+
+    Most conditions self-limit because raising an incident moves the position
+    to INCIDENT and it stops being re-examined. A terminal position is the
+    exception - `open_incident` deliberately refuses to overwrite CLOSED or
+    ABANDONED - so a late fill on an abandoned position is re-observed every
+    cycle forever. On 2026-08-31 that produced twelve identical rows in eleven
+    minutes.
+    """
+
+    def abandoned_with_broker_exposure(self) -> FakeBroker:
+        order_id, position_id, _ = self.prepare()
+        self.store.record_submission(order_id, broker_order_id="brk-dead",
+                                     broker_status="accepted", now=NOW)
+        self.store.apply_order_reconciliation(
+            order_id, broker_status="canceled", filled_quantity=0,
+            filled_avg_price=None, now=NOW,
+        )
+        self.store.apply_entry_outcome(position_id, state=OrderState.CANCELED,
+                                       filled_quantity=0, avg_debit=None, now=NOW)
+        return FakeBroker(positions=[{"symbol": LONG, "qty": "1"},
+                                     {"symbol": SHORT, "qty": "-1"}])
+
+    def test_a_condition_re_observed_every_cycle_raises_one_incident(self) -> None:
+        broker = self.abandoned_with_broker_exposure()
+        for _ in range(5):
+            Reconciler(broker, self.store).reconcile(now=NOW)
+
+        late = [i for i in self.incidents() if i.kind == "late_fill_after_terminal"]
+        self.assertEqual(len(late), 1)
+
+    def test_every_cycle_still_reports_the_mismatch(self) -> None:
+        """Deduplicating the record must not quiet the halt."""
+        broker = self.abandoned_with_broker_exposure()
+        for _ in range(3):
+            report = Reconciler(broker, self.store).reconcile(now=NOW)
+            self.assertFalse(report.clean)
+            self.assertIs(report.execution_state, ExecutionState.NO_NEW_RISK)
+
+    def test_deduplicating_the_row_still_re_marks_the_position(self) -> None:
+        """The row is suppressed; the state transition is not.
+
+        A condition can be healed at the top of a tick and re-observed at the
+        bottom. If the duplicate row also swallowed the transition, the position
+        would be left looking healthy while the problem was still open.
+        """
+        position_id, _ = self.open_position()
+        for _ in range(2):
+            self.store.open_incident(
+                kind="position_vanished", detail="same detail",
+                position_id=position_id, now=NOW,
+            )
+            with Session(self.engine) as session:
+                row = session.get(Position, position_id)
+                assert row is not None
+                row.lifecycle_status = PositionState.OPEN.value  # heal
+                session.commit()
+
+        self.store.open_incident(
+            kind="position_vanished", detail="same detail",
+            position_id=position_id, now=NOW,
+        )
+        managed = self.store.get_position(position_id)
+        assert managed is not None
+        self.assertIs(managed.state, PositionState.INCIDENT)
+        self.assertEqual(
+            len([i for i in self.incidents() if i.kind == "position_vanished"]), 1
+        )
+
+    def test_a_resolved_incident_can_be_raised_again(self) -> None:
+        """Deduplication is about an *open* item, not about silencing a recurrence."""
+        broker = self.abandoned_with_broker_exposure()
+        Reconciler(broker, self.store).reconcile(now=NOW)
+        first = [i for i in self.incidents() if i.kind == "late_fill_after_terminal"]
+        self.assertEqual(len(first), 1)
+
+        with Session(self.engine) as session:
+            row = session.get(Incident, first[0].id)
+            assert row is not None
+            row.resolved_at = NOW
+            session.commit()
+
+        Reconciler(broker, self.store).reconcile(now=NOW)
+        self.assertEqual(
+            len([i for i in self.incidents() if i.kind == "late_fill_after_terminal"]), 2
+        )
 
 
 class CloseReconciliationTests(ReconcileCase):
