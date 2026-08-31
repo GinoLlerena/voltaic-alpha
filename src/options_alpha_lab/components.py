@@ -12,7 +12,7 @@ control arm of the Phase 3 ablation and stays in the codebase permanently.
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 
 from .architecture.contracts import (
     DecisionSnapshot,
@@ -40,6 +40,15 @@ MAX_RELATIVE_QUOTE_SPREAD = Decimal("0.25")
 LONG_DELTA_BAND = (Decimal("0.55"), Decimal("0.70"))
 SHORT_DELTA_BAND = (Decimal("0.25"), Decimal("0.40"))
 MAX_DEBIT_TO_WIDTH = Decimal("0.60")
+# Crossing the quoted spread is not the same as being fillable. On
+# 2026-08-31 the indicative feed showed the SPY 765C at 7.72 ask while the
+# contract was trading at 7.80, and the 775C at 2.79 bid while it traded at
+# 2.65. Both errors push the computed debit down, so the entry went out at a
+# 4.93 limit against a real market near 5.15 and sat there until the deadline
+# canceled it. The allowance below prices in the feed's own uncertainty, and
+# it is folded into the debit *before* risk sees it so the approved maximum
+# loss stays an upper bound on what can actually be paid.
+EXECUTION_ALLOWANCE_FRACTION = Decimal("0.5")
 MIN_WIDTH_FRACTION_OF_SPOT = Decimal("0.005")
 RISK_FRACTION_OF_EQUITY = Decimal("0.005")
 CONTRACT_MULTIPLIER = Decimal("100")
@@ -51,6 +60,26 @@ _STRUCTURE_FAMILIES = frozenset({SignalFamily.STRUCTURE})
 
 def _opposite(direction: Direction) -> Direction:
     return Direction.BEARISH if direction is Direction.BULLISH else Direction.BULLISH
+
+
+def crossing_debit(
+    long_leg: OptionQuoteSnapshot, short_leg: OptionQuoteSnapshot
+) -> Decimal:
+    """The debit to assume for a vertical, allowing for quote uncertainty.
+
+    Conservative on both counts: pay the ask on the long leg, take the bid on
+    the short, then add a fraction of each leg's own quoted width. A tight
+    quote contributes almost nothing, so this scales itself down when the feed
+    is trustworthy and up when it is not.
+
+    The proposer and the risk governor both call this, but the governor still
+    recomputes from the quotes rather than trusting the number it was handed.
+    """
+    allowance = (
+        ((long_leg.ask - long_leg.bid) + (short_leg.ask - short_leg.bid))
+        * EXECUTION_ALLOWANCE_FRACTION
+    ).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+    return (long_leg.ask - short_leg.bid) + allowance
 
 
 def _delta_in(quote: OptionQuoteSnapshot, band: tuple[Decimal, Decimal]) -> bool:
@@ -244,12 +273,21 @@ class DeterministicSpreadSelector:
                     # A one-dollar wing on a 771-dollar underlying is noise, not
                     # a structure: the debit swamps the achievable gain.
                     continue
+                # Structural screen on the quoted market: is this spread's
+                # shape worth buying at all? Judged without the execution
+                # allowance, so the same structure is judged the same way
+                # whichever feed is quoting it.
                 # Conservative: pay the ask on the long leg, take the bid on the short.
-                debit = long_leg.ask - short_leg.bid
-                if debit <= 0 or debit >= width:
+                quoted = long_leg.ask - short_leg.bid
+                if quoted <= 0 or quoted >= width:
                     continue
-                ratio = (debit / width).quantize(Decimal("0.0001"))
+                ratio = (quoted / width).quantize(Decimal("0.0001"))
                 if ratio > MAX_DEBIT_TO_WIDTH:
+                    continue
+                # What we are actually prepared to bid, and therefore what risk
+                # must approve.
+                debit = crossing_debit(long_leg, short_leg)
+                if debit >= width:
                     continue
                 # Deterministic ordering: narrowest eligible width first, because
                 # it carries the smallest maximum loss; then the best price paid
@@ -319,7 +357,7 @@ class DeterministicRiskGovernor:
             return self._decision(False, reasons, budget, Decimal("0"), checks)
         checks.append({"check": "legs_present", "passed": True})
 
-        recomputed_debit = long_leg.ask - short_leg.bid
+        recomputed_debit = crossing_debit(long_leg, short_leg)
         recomputed_loss = (recomputed_debit * CONTRACT_MULTIPLIER * spread.quantity).quantize(
             Decimal("0.01")
         )

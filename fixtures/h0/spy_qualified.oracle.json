@@ -9,8 +9,8 @@
   "expected_strategy": "bull_call_debit_spread",
   "expected_long_contract_symbol": "SPY260918C00640000",
   "expected_short_contract_symbol": "SPY260918C00645000",
-  "expected_estimated_debit": "3.00",
-  "expected_calculated_max_loss": "300.00",
+  "expected_estimated_debit": "3.20",
+  "expected_calculated_max_loss": "320.00",
   "expected_risk_budget": "500.00",
   "expected_risk_approved": true,
   "why": [
@@ -20,7 +20,8 @@
     "The 8-DTE and 50-DTE expirations are outside the provisional 14-45 band; the 655 strike is excluded because its quote is too wide.",
     "Long 640 is the only contract with delta inside the 0.55-0.70 long band; 645 and 650 sit inside the 0.25-0.40 short band.",
     "Width 5.00 clears the minimum width floor of 0.5% of spot (3.21). The 640/650 pair is also eligible but is wider, and the narrowest eligible width is preferred because it carries the smallest maximum loss.",
-    "Debit is the conservative 12.60 ask minus the 9.60 bid = 3.00, a debit/width ratio of 0.60 at the limit, so maximum loss is 300.00 against a 500.00 budget at 0.5% of 100000 equity."
+    "Debit is the conservative 12.60 ask minus the 9.60 bid = 3.00, a debit/width ratio of 0.60 at the limit, so the structure clears the screen. Half of each leg's own quoted width is then added as an execution allowance ((0.20 + 0.20) / 2 = 0.20), giving the 3.20 the order is actually bid at and the 320.00 maximum loss risk must approve against a 500.00 budget at 0.5% of 100000 equity.",
+    "The structural debit/width screen reads the quoted market and the allowance does not enter it, so the same spread is judged the same way whichever feed is quoting it; the allowance moves only the price bid and the loss approved."
   ],
   "expected_debit_to_width_ratio": "0.6000"
 }

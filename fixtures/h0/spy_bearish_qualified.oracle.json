@@ -9,8 +9,8 @@
   "expected_strategy": "bear_put_debit_spread",
   "expected_long_contract_symbol": "SPY260918P00620000",
   "expected_short_contract_symbol": "SPY260918P00610000",
-  "expected_estimated_debit": "5.40",
-  "expected_calculated_max_loss": "540.00",
+  "expected_estimated_debit": "5.60",
+  "expected_calculated_max_loss": "560.00",
   "expected_risk_budget": "600.00",
   "expected_risk_approved": true,
   "expected_debit_to_width_ratio": "0.5400",
@@ -21,7 +21,7 @@
     "The 615 put is excluded from both legs: its 0.52 delta falls in the gap between the 0.25-0.40 short band and the 0.55-0.70 long band.",
     "Long 620 put is the only contract inside the long delta band. Short candidates are 610 (0.38) and 605 (0.27), and the short strike must sit below the long strike for a bear put spread.",
     "620/610 is 10.00 wide and 620/605 is 15.00 wide. Both clear the 3.09 minimum width, and the narrowest eligible width is preferred because it carries the smallest maximum loss.",
-    "Debit is the conservative 15.00 ask minus the 9.60 bid = 5.40, a debit/width ratio of 0.54, so maximum loss is 540.00 against a 600.00 budget at 0.5% of 120000 equity.",
+    "Debit is the conservative 15.00 ask minus the 9.60 bid = 5.40, a debit/width ratio of 0.54, which clears the structural screen. Half of each leg's own quoted width is then added as an execution allowance ((0.20 + 0.20) / 2 = 0.20), giving the 5.60 bid and the 560.00 maximum loss against a 600.00 budget at 0.5% of 120000 equity.",
     "The 50-DTE put is outside the 14-45 band."
   ]
 }
