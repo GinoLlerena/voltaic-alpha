@@ -1,19 +1,21 @@
 # Options Alpha Agent
 
-## Multi-Position Scaling Handoff v0.1
+## Multi-Position Scaling Handoff v0.2
 
 *Developer handoff for safely separating multi-position management from
 multi-position entry. This document is not authorization to raise the entry cap.*
 
 | Field | Value |
 |---|---|
-| Version | 0.1.0 |
+| Version | 0.2.0 |
 | Date | 31 August 2026 |
-| Status | Implementation handoff; portfolio-entry policy remains unapproved |
+| Status | Master handoff split into an immediate safety task and post-hackathon portfolio task |
 | Environment | Alpaca Paper only |
 | Current scope | One tradeable underlying (`SPY`), one trend/retest setup, vertical debit spreads |
 | Primary decision | Implement **manage many, enter one** before considering concurrent entry |
 | Review disciplines | Options portfolio risk, trading-systems/backend architecture, quantitative strategy/capacity |
+| Task 1 — now | [Manage Many, Enter One](./options_alpha_multi_position_task_1_manage_many_v0_1.md) |
+| Task 2 — post-hackathon | [Portfolio Evidence and Cap Two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) |
 | Related design | [Trading Design](./options_alpha_trading_design_v0_1.md) |
 | Related lifecycle review | [Exit Policy and Position-Lifecycle Review](./options_alpha_exit_policy_review_v0_1.md) |
 | Requirement tracker | [Requirements Traceability Matrix](./options_alpha_requirements_traceability_v0_1.md) |
@@ -31,8 +33,10 @@ positions for any reason, the runtime reconciles multiple rows but actively valu
 and manages only the first one selected from the database. The next implementation
 target is therefore:
 
-> Reconcile, observe, evaluate, and close every position the system owns, while
-> retaining one open or pending new-entry strategy.
+> Reconcile, observe, evaluate, and close every uniquely attributable position the
+> system owns, while retaining one open or pending new-entry strategy. If broker
+> netting makes local attribution ambiguous, own the aggregate exposure, halt new
+> risk, and require the declared operator recovery path rather than inventing lots.
 
 Concurrent entry may advance only after shadow evidence demonstrates distinct
 blocked opportunities and a deterministic portfolio governor controls aggregate
@@ -45,11 +49,26 @@ and pending risk.
 - Do not allow repeated entries from the same completed-session signal cohort.
 - Do not allow simultaneous strategies with overlapping option contract symbols
   in the first bounded multi-entry release.
+- If inherited, manual, partial, or late-filled exposure creates overlapping live
+  symbols, detect it, enter `NO_NEW_RISK`, retain aggregate ownership, and refuse
+  automatic lot attribution. Preventing new overlap does not remove this recovery
+  requirement.
 - Do not grant offsetting-risk credit between bullish and bearish SPY spreads.
 - Do not introduce one worker per position. Retain one credentialed writer.
 - Do not change policy, thresholds, prompts, or risk limits during a trading
   session.
 - Do not treat Paper profit as evidence of validated alpha.
+
+### 1.2 Two-task delivery split
+
+| Task | When | Objective | Entry authority | Directional effort |
+|---|---|---|---|---:|
+| [Task 1 — Manage Many, Enter One](./options_alpha_multi_position_task_1_manage_many_v0_1.md) | Now | Remove the singular management defect, isolate per-position failures, and fail closed on ambiguous overlap | Unchanged: maximum one open or pending strategy | 3-5 engineer-days |
+| [Task 2 — Portfolio Evidence and Cap Two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) | After the hackathon | Measure whether capacity matters, add portfolio admission and reservations, then run a reversible cap-two Paper canary | Remains one until every Task 2 promotion gate passes | 12-21 engineer-days plus market evidence |
+
+Task 1 is intentionally small: no portfolio-risk schema, no cap-two flag, no general
+lot allocator, and no broad dashboard redesign. Task 2 must not begin by raising the
+cap; it begins with shadow evidence and a portfolio governor.
 
 ## 2. Strongest argument against raising the cap now
 
@@ -95,7 +114,7 @@ It cannot reliably determine which local thesis remains after one unit closes.
 | Clock result | One `TickResult` represents one action | Add a cycle/batch result with per-position outcomes |
 | Entry guard | Any broker order or leg position blocks entry | Retain for now; later replace with a portfolio-admission token |
 | Risk | Candidate-local maximum loss and buying power | Add open, pending, cluster, daily-loss, overlap, and count checks |
-| Reconciliation | Compares each local strategy with aggregate broker symbols | Reconcile aggregate exposure first; prohibit overlap in the first release |
+| Reconciliation | Compares each local strategy with aggregate broker symbols | Task 1 detects inherited overlap and fails closed without inventing attribution; Task 2 adds portfolio admission and keeps new overlapping entries prohibited |
 | Close preparation | Mutates `OPEN` to `CLOSING` without a versioned claim | Add compare-and-set or optimistic versioning |
 | Fill identity | Deduplicates by order, symbol, quantity, and price | Store broker execution/activity identity when available |
 | Worker lease | Heartbeats before a tick and during the wait loop | Prevent lease expiry during a long management batch; add fencing before writes |
@@ -157,7 +176,7 @@ These requirements are prerequisites to multi-position entry, not cleanup after 
 | Partial entry fill | Count confirmed exposure and retain a reservation for the unfilled remainder until cancel is confirmed |
 | `OPEN` | Value, observe, evaluate, and count actual filled exposure |
 | `CLOSING` | Continue valuation and ownership; retain risk and slot until broker-flat reconciliation |
-| `INCIDENT` | Treat exposure as unknown, globally halt new risk, and continue management of every other position |
+| `INCIDENT` | Treat exposure as unknown and globally halt new risk. Reconciliation may heal the row back to a manageable state; if it cannot, record which rules remain decidable, continue every other position, and retain an explicit operator recovery path |
 | `ABANDONED` | Allocate no ordinary slot, but continue late-fill surveillance |
 | `CLOSED` | Release risk only after authoritative broker-flat reconciliation |
 
@@ -166,6 +185,9 @@ These requirements are prerequisites to multi-position entry, not cleanup after 
 - An account-wide integrity failure sets global `NO_NEW_RISK`.
 - A position-specific valuation or reconstruction failure opens a position-linked
   incident and must not suppress management of other positions.
+- An unresolved `INCIDENT` is not silently treated as flat. The cycle records
+  whether exposure is confirmed, possible, or absent; evaluates only rules whose
+  required inputs remain trustworthy; and otherwise escalates to the operator path.
 - Risk reductions are evaluated before any new entry.
 - All positions whose exit rules fire in the same cycle retain the opportunity to
   submit a close. The first result must not terminate the cycle.
@@ -175,6 +197,8 @@ These requirements are prerequisites to multi-position entry, not cleanup after 
 ## 5. Work packages
 
 ### MP-001 — Shadow capacity evidence
+
+**Delivery:** Task 2, after the hackathon.
 
 **Purpose:** establish whether the entry cap blocks material, distinct opportunities.
 
@@ -197,6 +221,8 @@ blocked, how many were duplicates, and what incremental risk each required.
 
 ### MP-002 — Collection-based lifecycle API
 
+**Delivery:** Task 1, now.
+
 Replace singular lifecycle selectors with explicit collections, for example:
 
 ```python
@@ -218,6 +244,8 @@ migration. New code must not call it.
 
 ### MP-003 — Batch position management
 
+**Delivery:** Task 1, now.
+
 - Reconcile once at the start of the cycle.
 - Re-read the complete managed set after reconciliation.
 - Fetch one snapshot per underlying; H0 therefore fetches one SPY snapshot.
@@ -232,6 +260,10 @@ The strategy and position clocks must not create new entries from this method.
 
 ### MP-004 — Aggregate reconciliation
 
+**Delivery:** split. Task 1 detects ambiguous overlapping live symbols, halts new
+risk, retains aggregate ownership, and invokes the operator recovery path. Task 2
+adds portfolio admission and any later lot-allocation design.
+
 Build an aggregate expected-exposure map:
 
 ```text
@@ -245,9 +277,15 @@ lineage may then explain position-level responsibility.
 For the first multi-entry release, reject a candidate if either option symbol is
 already named by a `PENDING`, `OPEN`, `CLOSING`, or unresolved incident position.
 Supporting overlapping symbols requires a separate lot-allocation design and is
-out of scope for the bounded release.
+out of scope for the bounded release. Overlap already present at startup or caused
+by a late fill is not out of scope for detection and safe disposition: do not assign
+the broker's net quantity to a guessed local lot, do not open new risk, and keep the
+aggregate exposure visible until an operator-approved resolution reconciles it.
 
 ### MP-005 — Atomic close ownership and attempts
+
+**Delivery:** Task 2. Task 1 retains the single-writer topology and must measure
+batch duration; it does not introduce another close-submission worker.
 
 - Claim `OPEN -> CLOSING` using a row lock, compare-and-set state transition, or
   optimistic version.
@@ -259,6 +297,8 @@ out of scope for the bounded release.
   to `OPEN` without releasing portfolio risk.
 
 ### MP-006 — Portfolio-risk ledger in shadow mode
+
+**Delivery:** Task 2, after the hackathon.
 
 Introduce either a `risk_reservations` table or an equivalent transactional ledger.
 The portfolio view must expose:
@@ -297,6 +337,8 @@ reference. It must not infer authorization from `len(open_orders) + len(position
 
 ### MP-007 — Signal-cohort uniqueness
 
+**Delivery:** Task 2, before any cap increase.
+
 Add a stable cohort key that does not contain the intraday snapshot ID. For H0 it
 must include at least:
 
@@ -312,6 +354,9 @@ that rule is approved.
 
 ### MP-008 — Lease fencing and fill identity
 
+**Delivery:** Task 2. Task 1 must at minimum prove its worst-case management batch
+stays safely inside the existing lease TTL.
+
 - Heartbeat independently while a management batch is executing, or prove the
   worst-case batch time cannot approach the lease TTL.
 - Add a monotonic lease epoch/fencing token.
@@ -321,6 +366,10 @@ that rule is approved.
 - Do not collapse two genuine same-price, same-quantity fills into one record.
 
 ### MP-009 — Operator and dashboard surfaces
+
+**Delivery:** split. Task 1 adds only batch health, per-position outcomes, and an
+ambiguous-overlap/unmanaged-position alarm. Task 2 adds the portfolio-risk and
+capacity surfaces below.
 
 Add:
 
@@ -341,7 +390,7 @@ has one slot. Replace it with the actual portfolio admission result.
 
 | ID | Scenario | Required result |
 |---|---|---|
-| `MP-AC-01` | Two disjoint `OPEN` spreads; one stop fires and one holds | Both receive persisted marks and decisions; only the first closes |
+| `MP-AC-01` | Two disjoint `OPEN` spreads; one stop fires and one holds | Both receive persisted marks and decisions; only the stop-triggered position closes |
 | `MP-AC-02` | Two exits fire in the same cycle | Both close claims are attempted; neither result suppresses the other |
 | `MP-AC-03` | One close submission fails | Incident is position-linked; other eligible close still proceeds |
 | `MP-AC-04` | One `OPEN` position and one pending order | Exit evaluation and order deadline both run on time |
@@ -357,9 +406,10 @@ has one slot. Replace it with the actual portfolio admission result.
 | `MP-AC-14` | One position cannot be valued | It raises an incident; other positions are still valued and managed |
 | `MP-AC-15` | `NO_NEW_RISK` with several positions | Entries blocked; cancels and reconciled risk-reducing closes remain available |
 | `MP-AC-16` | Dashboard selects a position | Only that position's complete lifecycle lineage is shown |
+| `MP-AC-17` | Two active local rows share an option symbol at startup or after a late fill | Aggregate exposure remains owned, new risk halts, no local lot is invented, all unambiguous positions continue, and the operator recovery path is explicit |
 
-`MP-AC-10`'s qualifier is load-bearing and was added after 31 August 2026, when
-the reconciler was changed so that live positions **claim** broker exposure
+`MP-AC-10`'s qualifier is load-bearing and was added after the 31 August 2026
+reconciliation change in which live positions **claim** broker exposure
 before a terminal one is judged against the residue. An abandoned position whose
 legs are fully explained by a live position now correctly raises nothing, so the
 obvious way to write this scenario — abandon a spread, leave the broker holding
@@ -398,17 +448,18 @@ that total risk should be increased.
 per completed session, and `MP-007` makes one completed-session state one cohort,
 so the maximum rate of cohort accumulation is **one per trading day** — and only
 those days on which a cohort is both otherwise eligible *and* blocked by capacity
-count toward the 30. On 31 August 2026 the live worker qualified on roughly one
-session in one, but produced a position on one of nine intraday scans, so the
-eligible-and-blocked rate is unknown and cannot be assumed high. Thirty blocked
-cohorts across two declared regimes is therefore a **multi-month** collection at
-best, and regime diversity may extend it further, since two regimes cannot be
+count toward the 30. The nine intraday candidates recorded on 31 August 2026 were
+observations of one completed-session state; they do not establish nine cohorts or
+an eligible-and-blocked rate. Thirty blocked cohorts have an absolute theoretical
+minimum of roughly 30 trading days, or six calendar weeks, if every session
+qualifies and is blocked. Realistically the collection will likely take several
+months, and regime diversity may extend it further, since two regimes cannot be
 manufactured on demand.
 
-This dominates the schedule. Section 10 estimates 15-24 engineer-days, which is
-the engineering only; the evidence gate is the larger half and is bounded by the
-market rather than by staffing. Read the two together, or the delivery table
-reads as a quarter of the true elapsed time.
+This dominates the schedule. Section 10 estimates 15-26 engineer-days across both
+tasks, which is the engineering only; the evidence gate is bounded by the market
+rather than by staffing. Read the two together or the delivery table materially
+understates elapsed time to cap-two authorization.
 
 ## 8. Controlled cap-two Paper canary
 
@@ -446,27 +497,26 @@ profitability.
 These cadences are responsibilities, not a demand for market-data streaming or
 online strategy learning.
 
-## 10. Delivery sequence and estimate
+## 10. Two-task delivery sequence and estimate
 
-| Increment | Scope | Directional effort |
+| Task | Included work | Directional effort |
 |---|---|---:|
-| A | `MP-001` shadow capacity records | 1-3 engineer-days |
-| B | `MP-002` to `MP-003`: manage many, enter one | 3-5 engineer-days |
-| C | `MP-004` to `MP-005`: aggregate reconciliation and close ownership | 3-5 engineer-days |
-| D | `MP-006` to `MP-008`: portfolio ledger, cohort guard, fencing and fill identity | 5-8 engineer-days |
-| E | `MP-009`, acceptance matrix, deployment and operator proof | 3-5 engineer-days plus Paper sessions |
+| Task 1 — now | `MP-002`, `MP-003`, inherited-overlap detection from `MP-004`, minimal operational output from `MP-009`, and Gate M1 tests | 3-5 engineer-days |
+| Task 2 — post-hackathon | `MP-001`, remaining `MP-004`, `MP-005` to `MP-008`, full `MP-009`, Gates M2/M3, migration, deployment, and Paper proof | 12-21 engineer-days plus market evidence |
 
-A safe bounded cap-two implementation is approximately **15-24 engineer-days**, plus
-the calendar time required for Paper validation. General multi-underlying operation,
-overlapping contract allocation, or horizontally partitioned workers is a separate
-portfolio-system project, likely measured in multiple additional weeks.
+The combined engineering range is **15-26 engineer-days**. Task 1 is independently
+deployable and does not wait for portfolio policy. Task 2's calendar duration is
+dominated by its evidence gate: an absolute minimum of about six trading weeks for
+30 blocked cohorts and, more plausibly, several months. General multi-underlying
+operation, overlapping contract allocation, or horizontally partitioned workers is
+a separate portfolio-system project measured in additional weeks.
 
 ## 11. Release gates
 
 ### Gate M1 — Manage-many correctness
 
 - all `MP-AC-01` through `MP-AC-06`, `MP-AC-09`, `MP-AC-10`, `MP-AC-14`, and
-  `MP-AC-15` pass;
+  `MP-AC-15`, plus `MP-AC-17`, pass;
 - one entry remains enforced at the agent and gateway;
 - every owned exposure has a recent observation or an open incident;
 - restart reconstruction covers the full active set;
@@ -521,17 +571,15 @@ cluster-risk values remain hypotheses until the owners above approve evidence.
 
 ## 14. Developer start checklist
 
-- [ ] Confirm the deployed worker is disarmed or otherwise safely bounded before
-      lifecycle migrations or clock changes. **This is currently an active
-      blocker, not a formality:** autonomous Paper entry was armed on 30 August
-      2026 and the worker opened and is managing a live SPY vertical on
-      31 August. Run `scripts/disarm_worker.sh` — which stops new risk while
-      continuing to manage open exposure — and confirm the position is flat
-      before changing any lifecycle selector or clock.
+- [ ] Re-verify deployed worker authority and broker exposure immediately before
+      lifecycle or clock changes. At the `EV-034` observation, autonomous Paper
+      entry was armed and the worker held a live SPY vertical; that is historical
+      evidence, not a permanent current-state claim. If still armed, run
+      `scripts/disarm_worker.sh`, which stops new risk while continuing management,
+      and confirm the position is flat before changing lifecycle selectors or clocks.
 - [ ] Add tests that reproduce two simultaneous active positions before refactoring.
-- [ ] Add the simultaneous identical-contract failure test, even though overlap will
-      initially be rejected.
-- [ ] Implement `MP-001` without write authority.
+- [ ] Add the simultaneous identical-contract failure test and assert the Task 1
+      fail-closed/operator disposition, even though Task 2 will reject new overlap.
 - [ ] Replace singular position selection with deterministic collections.
 - [ ] Add batch results and position-specific failure isolation.
 - [ ] Preserve reconcile-before-manage and exits-before-entry.
@@ -553,5 +601,7 @@ collection-based management, aggregate reconciliation, atomic risk reservation,
 signal-cohort uniqueness, failure isolation, lease fencing, portfolio observability,
 and evidence that additional capacity solves a real problem.
 
-The approved implementation direction is **manage many, enter one**. Cap two is a
-later, reversible Paper experiment behind explicit Trading/Risk and evidence gates.
+The approved implementation direction is [Task 1: manage many, enter one](./options_alpha_multi_position_task_1_manage_many_v0_1.md).
+[Task 2: portfolio evidence and cap two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md)
+is post-hackathon work and begins in shadow mode. Cap two remains a later,
+reversible Paper experiment behind explicit Trading/Risk and evidence gates.
