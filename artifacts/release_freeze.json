@@ -2,7 +2,7 @@
   "categories": {
     "code": {
       "app.py": "sha256:297fe7696d07f61c1cd2b329e406187676b234039ae8a0caf246103eed919cbc",
-      "scripts/build_demo_db.py": "sha256:0b6fd5d21a2abb9281367f54e3493f4b47461bb6c127ffad02b38cb696a45702",
+      "scripts/build_demo_db.py": "sha256:3ce62c83bb66c315e5ae017e41c0f426f33c9b3b812269abc336b9504af48b5b",
       "scripts/check_no_write_path.py": "sha256:68b793642499883e7014a50f089a46dfa777988164ebef63fe8c92fe28aa968b",
       "scripts/configure_secrets.py": "sha256:6c70749aa83394d9d2260226948629cd6e1ed450771c275e37a035dd287af4e5",
       "scripts/deploy_worker.sh": "sha256:1790f4bec929d38e6369e459b4063c257da875bb1807e246427bc9d068c8179f",
@@ -12,7 +12,7 @@
       "scripts/restore_hosted_demo.sh": "sha256:620f8c2a7de9d9a5a80322a931dcceecdfe0a791030f8d0b79099f910a28da6a",
       "scripts/run_h0_validation.sh": "sha256:15269f3d9ada84f7c5aff93bde84024e35315f5ead7764dc7274c88ab51054fd",
       "src/options_alpha_lab/__init__.py": "sha256:dbcf1d6180ae5bd78b04786746c7f7735dd043e738aaab2bef618392a30d2e67",
-      "src/options_alpha_lab/ablation.py": "sha256:a21fbd4d7bd63897f7d35858182cb2bd4f28b4bbfddc108ccb8d0edd328871f0",
+      "src/options_alpha_lab/ablation.py": "sha256:25172bdf16d4de7b095d20beedb268a8ccdacd50d14c7e4ab3746460fb764196",
       "src/options_alpha_lab/agent.py": "sha256:73f63ec42930e8108247eccc2a65d4f11d46374132e6c003972232ab9b56f654",
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
       "src/options_alpha_lab/architecture/__init__.py": "sha256:b9ec27fa878d4c68c402434339bad7a35db69868d14fad68ecb67b086b540d1a",
@@ -21,8 +21,8 @@
       "src/options_alpha_lab/architecture/workflow.py": "sha256:00a3651fe2d1e981f8980d7f4325a4e2f9e5bf8f0e17eaf4e8e1448a73e51ada",
       "src/options_alpha_lab/calendar.py": "sha256:4b479ebdcca608f334561c26a456e51b4c1b6b717ac83391cfab83cc116f9508",
       "src/options_alpha_lab/cli.py": "sha256:ea7a1869bc8c8030e105cf32559f560e1cd6ec817ba43c3e54ea5a9c7efbc05a",
-      "src/options_alpha_lab/components.py": "sha256:0c1ed181b1a9055de89fe782a2d43cbfa50436cef5d8fb612dd8dff43403ff17",
-      "src/options_alpha_lab/config.py": "sha256:1fade1426cff2c53d44870a8887365f992f08db532eb3ab5df900137dc737803",
+      "src/options_alpha_lab/components.py": "sha256:732e8462252654a107681e2174ae818a6c8bc33192d408c667cc965060b1ddde",
+      "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
       "src/options_alpha_lab/evidence.py": "sha256:6b69114780b7ecdac1d72221068fe2a8050876691bfda2c7ccd235272fee7881",
       "src/options_alpha_lab/execution/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/execution/deadline.py": "sha256:5df778c8e738a5ccfae0a7a8ba48ac46588036a6eba1a2e15281c8e3b5c492b6",
@@ -63,30 +63,30 @@
     },
     "demo_data": {
       "artifacts/h0_paper_lifecycle.json": "sha256:a09aea77c418e7d53d12ba2db1b6e77274cdfd58d01654245f73c8336713bf4c",
-      "demo/h0_demo.db": "sha256:b8e05dc8a90e72063e7d354b8cd10f63fcb2a54ca67e6de747db1e7859de4dfb",
+      "demo/h0_demo.db": "sha256:aa68d80c1cdedf1eac13941378f4c49e91a0946ed017ec6bad3c890388c5b1cc",
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.manifest.json": "sha256:2710b9e3104a605b6ce6a9e13176500f123940d08564d4d61f37580eae6227c7",
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.snapshot.json": "sha256:ef9595f0454f73dde9099e537530492ff484f4e5509fd135e34298094e729206",
       "fixtures/h0/frozen/spy-live-20260828T153310Z.manifest.json": "sha256:ce436fa73460f9e96a9993a58ef644b8a80b1205eed1f463796e29f699a32cdd",
       "fixtures/h0/frozen/spy-live-20260828T153310Z.snapshot.json": "sha256:c086ac54602bb3dcaccd6487182185ceeeb90c4c63e64f94820e5a168287b462",
-      "fixtures/h0/spy_bearish_qualified.oracle.json": "sha256:73f0781dd322d30bc11ab5d682b31e5c4ef8d1c9b0e9bd996156029408aba24b",
+      "fixtures/h0/spy_bearish_qualified.oracle.json": "sha256:122d772075092c99223fe9fc39a83331867382274ea1b797d0b9847b118edcf2",
       "fixtures/h0/spy_bearish_qualified.snapshot.json": "sha256:fa005d07c391896abd91cd806181a4fb4801b6a740af55566006459684088066",
-      "fixtures/h0/spy_qualified.oracle.json": "sha256:48c67f69970734fc58b12bf880ae5300697c166977a30daeb687b3260f125f87",
+      "fixtures/h0/spy_qualified.oracle.json": "sha256:8a1001e285a6a092ecbf5fd3a76da9141ab4a26fee539c55c22ab5bf754124d5",
       "fixtures/h0/spy_qualified.snapshot.json": "sha256:0c4cf0ce461315429f5163488a2577501b9b62f0c400f794102a8184588061b8",
       "fixtures/h0/spy_refusal.oracle.json": "sha256:1b9a61a13922e1b322dab0ffe9473d5052e377e3acdbe939ebddac17d4dddcc5",
       "fixtures/h0/spy_refusal.snapshot.json": "sha256:de1fa35201e727d86fcf396141283b5b914e708e489b0380cb024f126ccdb994",
       "fixtures/nvda_earnings_bearish.json": "sha256:0cb13eeab2dec55fc74337c0142e7fbe0b73ab80250b91ad1829d028651d6e7f"
     },
     "policy": {
-      "src/options_alpha_lab/components.py": "sha256:0c1ed181b1a9055de89fe782a2d43cbfa50436cef5d8fb612dd8dff43403ff17",
-      "src/options_alpha_lab/config.py": "sha256:1fade1426cff2c53d44870a8887365f992f08db532eb3ab5df900137dc737803",
+      "src/options_alpha_lab/components.py": "sha256:732e8462252654a107681e2174ae818a6c8bc33192d408c667cc965060b1ddde",
+      "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
       "src/options_alpha_lab/evidence.py": "sha256:6b69114780b7ecdac1d72221068fe2a8050876691bfda2c7ccd235272fee7881"
     },
     "prompts": {
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:22d452c4f2ed38405fcb3738ad15f183b3ee3ec0",
-  "freeze_digest": "sha256:25ea78fe1648b7c5d1eb726665d8c889489c7afa25da6935a86f33b2e69e40a8",
-  "frozen_at": "2026-08-31T14:47:43.140797+00:00",
+  "commit": "git:60cdd6a1250b093a46188d70936f2da3d59ba2ae",
+  "freeze_digest": "sha256:eccac5bf9d8f4a645d3cbfe5139268e113a474876577b84b399c9192b7f29f42",
+  "frozen_at": "2026-08-31T15:09:30.161154+00:00",
   "manifest_version": "release_freeze.v1"
 }

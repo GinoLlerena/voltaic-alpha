@@ -50,10 +50,17 @@ MAX_DEBIT_TO_WIDTH = Decimal("0.60")
 # loss stays an upper bound on what can actually be paid.
 EXECUTION_ALLOWANCE_FRACTION = Decimal("0.5")
 MIN_WIDTH_FRACTION_OF_SPOT = Decimal("0.005")
-RISK_FRACTION_OF_EQUITY = Decimal("0.005")
+# Raised from 0.005 on 2026-08-31. At 0.5% the budget was $499.96, and the
+# delta bands put a 14-DTE SPY vertical about 10 points wide at roughly half
+# its width - so the smallest structure the strategy can express cost about
+# the entire budget, and whether a candidate passed came down to quote noise.
+# At 0.75% the 0.60 debit-to-width screen binds first on a 10-wide spread,
+# which is the right order: structure decides, and the budget is a backstop.
+# Still PROVISIONAL and still unapproved. See DEC-010.
+RISK_FRACTION_OF_EQUITY = Decimal("0.0075")
 CONTRACT_MULTIPLIER = Decimal("100")
 
-POLICY_VERSION = "h0-provisional-0"
+POLICY_VERSION = "h0-provisional-1"
 
 _STRUCTURE_FAMILIES = frozenset({SignalFamily.STRUCTURE})
 

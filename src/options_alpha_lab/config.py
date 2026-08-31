@@ -168,6 +168,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
             source, "REQUIRE_OPERATOR_APPROVAL", default="true"
         ),
         database_url=database_url,
-        policy_version=source.get("POLICY_VERSION", "h0-provisional-0").strip(),
+        policy_version=source.get("POLICY_VERSION", "h0-provisional-1").strip(),
         runtime_version=source.get("RUNTIME_VERSION", "0.1.0").strip(),
     )

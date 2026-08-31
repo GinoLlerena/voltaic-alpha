@@ -106,7 +106,7 @@ def run_ablation(
     snapshots: Sequence[DecisionSnapshot],
     synthesizer: BoundedThesisSynthesizer,
     *,
-    policy_version: str = "h0-provisional-0",
+    policy_version: str = "h0-provisional-1",
 ) -> AblationReport:
     report = AblationReport(generated_at=datetime.now(UTC).isoformat(), cases=len(snapshots))
 

@@ -238,7 +238,7 @@ evidence that the mechanism runs, never that the thresholds are right.
 The machinery underneath is sound: broker acceptance is recorded as `SUBMITTED`
 and never as `FILLED`, position state is durable and reconstructed at startup
 from reconciled fills, and it stays bounded to Paper, one strategy at a time,
-0.5% of equity per trade, SPY only, inside a calendar-derived entry window.
+0.75% of equity per trade, SPY only, inside a calendar-derived entry window.
 Disarm with `scripts/disarm_worker.sh`.
 
 `exits.py` contains provisional expiry, missing-value, stop-loss, invalidation,

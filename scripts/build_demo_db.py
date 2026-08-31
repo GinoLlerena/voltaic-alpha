@@ -103,7 +103,7 @@ def main() -> int:
                     client_order_id=leg_data["client_order_id"],
                     legs=leg_data["legs"],
                     desired_limit_price=Decimal(leg_data["limit_price"]),
-                    approval_reference=f"risk:h0-provisional-0:{phase}",
+                    approval_reference=f"risk:h0-provisional-1:{phase}",
                     expires_at=datetime.fromisoformat(receipt["recorded_at"]),
                 )
             )

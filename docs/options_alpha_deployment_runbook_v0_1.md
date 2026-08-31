@@ -171,7 +171,7 @@ What still bounds it, none of which is affected by arming:
 |---|---|
 | Endpoint | Paper only, verified against the client about to be used, not the flag that configured it |
 | Concurrent strategies | 1 |
-| Risk budget per trade | 0.5% of equity ≈ $500 |
+| Risk budget per trade | 0.75% of equity ≈ $750 (raised from 0.5% on 31 August; see `DEC-010`) |
 | Underlying allowlist | SPY |
 | Entry window | 09:45-15:15 ET, calendar-derived |
 | Operator approval | still required; the token is in the drop-in |
