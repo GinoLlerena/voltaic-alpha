@@ -26,6 +26,7 @@ that someone could disagree with it.
 | Clock | `GET /v2/clock` | paper-trading | Determines whether the current session is still forming |
 | Daily bars | `GET /v2/stocks/{symbol}/bars` | `sip` when entitled, else `iex` | `start` is mandatory; without it Alpaca returns only the current session |
 | Option chain | `GET /v1beta1/options/snapshots/{symbol}` | `opra` when entitled, else `indicative` | Pagination exhausted, never truncated |
+| Breadth reference | `GET /v2/stocks/RSP/bars` | same as daily bars | Equal-weight S&P 500, for the participation signal in section 6. A **second instrument**, which is the point (`CLR-010`). Optional: an unreadable read costs one confirmer and never fails a decision |
 
 Entitlement is **discovered at runtime**, not configured. `DEC-006` was resolved
 on 28 August 2026 by direct probe: the account returns
@@ -135,6 +136,33 @@ The minimum-width rule was added after the first live run selected a $1-wide
 spread on a $771 underlying at 63% of width. The pair passed every other check
 and was still a bad structure: the debit swamped the achievable gain.
 
+### 7.1 The price actually bid (normative, added 31 August 2026)
+
+The eligibility table above screens the **structure**, using the quoted crossing
+price `long.ask - short.bid`. That is not the number sent to the broker.
+
+Crossing the quoted spread is not the same as being fillable. On 31 August the
+indicative feed showed the SPY 765 call at 7.72 ask while it was trading at 7.80,
+and the 775 call at 2.79 bid while it traded at 2.65. Both errors push a crossing
+debit *down*, so the computed 4.93 went out against a real market near 5.15 and
+sat unfilled until its deadline cancelled it.
+
+| Quantity | Definition |
+|---|---|
+| Quoted debit | `long.ask - short.bid`. Screens debit/width; **excludes** the allowance |
+| Execution allowance | `0.5 × ((long.ask - long.bid) + (short.ask - short.bid))`, rounded up to the cent |
+| Debit bid, and maximum loss | quoted debit **plus** allowance, `× 100` |
+
+Two properties are deliberate. The allowance is **not** in the debit/width
+screen, so the same structure is judged the same way whichever feed is quoting
+it; and it enters the debit **before** the risk governor recomputes, never as
+padding added to the limit afterwards — a limit above the approved maximum loss
+would breach the budget the governor exists to enforce.
+
+It scales itself to the feed: 0.24 on the wide indicative quotes above, and two
+cents on a tight one, so an account that later signs OPRA pays almost nothing
+for it without a code change. `EXECUTION_ALLOWANCE_FRACTION` is `PROVISIONAL`.
+
 ## 8. Price-only benchmark
 
 The benchmark is deliberately trivial, because a benchmark exists to be hard to
@@ -176,4 +204,7 @@ sizing, eligibility, or execution — is falsified if any of these is ever obser
 4. A spread whose recomputed maximum loss disagrees with the recorded one.
 5. Any order request whose hash does not match its approved intent.
 
-Each has a test. Items 1–4 are enforced today; item 5 arrives with Phase 4.
+Each has a test, and **all five are enforced today**. Item 5 was written when
+Phase 4 was still ahead; the gateway has since refused any request whose hash
+does not match its approved intent (`execution/gateway.py`, covered by
+`tests/test_execution_firewall.py`), for opening and closing orders alike.
