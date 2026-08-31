@@ -70,7 +70,7 @@ stable choice.
 - general multi-underlying management;
 - the full portfolio dashboard.
 
-Task 1 may measure batch duration against the existing lease TTL. If the measured
+Task 1 must measure batch duration against the existing lease TTL. If the measured
 margin is unsafe, stop and move independent heartbeating/fencing forward from Task
 2; do not hide the result by increasing the TTL without analysis.
 
