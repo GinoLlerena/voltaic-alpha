@@ -42,6 +42,21 @@ The store and reconciler already use collections, but `tick()`, `position_clock(
 `active_positions()` has no `ORDER BY`, even that selected row is not a guaranteed
 stable choice.
 
+### 2.1 What the current code actually does with two live rows
+
+Measured against the reconciler as it stands on 31 August 2026, not inferred.
+Two `OPEN` rows naming the same contracts produce two different wrong answers:
+
+| Broker state | Today's result |
+|---|---|
+| `+2/-2` — both lots live, the correct aggregate | `leg_imbalance` raised against the **first** row, which goes to `INCIDENT` and halts new risk. A healthy pair is reported as broken, because one local row is compared against the aggregate broker quantity |
+| `+1/-1` — one lot genuinely closed | The first row silently claims the survivor; the second is declared `position_vanished` and goes to `INCIDENT` |
+
+In the second case the system decides which local lot survived, and it decides
+by unordered database return order, so the same inputs can produce a different
+answer on a different pass. `T1-05` is therefore not hardening against a future
+possibility. It replaces behaviour that is wrong now.
+
 ## 3. Binding scope
 
 ### 3.1 Included now
@@ -127,6 +142,14 @@ Close priority is:
 5. profit capture;
 6. stable position ID as the final tie-breaker.
 
+This ordering is not new. It is `PRECEDENCE` in `options_alpha_lab.exits`,
+which already carries exactly these five triggers in exactly this order and has
+a test asserting it. **Import it; do not restate it.** A second copy of exit
+precedence is a second thing to keep in step, and the watchdog shipped on
+31 August did precisely that with the worker lease name, guessed it wrong, and
+reported a healthy lease-holder as having no lease. Position ID remains the
+final tie-breaker and is the only part `PRECEDENCE` does not supply.
+
 Do not stop after the first `HOLD`, working close, incident, refusal, or submitted
 close.
 
@@ -171,8 +194,26 @@ cycle.
 
 ### T1-05 — Inherited overlapping-contract disposition
 
-Create a symbol-ownership map for all unresolved local rows. If more than one live
-or possibly live local strategy claims the same option symbol:
+Build the symbol-ownership map for all unresolved local rows **before any
+per-position judgement is made**. Ordering matters here more than it looks.
+
+The reconciler already consumes broker exposure position by position: live rows
+are settled first and their expected exposure is deducted, so a terminal row
+sees only the residue. That was added on 31 August to stop an abandoned entry
+being blamed for a live position's legs, and it is correct for the
+terminal-versus-live case. It is **wrong** for two live rows, because consuming
+in sequence silently attributes exposure to whichever row is settled first —
+which is exactly the decision point 5 below forbids, taken before any overlap
+check would run.
+
+So detection cannot simply be added alongside the existing path. For any symbol
+with more than one live or possibly live claimant, the consume-and-compare path
+must be skipped entirely and the aggregate comparison used instead. An
+implementer who adds overlap detection after the per-row loop will find the
+mis-attribution has already happened.
+
+If more than one live or possibly live local strategy claims the same option
+symbol:
 
 1. compare aggregate expected signed quantity with broker net quantity;
 2. retain responsibility for the aggregate exposure;
@@ -216,11 +257,12 @@ Do not build the full portfolio-risk dashboard in this task.
 | `T1-AC-06` | Rows are returned in different database order | The same deterministic evaluations and close priority result |
 | `T1-AC-07` | One position cannot be valued | It raises an incident; other positions remain managed |
 | `T1-AC-08` | `NO_NEW_RISK` with several positions | Entry is refused; eligible closes and cancels remain permitted |
-| `T1-AC-09` | Two active local rows share a symbol | Aggregate exposure remains owned, new risk halts, no lot is invented, and disjoint positions continue |
+| `T1-AC-09` | Two active local rows share a symbol, broker holds the correct aggregate | Aggregate exposure remains owned, new risk halts, disjoint positions continue, and **neither overlapping row changes lifecycle state on the basis of attribution** — today both failures in section 2.1 are exactly such a state change, so asserting the negative is what makes this test bite |
+| `T1-AC-09b` | Two active local rows share a symbol, broker holds one lot fewer | The shortfall is reported against the aggregate; no row is declared vanished and no row is declared the survivor |
 | `T1-AC-10` | Late fill with no live claimant | Exposure is reinstated, incident recorded, and new risk halted |
 | `T1-AC-11` | Unresolved incident may represent exposure | It is never reported flat or silently omitted from cycle health |
 | `T1-AC-12` | Multiple positions exist after Task 1 deployment | Agent and gateway still refuse a second risk-increasing entry |
-| `T1-AC-13` | Worst-case tested management batch | Duration remains inside the approved lease safety margin |
+| `T1-AC-13` | Worst-case tested management batch | Duration stays at or under **30 seconds**, one third of the 90-second `LEASE_TTL`. Measured baseline on 31 August 2026: one position-clock pass takes about 6 seconds including its chain fetch, and the wait loop heartbeats every 20 seconds but **nothing heartbeats during a batch**, which is what the margin is protecting |
 
 ## 7. Deployment and rollback
 
@@ -228,8 +270,13 @@ Before deployment:
 
 1. verify current broker exposure and deployed worker authority;
 2. if the worker is armed, disarm new entries with `scripts/disarm_worker.sh`;
-3. wait for or perform the approved flattening process and confirm broker/local
-   reconciliation;
+3. confirm broker/local reconciliation and that no exposure remains. There is
+   no automated flattening procedure and this document does not invent one: the
+   options are to let the position reach its own exit under the existing policy,
+   or for the operator to close it manually at the broker and let the next
+   reconciliation pass record the result. Closing by hand mid-thesis discards
+   the completed-lifecycle evidence that position was producing, so prefer
+   waiting unless something is actually wrong;
 4. run focused agent, lifecycle, reconciliation, deadline, worker, gateway, health,
    and reporting tests;
 5. run the complete offline validation suite;
