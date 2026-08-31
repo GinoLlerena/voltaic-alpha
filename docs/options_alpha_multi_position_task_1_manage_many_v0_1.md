@@ -264,6 +264,27 @@ Do not build the full portfolio-risk dashboard in this task.
 | `T1-AC-12` | Multiple positions exist after Task 1 deployment | Agent and gateway still refuse a second risk-increasing entry |
 | `T1-AC-13` | Worst-case tested management batch | Duration stays at or under **30 seconds**, one third of the 90-second `LEASE_TTL`. Measured baseline on 31 August 2026: one position-clock pass takes about 6 seconds including its chain fetch, and the wait loop heartbeats every 20 seconds but **nothing heartbeats during a batch**, which is what the margin is protecting |
 
+These exist as `tests/test_task1_acceptance.py`, written before the
+implementation as section 14 of the master handoff asks. Ten carry
+`pytest.mark.xfail(strict=True)` and ten fail today; the marker keeps the suite
+green now and turns the arrival of the behaviour into an `XPASS(strict)`
+failure, which is a demand to delete the marker rather than a pass nobody
+notices.
+
+Four already pass and are pinned so Task 1 cannot regress them while
+rearranging everything around them: `T1-AC-05` (reconciliation already
+reconstructs the whole active set, pending rows included), `T1-AC-08`
+(`NO_NEW_RISK` permits a close; only `FREEZE_ALL_WRITES` blocks one),
+`T1-AC-10` (a late fill with no live claimant is still caught) and `T1-AC-12`
+(the gateway refuses a second entry, stating the cap itself rather than letting
+the caller infer it).
+
+The two overlap tests fail on **behaviour**, not on a missing API: today
+`T1-AC-09` gets `INCIDENT` where it requires `OPEN`, and `T1-AC-09b` finds the
+`position_vanished` it forbids. The other eight fail on
+`TradingAgent.manage_positions` and `TradingAgent.managed_positions` not
+existing, which names the two entry points `T1-01` and `T1-02` must add.
+
 ## 7. Deployment and rollback
 
 Before deployment:
