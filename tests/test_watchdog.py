@@ -20,6 +20,8 @@ from options_alpha_lab.config import load_settings
 from options_alpha_lab.persistence.models import Incident, WorkerLease
 from options_alpha_lab.persistence.repository import build_engine, create_schema
 from options_alpha_lab.watchdog import (
+    DEFAULT_BACKUP_FILE,
+    DEFAULT_HEALTH_FILE,
     MAX_BACKUP_AGE_SECONDS,
     MAX_TICK_AGE_SECONDS,
     WATCHDOG_INCIDENT_KIND,
@@ -278,6 +280,30 @@ class LeaseNameTests(WatchdogCase):
         """
         self.assertNotIn("lease_present", self.failed(self.run_checks()))
         self.assertEqual(DEFAULT_LEASE, "options-alpha-worker")
+
+
+class StatusFileLocationTests(unittest.TestCase):
+    """Regression: the backup status lived inside the worker's RuntimeDirectory.
+
+    `options-alpha-worker.service` declares `RuntimeDirectory=options-alpha`, so
+    systemd deletes `/run/options-alpha` every time that unit stops - taking any
+    file another unit wrote there with it. The hourly backup's status file was
+    one, so every worker restart, including the host's own unattended-upgrade
+    one, produced a "backup is missing" alarm about a backup that was fine.
+
+    State written by one unit must not live inside another unit's lifecycle.
+    """
+
+    def test_the_backup_status_is_not_in_the_workers_runtime_directory(self) -> None:
+        self.assertFalse(
+            DEFAULT_BACKUP_FILE.startswith("/var/run/options-alpha"),
+            "systemd deletes this directory whenever the worker stops",
+        )
+        self.assertFalse(DEFAULT_BACKUP_FILE.startswith("/run/options-alpha"))
+
+    def test_the_health_file_may_stay_there_because_the_worker_owns_it(self) -> None:
+        """The distinction that matters: health *is* the worker's runtime state."""
+        self.assertTrue(DEFAULT_HEALTH_FILE.startswith("/var/run/options-alpha"))
 
 
 class WebhookTests(WatchdogCase):

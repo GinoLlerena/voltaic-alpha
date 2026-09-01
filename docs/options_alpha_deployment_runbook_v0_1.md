@@ -453,7 +453,13 @@ half-restored copy of production sitting on the same server is its own hazard.
 Anything that fails writes `verified: false` with the reason and exits non-zero.
 
 Dumps live in `/var/backups/options-alpha`, mode 700, owned by `postgres`,
-each file 600. Forty-eight are kept, which is two days at hourly.
+each file 600. Forty-eight are kept, which is two days at hourly. The status
+file is `/var/lib/options-alpha/backup.json` and **not** `/run/options-alpha`:
+that directory is the worker unit's `RuntimeDirectory`, so systemd deletes it
+whenever the worker stops, and a status file written by the backup unit was
+being destroyed by an unrelated unit's restart. State written by one unit must
+not live inside another unit's lifecycle. `health.json` stays in `/run` because
+it genuinely is the worker's own runtime state.
 
 The job authenticates as `postgres` over local peer auth, **not** as the
 application role. Verifying a restore means creating a database; the application

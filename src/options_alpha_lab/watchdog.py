@@ -43,7 +43,10 @@ MAX_TICK_AGE_SECONDS = 900
 MAX_BACKUP_AGE_SECONDS = 7800
 
 DEFAULT_HEALTH_FILE = "/var/run/options-alpha/health.json"
-DEFAULT_BACKUP_FILE = "/var/run/options-alpha/backup.json"
+#: Under /var/lib, not /run: /run/options-alpha is the worker unit's
+#: `RuntimeDirectory` and systemd removes it on every worker stop, which
+#: turned each restart into a false "missing backup" alarm.
+DEFAULT_BACKUP_FILE = "/var/lib/options-alpha/backup.json"
 #: The kind this module raises. Excluded from its own incident check: counting
 #: it would mean one transient failure latches the watchdog into permanent
 #: failure, since its own alarm would keep tripping the alarm.

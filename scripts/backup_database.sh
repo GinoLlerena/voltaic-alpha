@@ -18,7 +18,12 @@ set -euo pipefail
 DB="${OPTIONS_ALPHA_DB:-options_alpha}"
 SCRATCH="${DB}_restore_check"
 DIR="${BACKUP_DIR:-/var/backups/options-alpha}"
-STATUS="${BACKUP_STATUS:-/var/run/options-alpha/backup.json}"
+# Deliberately **not** under /run/options-alpha. That directory is the worker
+# unit's `RuntimeDirectory`, so systemd deletes it whenever the worker stops -
+# taking this file with it, and leaving the watchdog to report a missing backup
+# after every restart including the host's own unattended-upgrade one. State
+# written by one unit must not live inside another unit's lifecycle.
+STATUS="${BACKUP_STATUS:-/var/lib/options-alpha/backup.json}"
 KEEP="${BACKUP_KEEP:-48}"
 
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)

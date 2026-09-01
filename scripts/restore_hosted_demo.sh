@@ -310,6 +310,8 @@ if wants ops; then
   remote "$WORKER" 'set -euo pipefail
 install -d -m 700 -o postgres -g postgres /var/backups/options-alpha
 install -d -m 755 /var/run/options-alpha
+# Survives a worker restart; /run/options-alpha does not.
+install -d -m 755 /var/lib/options-alpha
 chmod +x /opt/options-alpha/scripts/backup_database.sh
 
 cat > /etc/systemd/system/options-alpha-backup.service <<"UNIT"
