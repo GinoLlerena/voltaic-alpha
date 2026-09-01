@@ -205,7 +205,9 @@ class DurableAgentCase(unittest.TestCase):
 
         self._tmp = tempfile.TemporaryDirectory()
         db = Path(self._tmp.name) / "agent.db"
-        settings = load_settings(dict(env, DATABASE_URL=f"sqlite+pysqlite:///{db}"))
+        from pgsupport import database_url
+
+        settings = load_settings(dict(env, DATABASE_URL=database_url(db)))
         engine = build_engine(settings)
         create_schema(engine)
         replay_paths([Path("fixtures/h0/spy_qualified.snapshot.json")], settings, create=False)

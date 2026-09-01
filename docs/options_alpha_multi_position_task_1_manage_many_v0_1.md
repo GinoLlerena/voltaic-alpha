@@ -314,7 +314,10 @@ rollback by abandoning a position that only the new code knows how to manage.
 Task 1 is complete only when:
 
 - all `T1-AC-*` tests pass against SQLite and production-shaped PostgreSQL where
-  locking/order behavior matters;
+  locking/order behavior matters. **Done 31 August 2026**: set
+  `OPTIONS_ALPHA_TEST_DATABASE_URL` and every harness takes a fresh database per
+  test; `docker compose up -d db` gives PostgreSQL 16.15, the same point release
+  the worker runs. The whole suite passes on both, with identical counts;
 - every uniquely attributable active position receives a timely persisted mark or
   an explicit incident;
 - ambiguous overlap has the declared fail-closed/operator disposition;

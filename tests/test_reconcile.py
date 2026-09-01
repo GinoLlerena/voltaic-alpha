@@ -32,6 +32,7 @@ from options_alpha_lab.execution.request import prepare_mleg_request
 from options_alpha_lab.persistence.models import Decision, Incident, Position
 from options_alpha_lab.persistence.repository import build_engine, create_schema
 from options_alpha_lab.replay import replay_paths
+from pgsupport import database_url
 
 NOW = datetime(2026, 8, 28, 15, 30, tzinfo=UTC)
 LONG, SHORT = "SPY260918C00640000", "SPY260918C00645000"
@@ -100,7 +101,7 @@ class ReconcileCase(unittest.TestCase):
         self.settings = load_settings({
             "BOT_MODE": "observe", "ALPACA_PAPER_TRADE": "true",
             "ALPACA_TRADING_ENABLED": "false",
-            "DATABASE_URL": f"sqlite+pysqlite:///{db}",
+            "DATABASE_URL": database_url(db),
         })
         self.engine = build_engine(self.settings)
         create_schema(self.engine)
