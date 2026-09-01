@@ -1,0 +1,926 @@
+{
+  "generated_for": "HK-008",
+  "packages_installed": 102,
+  "runtime_packages": 95,
+  "runtime_by_category": {
+    "PERMISSIVE": [
+      "APScheduler 3.11.3",
+      "CacheControl 0.14.4",
+      "Jinja2 3.1.6",
+      "Mako 1.4.1",
+      "MarkupSafe 3.0.3",
+      "PyYAML 6.0.3",
+      "Pygments 2.21.0",
+      "SQLAlchemy 2.0.52",
+      "alembic 1.19.1",
+      "alpaca-py 0.44.0",
+      "altair 6.2.2",
+      "annotated-doc 0.0.5",
+      "annotated-types 0.8.0",
+      "anyio 4.14.2",
+      "ast_serialize 0.8.0",
+      "attrs 26.1.0",
+      "blinker 1.9.0",
+      "boolean.py 5.0",
+      "charset-normalizer 3.5.1",
+      "click 8.5.0",
+      "cyclonedx-python-lib 11.12.0",
+      "defusedxml 0.7.1",
+      "fastapi 0.141.1",
+      "filelock 3.32.4",
+      "greenlet 3.5.5",
+      "h11 0.16.0",
+      "httpcore 1.0.9",
+      "httpcore2 2.12.0",
+      "httptools 0.8.0",
+      "httpx 0.28.1",
+      "httpx2 2.12.0",
+      "idna 3.19",
+      "iniconfig 2.3.0",
+      "itsdangerous 2.2.0",
+      "jiter 0.16.0",
+      "jsonschema 4.26.0",
+      "jsonschema-specifications 2025.9.1",
+      "librt 0.15.0",
+      "license-expression 30.4.4",
+      "markdown-it-py 4.2.0",
+      "mdurl 0.1.2",
+      "msgpack 1.2.2",
+      "mypy_extensions 1.1.0",
+      "narwhals 2.25.0",
+      "numpy 2.5.2",
+      "openai 3.5.0",
+      "options-alpha-agent-lab 0.1.0",
+      "packageurl-python 0.17.6",
+      "packaging 26.3",
+      "pandas 3.0.5",
+      "pillow 12.3.0",
+      "pip 26.2.1",
+      "pip-api 0.0.34",
+      "pip-requirements-parser 32.0.1",
+      "platformdirs 4.11.5",
+      "plotly 7.0.0",
+      "pluggy 1.6.0",
+      "protobuf 7.36.0",
+      "py-serializable 2.1.0",
+      "pyarrow 25.0.1",
+      "pydantic 2.13.4",
+      "pydantic_core 2.46.4",
+      "pydeck 0.9.3",
+      "pyparsing 3.3.2",
+      "python-dateutil 2.9.0.post0",
+      "python-dotenv 1.2.3",
+      "python-json-logger 4.2.0",
+      "python-multipart 0.0.32",
+      "pytz 2026.3.post1",
+      "referencing 0.37.0",
+      "requests 2.34.2",
+      "rich 15.0.0",
+      "rpds-py 2026.6.3",
+      "six 1.17.0",
+      "sniffio 1.3.1",
+      "sortedcontainers 2.4.0",
+      "sseclient-py 1.9.0",
+      "starlette 1.6.0",
+      "streamlit 1.62.0",
+      "toml 0.10.2",
+      "tomli 2.4.1",
+      "tomli_w 1.2.0",
+      "truststore 0.10.4",
+      "typing-inspection 0.4.4",
+      "typing_extensions 4.16.0",
+      "tzlocal 5.4.4",
+      "urllib3 2.7.0",
+      "uvicorn 0.52.4",
+      "uvloop 0.22.1",
+      "watchfiles 1.2.0",
+      "websockets 16.1.1"
+    ],
+    "WEAK_COPYLEFT": [
+      "certifi 2026.7.22",
+      "pathspec 1.1.1",
+      "psycopg 3.3.4",
+      "psycopg-binary 3.3.4"
+    ]
+  },
+  "strong_copyleft_at_runtime": [],
+  "unresolved_at_runtime": [],
+  "packages": [
+    {
+      "name": "alembic",
+      "version": "1.19.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "alpaca-py",
+      "version": "0.44.0",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "altair",
+      "version": "6.2.2",
+      "licence": "BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "annotated-doc",
+      "version": "0.0.5",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "anyio",
+      "version": "4.14.2",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "APScheduler",
+      "version": "3.11.3",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "ast_serialize",
+      "version": "0.8.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "blinker",
+      "version": "1.9.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "boolean.py",
+      "version": "5.0",
+      "licence": "BSD-2-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "CacheControl",
+      "version": "0.14.4",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "licence": "Mozilla Public License 2.0 (MPL 2.0)",
+      "category": "WEAK_COPYLEFT",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "click",
+      "version": "8.5.0",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "coverage",
+      "version": "7.15.4",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "License"
+    },
+    {
+      "name": "cyclonedx-python-lib",
+      "version": "11.12.0",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "defusedxml",
+      "version": "0.7.1",
+      "licence": "Python Software Foundation License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "detect-secrets",
+      "version": "1.5.0",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "Classifier"
+    },
+    {
+      "name": "fastapi",
+      "version": "0.141.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "filelock",
+      "version": "3.32.4",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "greenlet",
+      "version": "3.5.5",
+      "licence": "MIT AND PSF-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "httpcore2",
+      "version": "2.12.0",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "httptools",
+      "version": "0.8.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "licence": "BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "httpx2",
+      "version": "2.12.0",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "idna",
+      "version": "3.19",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "iniconfig",
+      "version": "2.3.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "itsdangerous",
+      "version": "2.2.0",
+      "licence": "BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "Jinja2",
+      "version": "3.1.6",
+      "licence": "BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "jiter",
+      "version": "0.16.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "jsonschema",
+      "version": "4.26.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "jsonschema-specifications",
+      "version": "2025.9.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "librt",
+      "version": "0.15.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "license-expression",
+      "version": "30.4.4",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "Mako",
+      "version": "1.4.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "markdown-it-py",
+      "version": "4.2.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "MarkupSafe",
+      "version": "3.0.3",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "mdurl",
+      "version": "0.1.2",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "msgpack",
+      "version": "1.2.2",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "mypy",
+      "version": "2.3.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "License-Expression"
+    },
+    {
+      "name": "mypy_extensions",
+      "version": "1.1.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "narwhals",
+      "version": "2.25.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.2",
+      "licence": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "openai",
+      "version": "3.5.0",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "options-alpha-agent-lab",
+      "version": "0.1.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "packageurl-python",
+      "version": "0.17.6",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "licence": "Apache-2.0 OR BSD-2-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pandas",
+      "version": "3.0.5",
+      "licence": "BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "pathspec",
+      "version": "1.1.1",
+      "licence": "Mozilla Public License 2.0 (MPL 2.0)",
+      "category": "WEAK_COPYLEFT",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0",
+      "licence": "MIT-CMU",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pip",
+      "version": "26.2.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pip-api",
+      "version": "0.0.34",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "pip-requirements-parser",
+      "version": "32.0.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "pip_audit",
+      "version": "2.10.1",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "Classifier"
+    },
+    {
+      "name": "platformdirs",
+      "version": "4.11.5",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "plotly",
+      "version": "7.0.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pluggy",
+      "version": "1.6.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "protobuf",
+      "version": "7.36.0",
+      "licence": "3-Clause BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "psycopg",
+      "version": "3.3.4",
+      "licence": "LGPL-3.0-only",
+      "category": "WEAK_COPYLEFT",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "psycopg-binary",
+      "version": "3.3.4",
+      "licence": "LGPL-3.0-only",
+      "category": "WEAK_COPYLEFT",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "py-serializable",
+      "version": "2.1.0",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "pyarrow",
+      "version": "25.0.1",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pydantic",
+      "version": "2.13.4",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pydantic_core",
+      "version": "2.46.4",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pydeck",
+      "version": "0.9.3",
+      "licence": "Apache License 2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "Pygments",
+      "version": "2.21.0",
+      "licence": "BSD-2-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.2",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pytest",
+      "version": "9.1.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pytest-asyncio",
+      "version": "1.4.0",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "License-Expression"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "licence": "Apache Software License; BSD License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.3",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "python-json-logger",
+      "version": "4.2.0",
+      "licence": "BSD-2-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.32",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "pytz",
+      "version": "2026.3.post1",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "PyYAML",
+      "version": "6.0.3",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "referencing",
+      "version": "0.37.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "rich",
+      "version": "15.0.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "rpds-py",
+      "version": "2026.6.3",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "ruff",
+      "version": "0.16.5",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": false,
+      "source": "License-Expression"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "sniffio",
+      "version": "1.3.1",
+      "licence": "Apache Software License; MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "sortedcontainers",
+      "version": "2.4.0",
+      "licence": "Apache Software License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "SQLAlchemy",
+      "version": "2.0.52",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "sseclient-py",
+      "version": "1.9.0",
+      "licence": "Apache Software License v2",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License"
+    },
+    {
+      "name": "starlette",
+      "version": "1.6.0",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "streamlit",
+      "version": "1.62.0",
+      "licence": "Apache-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "toml",
+      "version": "0.10.2",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "tomli",
+      "version": "2.4.1",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "tomli_w",
+      "version": "1.2.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "truststore",
+      "version": "0.10.4",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.4",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "typing_extensions",
+      "version": "4.16.0",
+      "licence": "PSF-2.0",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "tzlocal",
+      "version": "5.4.4",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.7.0",
+      "licence": "MIT",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.52.4",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    },
+    {
+      "name": "uvloop",
+      "version": "0.22.1",
+      "licence": "Apache Software License; MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "watchfiles",
+      "version": "1.2.0",
+      "licence": "MIT License",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "Classifier"
+    },
+    {
+      "name": "websockets",
+      "version": "16.1.1",
+      "licence": "BSD-3-Clause",
+      "category": "PERMISSIVE",
+      "runtime": true,
+      "source": "License-Expression"
+    }
+  ]
+}
