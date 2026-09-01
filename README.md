@@ -13,6 +13,26 @@ that. H0 runs on Alpaca Paper only, and no claim is made that the strategy has
 alpha or that the model improves decisions — a `NO_TRADE` refusal and a
 deterministic baseline beating the model are both valid results.
 
+## Disclosures
+
+The same four statements appear here, in the dashboard sidebar, and in the
+submission materials. They are repeated rather than linked because a disclosure
+someone has to navigate to is one they will not read.
+
+- **Alpaca Paper only.** No live endpoint exists in this build, and the gateway
+  refuses any resolved endpoint that is not the Paper host — checked against the
+  client about to be used, not the flag that configured it.
+- **Option quotes come from the `indicative` feed.** The account has no OPRA
+  agreement, so quotes are not trading-quality. On 31 August 2026 that feed
+  showed a contract 8 cents below where it was trading, which is enough to make
+  an order unfillable. Prices here should not be read as executable marks.
+- **No alpha is claimed.** The null hypothesis — that this setup has no
+  advantage over buying and holding SPY after costs — is the project's default
+  assumption and is **not rejected**. The sample is two trades. Any P&L shown is
+  a diagnostic reported with its sample size, never evidence of an edge.
+- **Nothing here is investment advice**, a recommendation, or an offer. It is an
+  engineering demonstration of an execution boundary.
+
 ## Try it
 
 ```bash
