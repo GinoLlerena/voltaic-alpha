@@ -122,7 +122,13 @@ ship() {  # ship <instance-id> <tar-source...> - push files with no inbound port
   # private key this script deliberately does not want.
   local id="$1"; shift
   local payload chunk i=0
-  payload=$(tar --exclude='__pycache__' -czf - "$@" | base64 | tr -d '\n')
+  # COPYFILE_DISABLE stops macOS tar writing AppleDouble `._name` resource
+  # forks into the archive. They are inert on the host - Python will not
+  # import a dotted name - but they litter the package directory with files
+  # that match nothing in the repository, which makes a digest comparison
+  # between local and deployed source disagree for no real reason.
+  payload=$(COPYFILE_DISABLE=1 tar --exclude='__pycache__' --exclude='._*' \
+    -czf - "$@" | base64 | tr -d '\n')
   [ "$APPLY" = 1 ] || { note "would ship $* to $id (${#payload} encoded chars)"; return 0; }
   note "shipping $* to $id (${#payload} encoded chars)"
   while [ -n "$payload" ]; do
