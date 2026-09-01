@@ -97,6 +97,45 @@ class TickResult:
 
 
 @dataclass(frozen=True)
+class PositionManagementResult:
+    """What one management cycle did about one position."""
+
+    position_id: str
+    action: str
+    detail: str
+    submitted_order_id: str | None = None
+    incident_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ManagementCycleResult:
+    """What one cycle did about every position it owns.
+
+    A single `last_action` cannot be the evidence of a multi-position cycle: it
+    describes whichever position happened to be last. Every per-position outcome
+    is kept so a cycle that managed three positions can be told from one that
+    managed one and skipped two.
+    """
+
+    at: datetime
+    reconciliation_summary: str
+    positions_seen: int
+    positions_valued: int
+    results: tuple[PositionManagementResult, ...]
+    elapsed_ms: int
+
+    @property
+    def submissions(self) -> tuple[str, ...]:
+        return tuple(
+            r.submitted_order_id for r in self.results if r.submitted_order_id
+        )
+
+    @property
+    def incidents(self) -> tuple[str, ...]:
+        return tuple(r.incident_id for r in self.results if r.incident_id)
+
+
+@dataclass(frozen=True)
 class Observation:
     """What one pass of observation established, whatever produced it.
 
@@ -187,6 +226,12 @@ class TradingAgent:
         self._sessions: list[date] = []
         #: Set by reconciliation. Entries are refused while this is not NORMAL.
         self.execution_state: ExecutionState = ExecutionState.NORMAL
+        #: The `TickResult` each position produced in the last management cycle,
+        #: so a cycle that managed exactly one position can return precisely what
+        #: the single-position path always returned.
+        self._cycle_ticks: dict[str, TickResult] = {}
+        #: The last management cycle, for the worker's health output (T1-06).
+        self.last_cycle: ManagementCycleResult | None = None
         #: Last observation failure seen by the position clock, which stays quiet
         #: about it because the strategy tick is what reports an outage.
         self.last_observation_error: str | None = None
@@ -324,10 +369,16 @@ class TradingAgent:
                 detail = f"reconciled: {report.summary()}"
             return self._record(TickResult(now, "MARKET_CLOSED", detail))
 
-        # Exits before entries, always.
-        managed = self.active_position()
-        if managed is not None:
-            return self._record(self._manage_open_position(managed, snapshot, now))
+        # Exits before entries, always. Every owned position is valued and
+        # acted on, not just the first one the database happened to return: a
+        # second position's stop loss does not care that the first one held.
+        if self.active_position() is not None:
+            cycle = self.manage_positions(
+                report=report, reconciled=True,
+                snapshot=snapshot, market_open=market_open,
+            )
+            self.last_cycle = cycle
+            return self._record(self._result_for(cycle, now, snapshot.snapshot_id))
 
         # An entry already in flight blocks another. active_position() above
         # deliberately ignores PENDING because there is nothing to manage, but a
@@ -433,6 +484,240 @@ class TradingAgent:
         return self._record(result) if result is not None else None
 
     # -- the position clock ------------------------------------------------
+    def managed_positions(self) -> list[ManagedPosition]:
+        """Everything still owed management, in a stable order.
+
+        Plural on purpose. Multiple exposures can exist even when the bot only
+        ever intends to enter one strategy: a cancel can lose a race with a late
+        fill, a partial close can leave a leg, an operator can act at the broker,
+        and a restart can discover exposure created before this process existed.
+        """
+        if self.store is None:
+            return []
+        return list(self.store.active_positions())
+
+    def unresolved_positions(self) -> list[ManagedPosition]:
+        """Every row that still owns the strategy slot, including PENDING."""
+        return [
+            position
+            for position in self.managed_positions()
+            if position.state
+            in {
+                PositionState.PENDING,
+                PositionState.OPEN,
+                PositionState.CLOSING,
+                PositionState.INCIDENT,
+            }
+        ]
+
+    def _close_urgency(
+        self, position: ManagedPosition, snapshot: DecisionSnapshot, now: datetime
+    ) -> int:
+        """Where this position sits in `PRECEDENCE`, for ordering closes.
+
+        Asks what *would* fire without persisting or submitting anything, so the
+        act phase can run most-urgent-first. Anything unanswerable sorts last
+        rather than raising: ordering is a convenience, and a position that
+        cannot be classified still gets managed.
+        """
+        if position.avg_entry_debit is None:
+            return len(PRECEDENCE) + 1
+        try:
+            decision = evaluate_exit(self._exit_inputs(position, snapshot, now))
+        except (ValueError, ProviderError):
+            return len(PRECEDENCE) + 1
+        if not decision.should_close:
+            return len(PRECEDENCE)
+        try:
+            return PRECEDENCE.index(decision.trigger)
+        except ValueError:
+            return len(PRECEDENCE)
+
+    def manage_positions(
+        self,
+        *,
+        report: ReconciliationReport | None = None,
+        reconciled: bool = False,
+        snapshot: DecisionSnapshot | None = None,
+        market_open: bool | None = None,
+    ) -> ManagementCycleResult:
+        """Reconcile once, value every position, and act on each independently.
+
+        The cycle never considers an entry. Exits come before entries everywhere
+        in this agent, and the caller decides afterwards whether a new position
+        is permitted; mixing the two here would let a management pass open risk.
+
+        One position's failure - provider, pricing, reconstruction, persistence
+        or broker - is contained to that position. The first result must not end
+        the cycle, because the second position's stop loss does not care that the
+        first one's close was refused.
+        """
+        import time
+
+        started = time.perf_counter()
+        now = self._clock()
+
+        # Broker responsibility first, then re-read: reconciliation can resolve a
+        # position out from under us, so the set is taken *after* it. A caller
+        # that has already reconciled and observed passes both in, because doing
+        # either twice in one tick is a second broker read and a second chain
+        # read for no new information.
+        self._cycle_ticks = {}
+        if not reconciled:
+            report = self.reconcile()
+        summary = report.summary() if report is not None else "no reconciler"
+        positions = self.managed_positions()
+
+        results: list[PositionManagementResult] = []
+        valuable = [
+            p for p in positions
+            if p.state in {PositionState.OPEN, PositionState.CLOSING}
+        ]
+
+        observe_error: str | None = None
+        if market_open is None:
+            market_open = False
+        if valuable and snapshot is None:
+            # One snapshot for the whole cycle. Every position here is on the
+            # same underlying, and re-reading the chain per position would make
+            # the batch scale with exposure for no added information.
+            try:
+                snapshot, market_open = self.observe()
+            except (ProviderError, ValueError) as exc:
+                observe_error = f"{type(exc).__name__}: {exc}"
+
+        order = {p.position_id: i for i, p in enumerate(positions)}
+        if snapshot is not None and market_open:
+            urgency = {
+                p.position_id: self._close_urgency(p, snapshot, now) for p in valuable
+            }
+            valuable.sort(key=lambda p: (urgency[p.position_id], p.position_id))
+
+        before = {i.incident_id for i in self._open_incident_records()}
+        valued = 0
+        for position in valuable:
+            if snapshot is None or not market_open:
+                results.append(PositionManagementResult(
+                    position.position_id,
+                    "OBSERVE_FAILED" if observe_error else "MARKET_CLOSED",
+                    observe_error or "no valuation while the market is closed",
+                ))
+                continue
+            # Re-read: an earlier close in this same cycle reconciles, which can
+            # change a later position's state.
+            current = self.store.get_position(position.position_id) if self.store else None
+            if current is None or current.state not in {
+                PositionState.OPEN, PositionState.CLOSING
+            }:
+                results.append(PositionManagementResult(
+                    position.position_id, "RESOLVED_MID_CYCLE",
+                    "the position left the managed set earlier in this cycle",
+                ))
+                continue
+            outcome: TickResult | None = None
+            try:
+                outcome = self._manage_open_position(current, snapshot, now)
+                self._cycle_ticks[position.position_id] = outcome
+                valued += 1
+                action, detail, submitted = outcome.action, outcome.detail, outcome.submitted
+                if action in {"EXIT_REFUSED", "EXIT_BLOCKED"} and self.store is not None:
+                    # An exit that fired and did not reach the broker is a
+                    # durable fact, not a log line: the position still holds the
+                    # risk its own policy just voted to shed. `EXIT_REFUSED` also
+                    # covers `AmbiguousSubmission`, where the order may exist and
+                    # nobody knows - the case least safe to leave unrecorded.
+                    self.store.open_incident(
+                        kind="close_submission_failed", severity="high",
+                        detail=f"position {current.position_id}: {action}: {detail}",
+                        position_id=current.position_id, run_id=self.run_id, now=now,
+                    )
+                    self._halt_new_risk()
+            except Exception as exc:  # noqa: BLE001 - contained to this position
+                if self.store is not None:
+                    self.store.open_incident(
+                        kind="position_management_failed", severity="high",
+                        detail=(
+                            f"managing position {position.position_id} raised "
+                            f"{type(exc).__name__}: {exc}"
+                        ),
+                        position_id=position.position_id, run_id=self.run_id, now=now,
+                    )
+                self._halt_new_risk()
+                action = "MANAGEMENT_FAILED"
+                detail = f"{type(exc).__name__}: {exc}"
+                submitted = None
+            results.append(PositionManagementResult(
+                position.position_id, action, detail, submitted,
+                self._incident_since(before, position.position_id),
+            ))
+
+        # Rows that own the slot but hold nothing to value. Reported, never
+        # omitted: a PENDING entry or an unhealed INCIDENT is not a flat book,
+        # and a cycle that silently skipped them would look identical to one
+        # that had nothing to do.
+        for position in positions:
+            if position.state in {PositionState.OPEN, PositionState.CLOSING}:
+                continue
+            results.append(PositionManagementResult(
+                position.position_id,
+                "ENTRY_IN_FLIGHT" if position.state is PositionState.PENDING
+                else f"POSITION_{position.state.value}",
+                f"{position.state.value.lower()}; deadlines and reconciliation still apply",
+                None,
+                self._incident_since(before, position.position_id),
+            ))
+
+        results.sort(key=lambda r: order.get(r.position_id, 0))
+        return ManagementCycleResult(
+            at=now,
+            reconciliation_summary=summary,
+            positions_seen=len(positions),
+            positions_valued=valued,
+            results=tuple(results),
+            elapsed_ms=int((time.perf_counter() - started) * 1000),
+        )
+
+    def _result_for(
+        self, cycle: ManagementCycleResult, now: datetime, snapshot_id: str | None
+    ) -> TickResult:
+        """One tick's answer for a cycle that may have touched several positions.
+
+        With exactly one valued position this returns precisely what the
+        single-position path always returned, down to the exit decision it
+        carries. That is not tidiness: every caller, log line and test that reads
+        a tick keeps working unchanged, so widening management to a set does not
+        quietly rewrite what a one-position tick says.
+
+        With more than one, no single action is the truth, so the summary counts
+        them and the per-position detail lives in the cycle result.
+        """
+        valued = [r for r in cycle.results if r.position_id in self._cycle_ticks]
+        if len(valued) == 1:
+            single = self._cycle_ticks.get(valued[0].position_id)
+            if single is not None:
+                return single
+
+        submitted = len(cycle.submissions)
+        return TickResult(
+            now,
+            "POSITIONS_MANAGED",
+            f"{cycle.positions_valued} of {cycle.positions_seen} position(s) valued; "
+            f"{submitted} close(s) submitted; "
+            + "; ".join(f"{r.position_id[:8]} {r.action}" for r in cycle.results),
+            snapshot_id,
+        )
+
+    def _open_incident_records(self) -> list[Any]:
+        if self.store is None:
+            return []
+        return list(self.store.open_incidents())
+
+    def _incident_since(self, before: set[str], position_id: str) -> str | None:
+        for record in self._open_incident_records():
+            if record.incident_id not in before and record.position_id == position_id:
+                return str(record.incident_id)
+        return None
+
     def position_clock(self) -> TickResult | None:
         """Value and manage an open position between strategy ticks.
 
@@ -457,9 +742,8 @@ class TradingAgent:
         # Broker first, as everywhere else. Reconciliation may resolve the
         # position out from under us - a close that filled, an exposure that
         # vanished - so re-read it rather than managing a stale object.
-        self.reconcile()
-        managed = self.active_position()
-        if managed is None:
+        report = self.reconcile()
+        if self.active_position() is None:
             return None
 
         try:
@@ -475,7 +759,15 @@ class TradingAgent:
             # completed-session rules are judged on the strategy tick.
             return None
 
-        return self._record(self._manage_open_position(managed, snapshot, now))
+        # Every position on this cadence, not the first one found. The whole
+        # point of a sixty-second clock is that a stop is judged on a fresh
+        # mark; a second position valued only on the strategy tick would be
+        # judged on one up to five minutes old.
+        cycle = self.manage_positions(
+            report=report, reconciled=True, snapshot=snapshot, market_open=market_open,
+        )
+        self.last_cycle = cycle
+        return self._record(self._result_for(cycle, now, snapshot.snapshot_id))
 
     def _halt_new_risk(self) -> None:
         """Stop new risk here *and* at the gateway, which is what must refuse."""
@@ -556,6 +848,33 @@ class TradingAgent:
         entry_day = filled_at.astimezone(UTC).date()
         return sum(1 for session in self._sessions if session > entry_day)
 
+    def _exit_inputs(
+        self, position: ManagedPosition, snapshot: DecisionSnapshot, now: datetime
+    ) -> ExitInputs:
+        """The exit policy's inputs for one position. Pure: it persists nothing.
+
+        Extracted so a management cycle can ask what *would* fire, in order to
+        sort closes by urgency, without persisting a mark or submitting anything
+        while it decides the order.
+        """
+        assert position.avg_entry_debit is not None
+        return ExitInputs(
+            direction=position.direction,
+            # The actual reconciled fill, never the estimate.
+            entry_debit=position.avg_entry_debit,
+            width=position.width,
+            quantity=position.filled_quantity,
+            dte=(position.expiration.astimezone(UTC).date() - now.date()).days,
+            underlying_price=snapshot.underlying_price,
+            underlying_source=snapshot.underlying_source,
+            invalidation=position.invalidation,
+            current_value=spread_value(
+                snapshot, position.long_symbol, position.short_symbol
+            ),
+            as_of=now.date(),
+            sessions_elapsed=self.sessions_since(position.entry_filled_at),
+        )
+
     def _manage_open_position(
         self, position: ManagedPosition, snapshot: DecisionSnapshot, now: datetime
     ) -> TickResult:
@@ -574,21 +893,7 @@ class TradingAgent:
                 snapshot.snapshot_id,
             )
 
-        value = spread_value(snapshot, position.long_symbol, position.short_symbol)
-        inputs = ExitInputs(
-            direction=position.direction,
-            # The actual reconciled fill, never the estimate.
-            entry_debit=position.avg_entry_debit,
-            width=position.width,
-            quantity=position.filled_quantity,
-            dte=(position.expiration.astimezone(UTC).date() - now.date()).days,
-            underlying_price=snapshot.underlying_price,
-            underlying_source=snapshot.underlying_source,
-            invalidation=position.invalidation,
-            current_value=value,
-            as_of=now.date(),
-            sessions_elapsed=self.sessions_since(position.entry_filled_at),
-        )
+        inputs = self._exit_inputs(position, snapshot, now)
 
         # The mark is persisted *before* the policy runs, so it exists whether or
         # not the decision that follows does anything, and whether or not the

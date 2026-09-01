@@ -97,6 +97,26 @@ def _expected_exposure(position: ManagedPosition) -> dict[str, int]:
     return {position.long_symbol: quantity, position.short_symbol: -quantity}
 
 
+#: States that may still hold, or come to hold, exposure at the broker.
+LIVE_STATES = frozenset({
+    PositionState.PENDING,
+    PositionState.OPEN,
+    PositionState.CLOSING,
+    PositionState.INCIDENT,
+})
+
+
+def _contested_symbols(managed: list[ManagedPosition]) -> set[str]:
+    """Option symbols claimed by more than one live or possibly live position."""
+    claims: dict[str, int] = {}
+    for position in managed:
+        if position.state not in LIVE_STATES:
+            continue
+        for symbol in {position.long_symbol, position.short_symbol}:
+            claims[symbol] = claims.get(symbol, 0) + 1
+    return {symbol for symbol, owners in claims.items() if owners > 1}
+
+
 def _consume(remaining: dict[str, int], claimed: dict[str, int]) -> None:
     """Deduct exposure a position accounts for, so nothing is counted twice.
 
@@ -187,15 +207,36 @@ class Reconciler:
         # settled first and their exposure is deducted; an abandoned position
         # sees only what is genuinely left over.
         remaining = dict(held)
+
+        # Ownership is established *before* any per-position judgement. Two live
+        # rows naming the same contract cannot be told apart from the broker's
+        # net quantity, and consuming exposure in sequence would silently award
+        # it to whichever row is settled first - a decision made by row order
+        # rather than by evidence. Those rows are held out of the per-position
+        # path entirely and answered in aggregate below.
+        contested = _contested_symbols(managed)
+        held_out = {
+            position.position_id
+            for position in managed
+            if contested & {position.long_symbol, position.short_symbol}
+        }
+
         for position in sorted(
             managed, key=lambda p: p.state is PositionState.ABANDONED
         ):
             claimed_symbols.update({position.long_symbol, position.short_symbol})
+            if position.position_id in held_out:
+                continue
             self._reconcile_one(
                 position, remaining, working_by_client_id, report, run_id, stamp
             )
             if position.state is not PositionState.ABANDONED:
                 _consume(remaining, _expected_exposure(position))
+
+        if contested:
+            self._report_contested(
+                contested, managed, held, report, run_id, stamp
+            )
 
         # Exposure the broker reports that no local record claims.
         unexpected = sorted(
@@ -219,6 +260,62 @@ class Reconciler:
         if report.mismatches:
             report.execution_state = ExecutionState.NO_NEW_RISK
         return report
+
+    def _report_contested(
+        self,
+        contested: set[str],
+        managed: list[ManagedPosition],
+        held: dict[str, int],
+        report: ReconciliationReport,
+        run_id: str | None,
+        stamp: datetime,
+    ) -> None:
+        """Answer contested symbols in aggregate, and name no survivor.
+
+        Deliberately does three things and refuses a fourth. It halts new risk,
+        records one durable incident, and reports the aggregate comparison. It
+        does **not** decide which local lot a broker quantity belongs to, and it
+        does not move any position's lifecycle state - which is why the incident
+        carries no `position_id`: attaching one would flip that row to INCIDENT
+        and so answer, by side effect, the very question this refuses to answer.
+
+        Resolving it needs an operator and a lot-allocation rule that does not
+        exist yet. Until then the exposure stays owned and new risk stays halted.
+        """
+        owners = [
+            position for position in managed
+            if position.state in LIVE_STATES
+            and contested & {position.long_symbol, position.short_symbol}
+        ]
+        expected: dict[str, int] = {}
+        for position in owners:
+            for symbol, quantity in _expected_exposure(position).items():
+                if symbol in contested:
+                    expected[symbol] = expected.get(symbol, 0) + quantity
+        observed = {symbol: held.get(symbol, 0) for symbol in sorted(contested)}
+
+        agrees = observed == {s: q for s, q in expected.items() if s in observed}
+        report.mismatches.append(
+            "contested exposure: "
+            + ", ".join(sorted(contested))
+            + f" claimed by {len(owners)} live positions; "
+            + ("aggregate agrees" if agrees else "aggregate disagrees")
+            + f" (expected {_describe(expected)}; broker {_describe(observed)})"
+        )
+        report.incidents.append(
+            self._store.open_incident(
+                kind="contested_exposure",
+                detail=(
+                    f"{', '.join(sorted(contested))} claimed by "
+                    + ", ".join(sorted(p.position_id for p in owners))
+                    + f"; expected {_describe(expected)}, broker reports "
+                    f"{_describe(observed)}. No lot allocation is attempted and "
+                    "no position state is changed; new risk is halted until an "
+                    "operator resolves the attribution"
+                ),
+                run_id=run_id, now=stamp,
+            )
+        )
 
     def _reconcile_one(
         self,

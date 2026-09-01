@@ -565,7 +565,13 @@ class LifecycleStore:
             states.append(PositionState.ABANDONED.value)
         with self._session() as session:
             rows = session.scalars(
-                select(Position).where(Position.lifecycle_status.in_(states))
+                select(Position)
+                .where(Position.lifecycle_status.in_(states))
+                # A stable base order, so which position gets managed is never
+                # decided by physical row order. Safety priority is chosen
+                # explicitly by the agent on top of this; what this guarantees is
+                # only that the same set comes back the same way twice.
+                .order_by(Position.recorded_at, Position.id)
             ).all()
             return [self._to_managed(row) for row in rows]
 

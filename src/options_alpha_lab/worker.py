@@ -24,6 +24,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -159,6 +160,17 @@ class WorkerHealth:
     #: Valuations taken by the position clock between strategy ticks. A worker
     #: holding a spread should show these climbing; a flat one never will.
     position_clock_actions: int = 0
+    #: The last management cycle, per T1-06. A single `last_action` describes
+    #: whichever position happened to be last, so a worker holding three
+    #: positions and valuing one would look identical to a healthy one.
+    positions_seen: int = 0
+    positions_valued: int = 0
+    unvalued_positions: int = 0
+    oldest_mark_age_seconds: float | None = None
+    close_attempts: int = 0
+    close_failures: int = 0
+    contested_symbol_incidents: int = 0
+    management_batch_ms: int = 0
     last_tick_at: datetime | None = None
     last_action: str | None = None
     last_error: str | None = None
@@ -174,8 +186,37 @@ class WorkerHealth:
             "last_action": self.last_action,
             "last_error": self.last_error,
             "lease_lost": self.lease_lost,
-            "healthy": not self.lease_lost and self.last_error is None,
+            "positions_seen": self.positions_seen,
+            "positions_valued": self.positions_valued,
+            "unvalued_positions": self.unvalued_positions,
+            "oldest_mark_age_seconds": self.oldest_mark_age_seconds,
+            "close_attempts": self.close_attempts,
+            "close_failures": self.close_failures,
+            "contested_symbol_incidents": self.contested_symbol_incidents,
+            "management_batch_ms": self.management_batch_ms,
+            # An owned position nobody valued is the alarm this exists for: it
+            # is indistinguishable from a flat book in every other field.
+            "healthy": (
+                not self.lease_lost
+                and self.last_error is None
+                and self.unvalued_positions == 0
+            ),
         }
+
+    def record_cycle(self, cycle: Any) -> None:
+        """Absorb a `ManagementCycleResult` into the reported health."""
+        self.positions_seen = cycle.positions_seen
+        self.positions_valued = cycle.positions_valued
+        self.unvalued_positions = cycle.positions_seen - cycle.positions_valued
+        self.management_batch_ms = cycle.elapsed_ms
+        self.close_attempts = sum(
+            1 for r in cycle.results if r.action in {
+                "CLOSE_SUBMITTED", "EXIT_REFUSED", "EXIT_BLOCKED"
+            }
+        )
+        self.close_failures = sum(
+            1 for r in cycle.results if r.action in {"EXIT_REFUSED", "EXIT_BLOCKED"}
+        )
 
     def write(self, path: str) -> None:
         import json
@@ -334,6 +375,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         else:
             health.position_clock_actions += 1
         health.last_action = result.action
+        if agent.last_cycle is not None:
+            health.record_cycle(agent.last_cycle)
         print(json.dumps({
             "event": name, "at": result.at.isoformat(),
             "action": result.action, "detail": result.detail,
@@ -375,6 +418,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                 health.last_tick_at = result.at
                 health.last_action = result.action
                 health.last_error = None
+                if agent.last_cycle is not None:
+                    health.record_cycle(agent.last_cycle)
                 print(json.dumps({
                     "event": "tick", "at": result.at.isoformat(), "action": result.action,
                     "detail": result.detail, "snapshot": result.snapshot_id,

@@ -9,7 +9,7 @@ not authorize concurrent entry.*
 |---|---|
 | Version | 0.1.0 |
 | Date | 31 August 2026 |
-| Status | Ready for implementation now |
+| Status | **Implemented 31 August 2026**; not yet deployed (see section 7) |
 | Target | Current hackathon runtime |
 | Directional effort | 3-5 engineer-days |
 | Required entry capacity after delivery | One open or pending strategy |

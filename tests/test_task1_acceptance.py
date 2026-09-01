@@ -4,15 +4,14 @@ Written **before** the implementation, which is the order `SRC-HANDOFF` section
 14 asks for: reproduce two simultaneous active positions first, then refactor.
 Every test here is the executable form of a row in `SRC-TASK-1` section 6.
 
-Tests for behaviour Task 1 has not built yet carry
-`@pytest.mark.xfail(strict=True)`. That is deliberate and load-bearing in both
-directions. The suite stays green today, so these can be committed without
-breaking the gate; and the moment the behaviour arrives the test **fails** as
-`XPASS(strict)`, which is a demand to delete the marker rather than a quiet
-pass nobody notices. A skipped test would rot instead.
+They were committed first as `xfail(strict=True)`, so the suite stayed green
+while they were red and the arrival of each behaviour failed loudly as
+`XPASS(strict)` rather than passing unnoticed. All fourteen pass now and the
+markers are gone; what remains is an acceptance suite, not a to-do list.
 
-The tests without that marker already pass. They are here to pin behaviour Task
-1 must not regress while it rearranges everything around them.
+Four of them passed from the start - `T1-AC-05`, `T1-AC-08`, `T1-AC-10` and
+`T1-AC-12` - and are here to pin behaviour the refactor was not allowed to
+regress while it rearranged everything around them.
 """
 
 from __future__ import annotations
@@ -22,7 +21,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -42,6 +40,7 @@ from test_agent import (
     WRITE_ENV,
     DurableAgentCase,
     FakeBroker,
+    FakeClient,
     occ,
 )
 
@@ -50,7 +49,36 @@ from test_agent import (
 LONG_A, SHORT_A = occ(619), occ(624)
 LONG_B, SHORT_B = occ(630), occ(635)
 
-PENDING = "Task 1 (T1-01..T1-06) is not implemented; see SRC-TASK-1"
+class TwoSpreadClient(FakeClient):
+    """A chain carrying both spreads, so both closes can actually be priced.
+
+    The stock `FakeClient` quotes one pair. A second position whose contracts
+    are absent is correctly refused as unpriceable, which is real behaviour and
+    exactly what `T1-AC-07` relies on - but it would make the two-exit tests
+    pass for the wrong reason.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.quotes = {
+            LONG_A: ("12.40", "12.60"), SHORT_A: ("9.60", "9.80"),
+            LONG_B: ("12.40", "12.60"), SHORT_B: ("9.60", "9.80"),
+        }
+
+    def option_chain(self, symbol: str, *, expiration_gte: str, expiration_lte: str
+                     ) -> Any:
+        from test_agent import read
+
+        deltas = {LONG_A: 0.60, SHORT_A: 0.32, LONG_B: 0.60, SHORT_B: 0.32}
+        return read({"underlying": symbol, "snapshots": {
+            sym: {
+                "latestQuote": {"bp": float(bid), "ap": float(ask),
+                                "t": (NOW - timedelta(seconds=20)).isoformat()},
+                "impliedVolatility": 0.15,
+                "greeks": {"delta": deltas[sym]},
+            }
+            for sym, (bid, ask) in self.quotes.items()
+        }})
 
 
 def intent_for(long_symbol: str, short_symbol: str, tag: str) -> OrderIntent:
@@ -124,10 +152,9 @@ class Task1Case(DurableAgentCase):
 
 # ------------------------------------------------------- managing several rows
 class ManagingSeveralPositionsTests(Task1Case):
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_01_one_stop_fires_and_one_holds(self) -> None:
         """Both are marked and evaluated; only the stop-triggered one closes."""
-        agent = self.build(WRITE_ENV)
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
         stopping = self.open_spread(LONG_A, SHORT_A, "a", invalidation="9999.00")
         holding = self.open_spread(LONG_B, SHORT_B, "b", invalidation="1.00")
         self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
@@ -140,9 +167,8 @@ class ManagingSeveralPositionsTests(Task1Case):
         self.assertIsNotNone(by_id[stopping].submitted_order_id)
         self.assertIsNone(by_id[holding].submitted_order_id)
 
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_02_two_exits_in_one_cycle_do_not_suppress_each_other(self) -> None:
-        agent = self.build(WRITE_ENV)
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
         first = self.open_spread(LONG_A, SHORT_A, "a", invalidation="9999.00")
         second = self.open_spread(LONG_B, SHORT_B, "b", invalidation="9999.00")
         self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
@@ -154,7 +180,6 @@ class ManagingSeveralPositionsTests(Task1Case):
         }
         self.assertEqual(submitted, {first, second})
 
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_03_a_failed_close_does_not_stop_the_other(self) -> None:
         class OneBadSubmit(FakeBroker):
             calls = 0
@@ -165,7 +190,7 @@ class ManagingSeveralPositionsTests(Task1Case):
                     raise RuntimeError("broker refused the first close")
                 return super().submit(*args, **kwargs)
 
-        agent = self.build(WRITE_ENV, broker=OneBadSubmit())
+        agent = self.build(WRITE_ENV, broker=OneBadSubmit(), client=TwoSpreadClient())
         self.open_spread(LONG_A, SHORT_A, "a", invalidation="9999.00")
         self.open_spread(LONG_B, SHORT_B, "b", invalidation="9999.00")
         self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
@@ -177,9 +202,8 @@ class ManagingSeveralPositionsTests(Task1Case):
         self.assertEqual(len(failed), 1, "the failure is position-linked")
         self.assertEqual(len(submitted), 1, "the other close still proceeded")
 
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_04_an_open_and_a_pending_are_both_serviced(self) -> None:
-        agent = self.build(WRITE_ENV)
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
         opened = self.open_spread(LONG_A, SHORT_A, "a")
         pending = self.open_spread(LONG_B, SHORT_B, "b", leave_pending=True)
         self.with_recon(agent, self.exposure((LONG_A, SHORT_A)))
@@ -190,7 +214,6 @@ class ManagingSeveralPositionsTests(Task1Case):
         self.assertIn(opened, seen, "the open position is valued")
         self.assertIn(pending, seen, "the pending entry is reported, not skipped")
 
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_07_one_unvaluable_position_does_not_suppress_the_others(self) -> None:
         agent = self.build(WRITE_ENV)
         valuable = self.open_spread(LONG_A, SHORT_A, "a")
@@ -207,7 +230,6 @@ class ManagingSeveralPositionsTests(Task1Case):
 
 
 class DeterministicOrderTests(Task1Case):
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_06_database_return_order_does_not_change_the_outcome(self) -> None:
         """`active_positions()` has no ORDER BY, so today this is luck."""
         agent = self.build(WRITE_ENV)
@@ -225,12 +247,11 @@ class DeterministicOrderTests(Task1Case):
 
 
 class BatchDurationTests(Task1Case):
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_13_a_management_batch_stays_inside_the_lease_margin(self) -> None:
         """30 s against the 90 s LEASE_TTL. Nothing heartbeats during a batch."""
         from options_alpha_lab.worker import LEASE_TTL
 
-        agent = self.build(WRITE_ENV)
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
         self.open_spread(LONG_A, SHORT_A, "a")
         self.open_spread(LONG_B, SHORT_B, "b")
         self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
@@ -276,7 +297,6 @@ class OverlappingContractsTests(unittest.TestCase):
                                        {"symbol": SHORT, "qty": short_qty}])
         return Reconciler(broker, self.case.store).reconcile()
 
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_09_no_row_changes_state_by_attribution(self) -> None:
         """Broker holds the correct aggregate for two live lots.
 
@@ -296,7 +316,6 @@ class OverlappingContractsTests(unittest.TestCase):
                 "neither overlapping row may change lifecycle state by attribution",
             )
 
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_09b_a_missing_lot_names_no_survivor(self) -> None:
         """One lot genuinely closed; the broker holds one spread.
 
@@ -396,7 +415,6 @@ class EntryStaysCappedTests(Task1Case):
 
 
 class IncidentVisibilityTests(Task1Case):
-    @pytest.mark.xfail(strict=True, reason=PENDING)
     def test_t1_ac_11_an_incident_position_is_never_reported_flat(self) -> None:
         """Needs the cycle health `T1-06` introduces."""
         agent = self.build(WRITE_ENV)
@@ -410,6 +428,83 @@ class IncidentVisibilityTests(Task1Case):
 
         self.assertIn(troubled, {r.position_id for r in cycle.results})
         self.assertGreaterEqual(cycle.positions_seen, 1)
+
+
+class ClocksActuallyUseTheCycleTests(Task1Case):
+    """The wiring, which is where "manage many" either happens or does not.
+
+    `manage_positions` being correct is worth nothing if `tick()` still returns
+    after the first row. These drive the real clocks.
+    """
+
+    def test_a_strategy_tick_values_every_position_not_the_first(self) -> None:
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
+        self.open_spread(LONG_A, SHORT_A, "a")
+        self.open_spread(LONG_B, SHORT_B, "b")
+        self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
+
+        agent.tick()
+
+        assert agent.last_cycle is not None
+        self.assertEqual(agent.last_cycle.positions_valued, 2)
+
+    def test_the_position_clock_values_every_position_too(self) -> None:
+        """A second position valued only on the strategy tick is judged on a
+        mark up to five minutes old, which is the staleness this clock exists
+        to remove."""
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
+        self.open_spread(LONG_A, SHORT_A, "a")
+        self.open_spread(LONG_B, SHORT_B, "b")
+        self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
+
+        agent.position_clock()
+
+        assert agent.last_cycle is not None
+        self.assertEqual(agent.last_cycle.positions_valued, 2)
+
+    def test_one_position_still_ticks_exactly_as_it_always_did(self) -> None:
+        """The regression that would matter most, asserted directly.
+
+        Widening management to a set must not rewrite what a one-position tick
+        says. Every caller, log line and existing test reads this result.
+        """
+        agent = self.build(WRITE_ENV)
+        self.open_spread(LONG_A, SHORT_A, "a")
+        self.with_recon(agent, self.exposure((LONG_A, SHORT_A)))
+
+        result = agent.tick()
+
+        self.assertEqual(result.action, "POSITION_HELD")
+        self.assertIsNotNone(result.exit, "the exit decision is carried through")
+        self.assertIsNotNone(result.snapshot_id)
+        self.assertNotEqual(
+            result.action, "POSITIONS_MANAGED",
+            "a single position must not be summarised into a batch action",
+        )
+
+    def test_health_reports_the_cycle_and_flags_an_unvalued_position(self) -> None:
+        from options_alpha_lab.worker import WorkerHealth
+
+        agent = self.build(WRITE_ENV, client=TwoSpreadClient())
+        self.open_spread(LONG_A, SHORT_A, "a")
+        self.open_spread(LONG_B, SHORT_B, "b")
+        self.open_spread(occ(660), occ(665), "c", leave_pending=True)
+        self.with_recon(agent, self.exposure((LONG_A, SHORT_A), (LONG_B, SHORT_B)))
+        agent.tick()
+
+        health = WorkerHealth(started_at=NOW)
+        assert agent.last_cycle is not None
+        health.record_cycle(agent.last_cycle)
+        payload = health.as_dict()
+
+        self.assertEqual(payload["positions_seen"], 3)
+        self.assertEqual(payload["positions_valued"], 2)
+        self.assertEqual(payload["unvalued_positions"], 1)
+        self.assertFalse(
+            payload["healthy"],
+            "an owned position nobody valued is indistinguishable from a flat "
+            "book in every other field, so it must not read as healthy",
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover
