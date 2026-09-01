@@ -234,6 +234,14 @@ server and CLI" as expecting all three. The mitigation is presentational — the
 deck and README state plainly why a firewall design keeps MCP off the write
 path — not architectural.
 
+### F-04 — Is autonomous execution required? — **RETIRED AS A BLOCKER 1 September 2026**
+
+The organizer rule remains **NOT STATED**; what changed is that it no longer
+blocks anything. Both postures ship and `scripts/arm_worker.sh` /
+`scripts/disarm_worker.sh` select between them, so either answer costs one
+configuration change. Retained below as the recorded interpretation, and removed
+from the open-questions list. See `HK-007`, now `RESOLVED_BY_CONFIGURATION`.
+
 ### F-04 — Is autonomous execution required? (`DEC-004`, `HK-007`, `CLR-019`)
 
 **Unknown:** whether execution must be fully autonomous, may be human-approved,
@@ -253,6 +261,15 @@ The approval state is durable and auditable in both configurations.
 **Cost if wrong:** one configuration value and the demo script's mode.
 
 ### F-05 — Account, equity, reset policy, leaderboard (`DEC-003`, `HK-003`, `HK-005`)
+
+**Account, equity and reset answered 1 September 2026 by direct verification;
+leaderboard answered 29 August 2026 by inspection.** The Paper account was
+verified read-only as same-day, created 81 minutes before kickoff, with zero
+pre-kickoff orders, `ACTIVE`, options level 3, and its identifier deliberately
+not recorded (`HK-003`). No starting-equity, reset or account-age rule is
+published anywhere; that absence is recorded rather than guessed at. This
+fallback is therefore **retired as a blocker**, and the construction below is
+kept because it is why the unknown never mattered.
 
 **Leaderboard answered 29 August 2026 by inspection of the live dashboard.** It
 ranks *Top builders*, *Top referrers* and *Top submissions*. There is no P&L or
@@ -361,8 +378,12 @@ owed by the start of Phase 5.
 1. Confirm platform enrollment **and** team membership before kickoff. Both are
    required of solo participants (`F-O`), and registration closes at 15:00 UTC
    on 28 August with no stated grace period.
-2. Ask the organizers only the three questions that remain open — `F-02`,
-   `F-04`, `F-05` — and record each answer against the fallback it replaces.
+2. No organizer question remains a blocker. `F-02` retired 29 August, and `F-04`
+   and `F-05` were retired as blockers on 1 September — the first because both
+   postures ship behind a configuration switch, the second because the account
+   was verified directly and no equity or reset rule is published to conflict
+   with. Each remains recorded as the interpretation it always was; none of them
+   now gates a submission.
 3. Ask whether the Submission Guidelines' "IBM Bob Report" clause applies to
    this event. It appears on the generic platform page rather than the event
    page and reads as carried-over copy, but it is marked mandatory, and

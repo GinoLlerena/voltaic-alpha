@@ -9,7 +9,7 @@ not authorized by this document.*
 |---|---|
 | Version | 0.1.0 |
 | Date | 31 August 2026 |
-| Status | Deferred until after the hackathon and completion of Task 1 |
+| Status | Deferred until after the hackathon. **Task 1 is complete and deployed as of 1 September 2026**, so that half of the dependency is discharged |
 | Directional engineering effort | 12-21 engineer-days |
 | Evidence duration | Absolute minimum about six trading weeks; realistically several months |
 | Entry capacity during implementation | One open or pending strategy |
@@ -33,12 +33,18 @@ authority.
 
 ## 2. Preconditions
 
-- Task 1 is deployed and its acceptance matrix passes.
-- The worker reconstructs and manages the complete attributable active set.
-- Inherited overlapping symbols have a tested fail-closed/operator path.
-- The gateway still permits only one open or pending strategy.
-- Trading/Risk names owners for total risk, cluster risk, daily loss, and re-entry.
-- Policy changes remain offline, versioned, approved, and reversible.
+Status as of 1 September 2026. Four of six are met; the two that are not are
+organizational rather than technical, which is the correct shape for this to be
+blocked on.
+
+| # | Precondition | Status |
+|---|---|---|
+| 1 | Task 1 deployed and its acceptance matrix passes | **Met.** Deployed 1 September; 18 acceptance tests pass on SQLite and on PostgreSQL 16.15, the same point release the worker runs (`EV-038`, `EV-039`, `EV-040`) |
+| 2 | The worker reconstructs and manages the complete attributable active set | **Met.** `manage_positions()` reconciles once, re-reads, fans one snapshot across every position and isolates per-position failure; `T1-AC-05` covers restart reconstruction |
+| 3 | Inherited overlapping symbols have a tested fail-closed/operator path | **Met.** Contested symbols are held out of the per-position path entirely and answered in aggregate, with no lot allocation and no lifecycle state change; `T1-AC-09` and `T1-AC-09b` |
+| 4 | The gateway still permits only one open or pending strategy | **Met and unchanged.** `T1-AC-12` asserts the refusal, and the gateway states the cap itself rather than letting the caller infer it from a count |
+| 5 | Trading/Risk names owners for total, cluster, daily-loss and re-entry risk | **Not met.** Organizational, not technical. `RISK-007` to `RISK-010`, `RISK-012`, `RISK-013` and `CLR-013` all remain open and are prerequisites, not cleanup |
+| 6 | Policy changes remain offline, versioned, approved, and reversible | **Partly met.** Versioning and reversibility exist - `POLICY_VERSION` moved to `h0-provisional-1` when the risk budget changed, and every threshold is `PROVISIONAL` - but *approved* is exactly what `DEC-008` and `DEC-010` still lack |
 
 ## 3. Non-goals
 

@@ -12,19 +12,19 @@
 
 ## 1. Ready-to-paste submission fields
 
-**Project title** (50 characters max — this is 38):
+**Project title** (50 characters max — this is **36**):
 
 ```
 Options Alpha: AI Execution Firewall
 ```
 
-**Short description** (255 max — this is 208):
+**Short description** (255 max — this is **214**):
 
 ```
 An auditable execution firewall for AI trading agents. A language model writes the memo; deterministic code owns direction, invalidation, sizing, eligibility, and every broker write. One SPY setup, on Alpaca Paper.
 ```
 
-**Long description** (100 words minimum — this is 191):
+**Long description** (100 words minimum — this is **201 words**):
 
 ```
 Most "AI trading agent" projects let a model propose a trade and add a validator
@@ -48,7 +48,27 @@ We ran one Paper lifecycle and published an ablation showing the model changed
 zero decisions. Both results are reported as they happened. No alpha is claimed.
 ```
 
-**Technology tags:** `Alpaca`, `GPT-5`, `Python`, `Streamlit`, `PostgreSQL`, `FastAPI-free`
+**Technology tags:** `Alpaca`, `OpenAI`, `Python`, `Streamlit`, `PostgreSQL`
+
+`FastAPI-free` was removed on 1 September 2026: it is a negative claim rather
+than a technology, it is not a selectable platform term, and a tag that names
+what the project does *not* use spends attention without buying anything.
+
+**Demo application platform:** `Alibaba Cloud ECS` — or the nearest selectable
+option, with the real platform named in Additional Information.
+
+**Additional information:**
+
+```
+Paper-only engineering demonstration. The public Alibaba Cloud ECS dashboard is
+credential-free and cannot place orders. A separate worker executes only through
+Alpaca's Paper endpoint behind deterministic risk and authorization checks.
+Option quotes use the indicative feed because this account has no OPRA
+entitlement; displayed prices are therefore not executable marks. The current
+sample is too small to establish alpha, and all P&L is reported as a diagnostic
+with its sample size. The H0 demonstration intentionally supports one concurrent
+SPY strategy; portfolio scaling is deferred until after the hackathon.
+```
 
 **Category / track:** Options Alpha Agents
 
@@ -83,9 +103,18 @@ Run in this order; each has a known-good answer.
 ## 4. Open items owned by the team
 
 - [ ] Record the MP4 (≤ 5 min) and export the deck PDF.
-- [ ] Answer the two still-open questions with the organizers: `F-04` autonomy,
-      and the account, equity and reset half of `F-05`. Both have binding
-      fallbacks, so neither blocks submission.
+- [ ] Enter every non-media field on the form, check the platform's own
+      validation, and save a draft.
+- [ ] Capture a redacted export or screenshot of the saved form.
+- [ ] Submit, and only then mark `HK-014` complete. **A saved draft is not a
+      submitted project**, and the missing video and deck may themselves stop the
+      platform accepting a final submit.
+
+`F-04` and `F-05` were removed from this list on 1 September 2026. Neither is an
+open organizer question any longer: autonomy ships in both postures behind a
+configuration switch, and the Paper account was verified directly with no
+published equity or reset rule to conflict with. Both remain recorded in
+`SRC-PHASE0` as the interpretations they always were.
 
 ## 5. Freeze rule
 
