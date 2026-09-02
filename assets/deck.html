@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Options Alpha — submission deck</title>
+<!--
+  Ten-slide submission deck.  1920x1080 per slide, 16:9.
+  Outline: docs/options_alpha_submission_narrative_v0_1.md section 7.
+  Palette and type taken from app.py so the deck, the dashboard and the
+  disclosure slide read as one system.
+
+  Slide 10 reproduces the four disclosures VERBATIM from README.md; `HK-018` is
+  proved by that wording matching across README, dashboard, deck and video.
+
+  Every figure here was verified against code or recorded data on 2 September
+  2026, not copied from prose.  Export:  node build/deck_pdf.js
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#1B222C; --surface:#263040; --line:#314054;
+    --text:#E7EDF5;   --dim:#8896A8;    --dimmer:#5C697A;
+    --amber:#E8A33D;  --blue:#5AB3F0;   --green:#46D08A; --red:#FF6161;
+    --body:'IBM Plex Sans',system-ui,sans-serif;
+    --cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{background:#0E1116;font-family:var(--body);-webkit-font-smoothing:antialiased}
+
+  .slide{
+    width:1920px;height:1080px;background:var(--ground);color:var(--text);
+    padding:76px 92px 58px;display:flex;flex-direction:column;
+    position:relative;overflow:hidden;
+    break-after:page;page-break-after:always;
+  }
+  .slide:last-child{break-after:auto;page-break-after:auto}
+
+  .eyebrow{
+    font-family:var(--mono);font-size:20px;letter-spacing:.16em;
+    color:var(--amber);text-transform:uppercase;margin-bottom:20px;
+  }
+  h2{
+    font-family:var(--cond);font-weight:700;font-size:70px;line-height:1.04;
+    letter-spacing:-.015em;text-wrap:balance;margin-bottom:14px;
+  }
+  h2.big{font-size:88px}
+  .sub{font-size:30px;line-height:1.4;color:var(--dim);max-width:34ch}
+  /* Every slide centres its body: the densest is 75% full, so centring
+     never crowds, and it stops the sparse slides reading bottom-heavy. */
+  .body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:34px}
+
+  footer{
+    display:flex;justify-content:space-between;align-items:center;
+    border-top:1px solid var(--line);padding-top:20px;margin-top:26px;
+    font-family:var(--mono);font-size:17px;color:var(--dimmer);
+  }
+  footer b{color:var(--dim);font-weight:500}
+
+  /* ── the authority chain (slide 3) ─────────────── */
+  .chain{display:flex;align-items:stretch;gap:0;margin:8px 0 30px}
+  .stage{
+    flex:1;border:1px solid var(--line);background:var(--surface);
+    padding:22px 16px;text-align:center;position:relative;
+  }
+  .stage + .stage{border-left:none}
+  .stage .n{font-family:var(--mono);font-size:17px;color:var(--dimmer);display:block;margin-bottom:8px}
+  .stage .t{font-size:24px;font-weight:600;line-height:1.15}
+  .stage.model{
+    background:rgba(232,163,61,.14);border-color:var(--amber);border-left:1px solid var(--amber);
+  }
+  .stage.model .t{color:var(--amber)}
+  .stage.model .n{color:var(--amber)}
+  .chain-note{display:flex;gap:0;font-family:var(--mono);font-size:17px;color:var(--dimmer)}
+  .chain-note span{flex:1;text-align:center}
+  .chain-note span.on{color:var(--amber)}
+
+  /* ── two-column comparison ─────────────────────── */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:54px}
+  .col h3{
+    font-family:var(--mono);font-size:19px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--dim);font-weight:500;padding-bottom:12px;margin-bottom:20px;
+    border-bottom:1px solid var(--line);
+  }
+  .col.can h3{color:var(--green)}
+  .col.cannot h3{color:var(--red)}
+  ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:15px}
+  /* The marker is positioned, not a flex item: making the li a flex container
+     turns every text node into its own column and shreds the running text. */
+  li{font-size:27px;line-height:1.35;position:relative;padding-left:32px}
+  li::before{content:"—";color:var(--dimmer);position:absolute;left:0;top:0}
+  li b{font-weight:600}
+  li code,code{font-family:var(--mono);font-size:.86em;background:var(--surface);padding:.06em .3em;border-radius:5px}
+
+  /* ── data readouts ─────────────────────────────── */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+  .tile{border:1px solid var(--line);background:var(--surface);padding:28px 30px}
+  .tile .k{font-family:var(--mono);font-size:17px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+  .tile .v{font-family:var(--mono);font-size:52px;font-weight:600;margin-top:12px;font-variant-numeric:tabular-nums}
+  .tile .v.amber{color:var(--amber)} .tile .v.green{color:var(--green)} .tile .v.red{color:var(--red)}
+  .tile .n{font-size:19px;color:var(--dim);margin-top:10px;line-height:1.35}
+
+  pre{
+    font-family:var(--mono);font-size:25px;line-height:1.55;color:var(--text);
+    background:var(--surface);border:1px solid var(--line);padding:28px 32px;
+    white-space:pre-wrap;
+  }
+  pre .c{color:var(--dimmer)}
+  pre .a{color:var(--amber)}
+  pre .g{color:var(--green)}
+
+  .quote{
+    border-left:3px solid var(--amber);padding-left:26px;
+    font-size:31px;line-height:1.4;color:var(--text);max-width:44ch;
+  }
+  .quote cite{display:block;font-family:var(--mono);font-size:18px;color:var(--dimmer);
+    font-style:normal;margin-top:16px}
+
+  .disc{display:grid;grid-template-columns:1fr 1fr;gap:36px 64px;padding-top:30px}
+  .disc .item{display:flex;gap:22px}
+  .disc .n{font-family:var(--mono);font-size:23px;font-weight:600;color:var(--amber);flex:none;padding-top:2px}
+  .disc p{font-size:26px;line-height:1.42;text-wrap:pretty}
+  .disc strong{font-weight:600}
+  .disc em{font-style:normal;color:var(--amber);font-weight:600}
+
+  @page{size:1920px 1080px;margin:0}
+  @media screen{ body{display:flex;flex-direction:column;align-items:center;gap:22px;padding:22px} }
+</style>
+</head>
+<body>
+
+<!-- 1 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Options Alpha · Voltaic Alpha</div>
+  <div class="body">
+    <h2 class="big">The expensive failure is not a&nbsp;bad trade.<br>It is an unexplainable one.</h2>
+    <p class="sub">A firm that cannot reconstruct why an automated system acted
+      cannot defend it to a regulator, an investor, or an insurer.</p>
+  </div>
+  <footer><b>An auditable AI execution firewall</b><span>01 / 10</span></footer>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">The uncomfortable question</div>
+  <div class="body">
+    <h2 class="big">“What exactly did the&nbsp;model decide, and what <em style="color:var(--amber);font-style:normal">could</em> it have decided?”</h2>
+    <p class="sub">Today that answer is usually a prompt, a log file, and a
+      promise. Checks can be removed, bypassed, or quietly loosened, and nothing
+      in the artifact tells you whether that happened.</p>
+  </div>
+  <footer><b>The question a risk reviewer actually asks</b><span>02 / 10</span></footer>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">The firewall</div>
+  <h2>The model touches exactly one box.</h2>
+  <div class="body top">
+    <div>
+      <div class="chain">
+        <div class="stage"><span class="n">01</span><span class="t">Evidence</span></div>
+        <div class="stage"><span class="n">02</span><span class="t">Setup</span></div>
+        <div class="stage model"><span class="n">03</span><span class="t">Memo</span></div>
+        <div class="stage"><span class="n">04</span><span class="t">Risk</span></div>
+        <div class="stage"><span class="n">05</span><span class="t">Intent</span></div>
+        <div class="stage"><span class="n">06</span><span class="t">Request</span></div>
+        <div class="stage"><span class="n">07</span><span class="t">Broker</span></div>
+      </div>
+      <div class="chain-note">
+        <span>deterministic</span><span>deterministic</span><span class="on">model advises</span>
+        <span>deterministic</span><span>deterministic</span><span>deterministic</span><span>deterministic</span>
+      </div>
+    </div>
+    <p class="sub" style="max-width:64ch;font-size:28px">
+      The model writes stage 03 and reads nothing else. Direction, invalidation,
+      sizing, eligibility and every broker write live outside the fence — and the
+      dashboard says so on the page, above every decision.</p>
+  </div>
+  <footer><b>evidence → setup → memo → risk → intent → request → broker</b><span>03 / 10</span></footer>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">What the model never sees</div>
+  <h2>An absence cannot be bypassed.</h2>
+  <div class="body top">
+    <div class="cols">
+      <div class="col can">
+        <h3>The entire model output schema</h3>
+        <pre><span class="c">RESPONSE_SCHEMA — strict: true</span>
+<span class="g">direction</span>              bullish|bearish|neutral
+<span class="g">confidence</span>             0 … 1
+<span class="g">evidence_ids</span>           string[]
+<span class="g">counter_evidence_ids</span>   string[]
+<span class="g">reasoning_summary</span>      ≤ 900 chars
+
+<span class="a">additionalProperties: false</span></pre>
+      </div>
+      <div class="col cannot">
+        <h3>Absent by construction</h3>
+        <ul>
+          <li><b>Invalidation.</b> No field exists. It is set from the
+            deterministic classifier, and never shown to the model.</li>
+          <li><b>Sizing, contracts, eligibility.</b> Not in the schema, not in
+            the prompt.</li>
+          <li><b>Direction is stated but not owned.</b> A reversal against the
+            setup is coerced to neutral and recorded as
+            <code>model_attempted_direction_reversal</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="sub" style="max-width:74ch;font-size:25px;color:var(--dimmer)">
+      A check can be deleted in a refactor while every test still passes. A field
+      that does not exist in a strict schema cannot be emitted at all.</p>
+  </div>
+  <footer><b>src/options_alpha_lab/providers/openai_thesis.py</b><span>04 / 10</span></footer>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Live refusal</div>
+  <h2>The strongest evidence is the memo that does not exist.</h2>
+  <div class="body top">
+    <div class="quote">
+      “No memo exists for this decision. The setup did not qualify, so the model
+      was never called. This is the cheapest possible refusal: it costs one
+      classifier and no tokens.”
+      <cite>rendered by the dashboard, snapshot spy-refusal-2026-08-27</cite>
+    </div>
+    <div class="grid3">
+      <div class="tile"><div class="k">Decision</div><div class="v amber" style="font-size:38px">NO_TRADE</div>
+        <div class="n">reason code <code>no_qualified_setup</code></div></div>
+      <div class="tile"><div class="k">Model calls</div><div class="v green">0</div>
+        <div class="n">the question never reached the model</div></div>
+      <div class="tile"><div class="k">Evidence hashes</div><div class="v" style="font-size:38px">identical</div>
+        <div class="n">a refusal is recorded exactly like a trade</div></div>
+    </div>
+  </div>
+  <footer><b>Refusals are not a failure path. They are the common path.</b><span>05 / 10</span></footer>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Hash lineage</div>
+  <h2>Every order chains back to the observation that justified it.</h2>
+  <div class="body top">
+    <pre><span class="c">decision hash</span>   →   <span class="c">intent hash</span>   →   <span class="c">request hash</span>   →   <span class="c">broker order</span>
+
+<span class="a">client_order_id = f"{CLIENT_ID_PREFIX}-{digest[:28]}"</span>
+<span class="c">                  the first 28 hex of the intent hash</span></pre>
+    <ul style="font-size:29px">
+      <li><b>Idempotency is derived, not generated.</b> A duplicate submit
+        collides at the broker instead of opening a second position.</li>
+      <li><b>Ambiguous writes recover by lookup, not retry</b> — re-submitting is
+        how duplicates are created.</li>
+      <li><b>Broker acknowledgement is <code>SUBMITTED</code>, never
+        <code>FILLED</code>.</b> A fill is only ever written from a reconciled
+        broker record.</li>
+    </ul>
+  </div>
+  <footer><b>execution/intent.py · execution/lifecycle.py</b><span>06 / 10</span></footer>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">The Paper lifecycle</div>
+  <h2>Real fills, reconciled to flat — and the friction stated out loud.</h2>
+  <div class="body top">
+    <div class="grid3">
+      <div class="tile"><div class="k">Opened, filled</div><div class="v">3.13</div>
+        <div class="n">against a 3.39 limit · 6.90 − 3.77</div></div>
+      <div class="tile"><div class="k">Closed, filled</div><div class="v">3.06</div>
+        <div class="n">6.87 − 3.81 · reconciled to zero open positions</div></div>
+      <div class="tile"><div class="k">Realized</div><div class="v red">−7.10</div>
+        <div class="n">equity 100,000.00 → 99,992.90</div></div>
+    </div>
+    <p class="sub" style="max-width:70ch;font-size:27px">
+      <b style="color:var(--text)">−7.10 is the cost of crossing the spread twice
+      on one contract.</b> It is the friction any real edge would have to clear,
+      and it is why the null hypothesis is stated as the default rather than as a
+      caveat. Five exit triggers fire in fixed precedence: expiry guard,
+      invalidation breach, stop loss, session stop, profit capture.</p>
+  </div>
+  <footer><b>Alpaca Paper · MLeg native multi-leg order</b><span>07 / 10</span></footer>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">The ablation</div>
+  <h2>We published the result that makes our own model look unnecessary.</h2>
+  <div class="body top">
+    <div class="grid3">
+      <div class="tile"><div class="k">Cases compared</div><div class="v">5</div>
+        <div class="n">each run with the model and without it</div></div>
+      <div class="tile"><div class="k">Action agreement</div><div class="v">5 / 5</div>
+        <div class="n">0 direction-reversal attempts</div></div>
+      <div class="tile"><div class="k">Decisions changed</div><div class="v amber">0</div>
+        <div class="n">by the model, across every case</div></div>
+    </div>
+    <div class="quote" style="max-width:74ch;font-size:27px">
+      “This is a mechanism check on a tiny sample, not evidence about returns.
+      The null hypothesis that the model does not improve decisions is not
+      rejected by this report and is not testable at this sample size.”
+      <cite>artifacts/ablation_h0.json — published verbatim, not summarised</cite>
+    </div>
+    <p class="sub" style="font-size:25px;color:var(--dimmer);max-width:74ch">
+      A system that cannot produce that answer is not measuring anything.</p>
+  </div>
+  <footer><b>Reporting the inconvenient result is the point</b><span>08 / 10</span></footer>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Business case</div>
+  <h2>Who buys an audit layer.</h2>
+  <div class="body top">
+    <div class="cols">
+      <div class="col">
+        <h3>The buyer</h3>
+        <ul>
+          <li>Teams shipping agentic trading applications who must answer a
+            compliance or risk reviewer.</li>
+          <li>The buyer is anyone who must explain an automated decision to
+            <b>someone with authority over them.</b></li>
+        </ul>
+      </div>
+      <div class="col">
+        <h3>Why it is worth money</h3>
+        <ul>
+          <li>Reconstruction is <b>cheaper to build in than to retrofit</b> — a
+            hash chain cannot be added to decisions already made.</li>
+          <li>Broker- and strategy-agnostic by construction: the gateway,
+            synthesizer and execution port are protocols. <b>SPY verticals are
+            the demonstration, not the product.</b></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <footer><b>An execution and audit layer between a model and a broker</b><span>09 / 10</span></footer>
+</section>
+
+<!-- 10 ────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Limits</div>
+  <h2>Disclosures.</h2>
+  <div class="body top">
+    <div class="disc">
+      <div class="item"><div class="n">01</div>
+        <p><strong>Alpaca Paper only.</strong> No live endpoint exists in this
+        build, and the gateway refuses any resolved endpoint that is not the
+        Paper host — checked against the client about to be used, not the flag
+        that configured it.</p></div>
+      <div class="item"><div class="n">02</div>
+        <p><strong>Option quotes come from the <code>indicative</code>
+        feed.</strong> The account has no OPRA agreement, so quotes are not
+        trading-quality. On 31 August 2026 that feed showed a contract 8 cents
+        below where it was trading, which is enough to make an order unfillable.
+        Prices here should not be read as executable marks.</p></div>
+      <div class="item"><div class="n">03</div>
+        <p><strong>No alpha is claimed.</strong> The null hypothesis — that this
+        setup has no advantage over buying and holding SPY after costs — is the
+        project's default assumption and is <em>not rejected</em>. The sample is
+        two trades. Any P&amp;L shown is a diagnostic reported with its sample
+        size, never evidence of an edge.</p></div>
+      <div class="item"><div class="n">04</div>
+        <p><strong>Nothing here is investment advice</strong>, a recommendation,
+        or an offer. It is an engineering demonstration of an execution
+        boundary.</p></div>
+    </div>
+  </div>
+  <footer><b>github.com/GinoLlerena/voltaic-alpha · 47.236.50.157</b><span>10 / 10</span></footer>
+</section>
+
+</body>
+</html>

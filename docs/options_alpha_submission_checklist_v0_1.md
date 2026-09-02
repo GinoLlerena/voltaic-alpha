@@ -77,9 +77,9 @@ SPY strategy; portfolio scaling is deferred until after the hackathon.
 | Artifact | Requirement | Status |
 |---|---|---|
 | Public GitHub repository | **Mandatory** | **Done.** `github.com/GinoLlerena/voltaic-alpha` is public and was validated by an unauthenticated clean clone: 34 commits, both tags, and all nine validation gates pass from the clone. |
-| Application URL | No platform restriction (organizers, 29 Aug 2026) | **Done, 30 August 2026.** `http://47.236.50.157` - an Elastic IP bound to the dashboard host, so it survives the instance being stopped, unlike the pay-as-you-go address it replaces. Port 80, no port number in the URL; `:8501` still serves as a fallback. All five views verified rendering from the public internet with zero console errors. No domain is required: `F-K` was superseded. See [runbook](./options_alpha_deployment_runbook_v0_1.md) section 8. |
-| Video | MP4, **5 minutes maximum** | Beats drafted in the narrative §8; not yet recorded |
-| Slide deck | PDF | Ten-slide outline in the narrative §7; not yet exported |
+| Application URL | No platform restriction (organizers, 29 Aug 2026) | **Done, 30 August 2026.** `http://47.236.50.157` - an Elastic IP bound to the dashboard host, so it survives the instance being stopped, unlike the pay-as-you-go address it replaces. Port 80, no port number in the URL; `:8501` still serves as a fallback. All five views verified rendering from the public internet with zero console errors. No domain is required: `F-K` was superseded. See [runbook](implementation/options_alpha_deployment_runbook_v0_1.md) section 8. |
+| Video | MP4, **5 minutes maximum** | **Done, 2 September 2026.** `build/options-alpha-demo.mp4`, 1920x1080 H.264 + AAC, **299.92s**, inside the 5:00 limit. Picture recorded by driving the dashboard with Playwright on the [video script](options_alpha_video_script_v0_1.md) beat schedule; narration laid on the same schedule, so sound and picture align by construction. Hybrid source, see script §3a. Disclosure slide held verbatim for the closing 35s. **Audio not yet listened to by a human.** |
+| Slide deck | PDF | **Done, 2 September 2026.** `assets/deck.html` exports to a ten-page 1920x1080 PDF via `node build/deck_pdf.js`. Follows the narrative §7 outline; palette and type taken from `app.py` so deck, dashboard and video read as one system. Slide 10 carries the four disclosures verbatim, checked against `README.md` programmatically. Every figure verified against code or recorded data, not copied from prose. |
 | Cover image | PNG or JPG, 16:9 | **Done.** `assets/cover.png`, 1920x1080. Source and regeneration steps in `assets/cover.html` |
 | Licence | Original and MIT-compliant (`F-F`) | **Done.** `LICENSE` at the repository root, declared in `pyproject.toml`. A public repository with no licence is all-rights-reserved by default, which is the opposite of MIT-compliant. |
 | Title, descriptions, tags | See §1 | Drafted above, within limits |
@@ -102,7 +102,9 @@ Run in this order; each has a known-good answer.
 
 ## 4. Open items owned by the team
 
-- [ ] Record the MP4 (≤ 5 min) and export the deck PDF.
+- [x] Record the MP4 (≤ 5 min) and export the deck PDF. Both done 2 September 2026:
+      `build/options-alpha-demo.mp4` (299.92s) and `build/options-alpha-deck.pdf` (10 pages).
+      **The video's audio has not been listened to by a human yet.**
 - [ ] Enter every non-media field on the form, check the platform's own
       validation, and save a draft.
 - [ ] Capture a redacted export or screenshot of the saved form.

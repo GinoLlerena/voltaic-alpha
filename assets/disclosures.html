@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Options Alpha — Disclosures slide</title>
+<!--
+  Disclosure slide for the submission video and deck.  1920x1080, 16:9.
+
+  The four statements below are reproduced VERBATIM from the `## Disclosures`
+  section of README.md.  `HK-018` is proved by the same wording appearing in the
+  README, the dashboard sidebar, the deck, and the video, so this file is not a
+  paraphrase and must not be edited independently: change README.md, then copy
+  the text across.  Verified identical to README.md on 2 September 2026.
+
+  A drift check belongs in `scripts/`, but `scripts/` is inside the `code`
+  freeze category, so adding one now would change the freeze digest and
+  invalidate the recorded video.  Add it after the deadline.
+
+  Palette and type are taken from app.py so the slide cuts seamlessly from
+  dashboard footage.
+
+  To capture:  open in a browser, press F to go fullscreen, hold for 35 seconds
+  over beat 4:25-5:00 of the video script.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#1B222C; --surface:#263040; --line:#314054;
+    --text:#E7EDF5;   --dim:#8896A8;    --dimmer:#5C697A;
+    --amber:#E8A33D;
+    --body:'IBM Plex Sans',system-ui,sans-serif;
+    --cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{
+    background:#000;overflow:hidden;position:relative;
+    font-family:var(--body);-webkit-font-smoothing:antialiased;
+  }
+  /* A scaled element still occupies its unscaled size in layout, so centring it
+     with flex/grid clips the overflow.  Pin to the centre and translate instead. */
+  .stage{
+    position:absolute;top:50%;left:50%;
+    width:1920px;height:1080px;transform-origin:center center;
+  }
+  .slide{
+    width:1920px;height:1080px;background:var(--ground);color:var(--text);
+    padding:82px 96px 66px;display:flex;flex-direction:column;
+  }
+
+  header{
+    display:flex;align-items:flex-end;justify-content:space-between;
+    gap:40px;padding-bottom:26px;border-bottom:2px solid var(--line);
+  }
+  h1{
+    font-family:var(--cond);font-weight:700;font-size:76px;
+    letter-spacing:-.015em;line-height:1;
+  }
+  .who{
+    font-family:var(--mono);font-size:21px;line-height:1.5;
+    color:var(--dim);text-align:right;
+  }
+  .who b{color:var(--amber);font-weight:500;display:block}
+
+  .grid{
+    flex:1;display:grid;grid-template-columns:1fr 1fr;
+    gap:44px 76px;padding-top:44px;
+  }
+  .item{display:flex;gap:26px}
+  .n{
+    font-family:var(--mono);font-size:26px;font-weight:600;color:var(--amber);
+    line-height:1.25;flex:none;padding-top:2px;
+  }
+  .item p{
+    font-size:31px;line-height:1.44;color:var(--text);text-wrap:pretty;
+  }
+  .item strong{font-weight:600}
+  .item code{
+    font-family:var(--mono);font-size:.9em;
+    background:var(--surface);padding:.06em .28em;border-radius:5px;
+  }
+  .item em{font-style:normal;color:var(--amber);font-weight:600}
+
+  footer{
+    margin-top:40px;padding-top:24px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:40px;
+    font-family:var(--mono);font-size:19px;color:var(--dimmer);
+  }
+  footer span{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="slide">
+
+    <header>
+      <h1>Disclosures</h1>
+      <div class="who">
+        <b>Options Alpha</b>
+        Voltaic Alpha · github.com/GinoLlerena/voltaic-alpha
+      </div>
+    </header>
+
+    <div class="grid">
+
+      <div class="item">
+        <div class="n">01</div>
+        <p><strong>Alpaca Paper only.</strong> No live endpoint exists in this
+        build, and the gateway refuses any resolved endpoint that is not the
+        Paper host — checked against the client about to be used, not the flag
+        that configured it.</p>
+      </div>
+
+      <div class="item">
+        <div class="n">02</div>
+        <p><strong>Option quotes come from the <code>indicative</code>
+        feed.</strong> The account has no OPRA agreement, so quotes are not
+        trading-quality. On 31 August 2026 that feed showed a contract 8 cents
+        below where it was trading, which is enough to make an order unfillable.
+        Prices here should not be read as executable marks.</p>
+      </div>
+
+      <div class="item">
+        <div class="n">03</div>
+        <p><strong>No alpha is claimed.</strong> The null hypothesis — that this
+        setup has no advantage over buying and holding SPY after costs — is the
+        project's default assumption and is <em>not rejected</em>. The sample is
+        two trades. Any P&amp;L shown is a diagnostic reported with its sample
+        size, never evidence of an edge.</p>
+      </div>
+
+      <div class="item">
+        <div class="n">04</div>
+        <p><strong>Nothing here is investment advice</strong>, a recommendation,
+        or an offer. It is an engineering demonstration of an execution
+        boundary.</p>
+      </div>
+
+    </div>
+
+    <footer>
+      <div>The same four statements appear in <span>README.md</span>, the
+        <span>dashboard sidebar</span>, and the <span>submission deck</span>.</div>
+      <div>HK-018</div>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+  // Scale the fixed 1920x1080 stage to fit whatever screen it is captured on,
+  // so the framing is identical regardless of monitor size.
+  const stage = document.getElementById('stage');
+  const fit = () => {
+    const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = `translate(-50%,-50%) scale(${s})`;
+  };
+  addEventListener('resize', fit);
+  fit();
+  addEventListener('keydown', e => {
+    if (e.key === 'f' || e.key === 'F') {
+      document.fullscreenElement ? document.exitFullscreen()
+                                 : document.documentElement.requestFullscreen();
+    }
+  });
+</script>
+</body>
+</html>

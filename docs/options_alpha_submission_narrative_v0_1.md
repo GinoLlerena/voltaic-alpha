@@ -41,7 +41,10 @@ tests still pass; an absence cannot be bypassed at all.
   daily bars, a 5-page option chain, each with provider, feed, source time,
   receipt time, page count, and payload hash.
 - One qualified SPY case and one refusal, replayed to identical decision hashes.
-- Model ablation over three frozen cases against `gpt-5.6-terra`.
+- Model ablation over five frozen cases against `gpt-5.6-terra`, each run
+  with the model and without it. Corrected 2 September 2026: this line read
+  "three frozen cases" and `artifacts/ablation_h0.json` records `cases: 5`,
+  `cases_compared: 5`, `action_agreement: 5/5`.
 - One Paper MLeg lifecycle: open filled at 3.13 against a 3.39 limit, close at
   3.06, reconciled to zero open positions.
 
