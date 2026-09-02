@@ -14,11 +14,11 @@ multi-position entry. This document is not authorization to raise the entry cap.
 | Current scope | One tradeable underlying (`SPY`), one trend/retest setup, vertical debit spreads |
 | Primary decision | Implement **manage many, enter one** before considering concurrent entry |
 | Review disciplines | Options portfolio risk, trading-systems/backend architecture, quantitative strategy/capacity |
-| Task 1 — now | [Manage Many, Enter One](./options_alpha_multi_position_task_1_manage_many_v0_1.md) |
-| Task 2 — post-hackathon | [Portfolio Evidence and Cap Two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) |
-| Related design | [Trading Design](./options_alpha_trading_design_v0_1.md) |
-| Related lifecycle review | [Exit Policy and Position-Lifecycle Review](./options_alpha_exit_policy_review_v0_1.md) |
-| Requirement tracker | [Requirements Traceability Matrix](./options_alpha_requirements_traceability_v0_1.md) |
+| Task 1 — now | [Manage Many, Enter One](options_alpha_multi_position_task_1_manage_many_v0_1.md) |
+| Task 2 — post-hackathon | [Portfolio Evidence and Cap Two](options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) |
+| Related design | [Trading Design](options_alpha_trading_design_v0_1.md) |
+| Related lifecycle review | [Exit Policy and Position-Lifecycle Review](options_alpha_exit_policy_review_v0_1.md) |
+| Requirement tracker | [Requirements Traceability Matrix](../options_alpha_requirements_traceability_v0_1.md) |
 
 ## 1. Executive decision
 
@@ -63,8 +63,8 @@ and pending risk.
 
 | Task | When | Objective | Entry authority | Directional effort |
 |---|---|---|---|---:|
-| [Task 1 — Manage Many, Enter One](./options_alpha_multi_position_task_1_manage_many_v0_1.md) | Now | Remove the singular management defect, isolate per-position failures, and fail closed on ambiguous overlap | Unchanged: maximum one open or pending strategy | 3-5 engineer-days |
-| [Task 2 — Portfolio Evidence and Cap Two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) | After the hackathon | Measure whether capacity matters, add portfolio admission and reservations, then run a reversible cap-two Paper canary | Remains one until every Task 2 promotion gate passes | 12-21 engineer-days plus market evidence |
+| [Task 1 — Manage Many, Enter One](options_alpha_multi_position_task_1_manage_many_v0_1.md) | Now | Remove the singular management defect, isolate per-position failures, and fail closed on ambiguous overlap | Unchanged: maximum one open or pending strategy | 3-5 engineer-days |
+| [Task 2 — Portfolio Evidence and Cap Two](options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) | After the hackathon | Measure whether capacity matters, add portfolio admission and reservations, then run a reversible cap-two Paper canary | Remains one until every Task 2 promotion gate passes | 12-21 engineer-days plus market evidence |
 
 Task 1 is intentionally small: no portfolio-risk schema, no cap-two flag, no general
 lot allocator, and no broad dashboard redesign. Task 2 must not begin by raising the
@@ -601,7 +601,7 @@ collection-based management, aggregate reconciliation, atomic risk reservation,
 signal-cohort uniqueness, failure isolation, lease fencing, portfolio observability,
 and evidence that additional capacity solves a real problem.
 
-The approved implementation direction is [Task 1: manage many, enter one](./options_alpha_multi_position_task_1_manage_many_v0_1.md).
-[Task 2: portfolio evidence and cap two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md)
+The approved implementation direction is [Task 1: manage many, enter one](options_alpha_multi_position_task_1_manage_many_v0_1.md).
+[Task 2: portfolio evidence and cap two](options_alpha_multi_position_task_2_portfolio_entry_v0_1.md)
 is post-hackathon work and begins in shadow mode. Cap two remains a later,
 reversible Paper experiment behind explicit Trading/Risk and evidence gates.

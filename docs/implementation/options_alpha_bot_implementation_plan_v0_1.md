@@ -11,10 +11,10 @@
 | Status | Active hackathon vertical-slice plan; adversarial scope review incorporated |
 | Trading environment | Alpaca Paper only during the hackathon |
 | Default LLM | `gpt-5.6-terra` through the OpenAI Responses API |
-| Primary design | [Trading System Design Specification](./options_alpha_trading_design_v0_1.md) |
-| Requirement tracker | [Requirements Traceability Matrix](./options_alpha_requirements_traceability_v0_1.md) |
-| Executable architecture | [Architecture Slice v0.1](./options_alpha_architecture_slice_v0_1.md) |
-| Exit review | [Exit Policy and Position-Lifecycle Review v0.1](./options_alpha_exit_policy_review_v0_1.md) |
+| Primary design | [Trading System Design Specification](options_alpha_trading_design_v0_1.md) |
+| Requirement tracker | [Requirements Traceability Matrix](../options_alpha_requirements_traceability_v0_1.md) |
+| Executable architecture | [Architecture Slice v0.1](options_alpha_architecture_slice_v0_1.md) |
+| Exit review | [Exit Policy and Position-Lifecycle Review v0.1](options_alpha_exit_policy_review_v0_1.md) |
 | External review | Claims are preserved in Section 3.2 as advisory dispositions; the named source artifact is not present in this repository and cannot serve as release evidence |
 | Alpaca skill review | [Alpaca Trading API skills](https://github.com/alpacahq/alpaca-skills/tree/main/skills/trading-api), advisory patterns only; no runtime skill installed |
 
@@ -212,7 +212,7 @@ The NVDA earnings fixture is a contract test only. It does not change the ETF-fi
 | Alpaca agent tools | Alpaca MCP Server V2, read-only toolsets only | Demonstrates sponsor technology without exposing order tools to the LLM. Start with `account,assets,stock-data,options-data,news`. |
 | Operator diagnostics | Version-pinned Alpaca CLI, optional | Use only for schema discovery, `doctor`, read-only inspection, request `--dry-run`, and a rehearsed release smoke test. It is not the production broker adapter or an unattended order path. |
 | LLM | Official OpenAI Python SDK, Responses API, `gpt-5.6-terra` | Structured outputs, configurable reasoning effort, and model override. Set `store=False`. |
-| Dashboard | FastAPI server-rendered Jinja2, HTMX, and Plotly | One deployable Python application with live operational views and no separate frontend build. Implement the judge/operator boundary, five-view information architecture, component states, and responsive behavior from [Frontend Design v0.1](./options_alpha_frontend_design_v0_1.md). |
+| Dashboard | FastAPI server-rendered Jinja2, HTMX, and Plotly | One deployable Python application with live operational views and no separate frontend build. Implement the judge/operator boundary, five-view information architecture, component states, and responsive behavior from [Frontend Design v0.1](options_alpha_frontend_design_v0_1.md). |
 | HTTP resilience | SDK retry controls plus bounded exponential backoff | Retry only safe reads and explicitly idempotent writes. |
 | Logging | Python logging with JSON formatting and correlation IDs | Machine-readable audit and deploy logs without a large observability stack. |
 | Tests | `pytest`, existing `unittest` compatibility, `pytest-asyncio`, and mocked provider clients | Preserve existing tests while adding fixtures, adapters, replay, and async coverage. |
@@ -403,7 +403,7 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** eligibility, Paper-only authority, build rules, H0 scope, and fallback interpretation are recorded. Uncalibrated trading thresholds remain explicitly provisional and do not block read-only work.
 
-**Status: `COMPLETE`, 28 August 2026.** Recorded in the [Phase 0 record](./options_alpha_phase0_event_cut_line_v0_1.md), which is normative for the frozen H0 scope (§3), Paper-only authority (§4), ownership (§5), and the binding fallbacks `F-01` to `F-06` (§6). Five organizer confirmations remain open; each is covered by a fallback with a named replacement trigger and a bounded cost, so none blocks Phase 1.
+**Status: `COMPLETE`, 28 August 2026.** Recorded in the [Phase 0 record](options_alpha_phase0_event_cut_line_v0_1.md), which is normative for the frozen H0 scope (§3), Paper-only authority (§4), ownership (§5), and the binding fallbacks `F-01` to `F-06` (§6). Five organizer confirmations remain open; each is covered by a fallback with a named replacement trigger and a bounded cost, so none blocks Phase 1.
 
 ### Phase 1: Executable vertical skeleton - 0.75 day
 
@@ -431,7 +431,7 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Exit gate:** the read-only path emits a reproducible H0 evidence pack or a reasoned refusal, with no expected answer visible to the system.
 
-**Status: `COMPLETE`, 28 August 2026.** `ReadOnlyAlpacaClient` is GET-only by construction and is deliberately not built on `TradingClient`. `evidence.py` discards the forming session while the market is open, applies feed-specific freshness, and takes its confirmation from a different instrument than its structure signal. `freeze.py` writes a live observation plus a provenance manifest to `fixtures/h0/frozen/`, and the frozen file replays to an identical decision. The frozen H0 rule is [`SRC-SIGNAL`](./options_alpha_h0_signal_spec_v0_1.md), which also declares benchmark `B0` and null hypothesis `H0`.
+**Status: `COMPLETE`, 28 August 2026.** `ReadOnlyAlpacaClient` is GET-only by construction and is deliberately not built on `TradingClient`. `evidence.py` discards the forming session while the market is open, applies feed-specific freshness, and takes its confirmation from a different instrument than its structure signal. `freeze.py` writes a live observation plus a provenance manifest to `fixtures/h0/frozen/`, and the frozen file replays to an identical decision. The frozen H0 rule is [`SRC-SIGNAL`](options_alpha_h0_signal_spec_v0_1.md), which also declares benchmark `B0` and null hypothesis `H0`.
 
 ### Phase 3: Bounded model memo, option mapping, and ablation - 1 day
 
@@ -464,7 +464,7 @@ The phases are dependency-ordered and sum to seven team-days. They deliberately 
 
 **Autonomous position-lifecycle sub-gate:** an entry becomes open only from reconciled fills; actual fill quantity and net debit become the exit basis; pending, partial, open, closing, and flat states are durable; restart reconstructs broker exposure; a close remains owned until fills reconcile; and trigger/precedence tests cover missing data, sessions, events, and bounded close replacement.
 
-**Status: `PARTIAL`, 28 August 2026.** The execution-transport sub-gate is complete: one watched Paper MLeg lifecycle produced observed fills and a broker-flat result; see `artifacts/h0_paper_lifecycle.md`. The command does not persist fills/positions or apply its printed reconciliation to durable lifecycle records, so this is not local-reconciliation evidence. The autonomous sub-gate is not complete. `TradingAgent` currently turns an unreconciled accepted entry into `POSITION_OPENED`, stores estimated rather than filled debit in process memory, and turns an accepted close into `POSITION_CLOSED` before fill reconciliation. Restart reconstruction, periodic reconciliation, post-submission order handling, and the entry window are absent. Remediation and acceptance evidence are defined in the [exit review](./options_alpha_exit_policy_review_v0_1.md).
+**Status: `PARTIAL`, 28 August 2026.** The execution-transport sub-gate is complete: one watched Paper MLeg lifecycle produced observed fills and a broker-flat result; see `artifacts/h0_paper_lifecycle.md`. The command does not persist fills/positions or apply its printed reconciliation to durable lifecycle records, so this is not local-reconciliation evidence. The autonomous sub-gate is not complete. `TradingAgent` currently turns an unreconciled accepted entry into `POSITION_OPENED`, stores estimated rather than filled debit in process memory, and turns an accepted close into `POSITION_CLOSED` before fill reconciliation. Restart reconstruction, periodic reconciliation, post-submission order handling, and the entry window are absent. Remediation and acceptance evidence are defined in the [exit review](options_alpha_exit_policy_review_v0_1.md).
 
 ### Phase 5: Five-view judge experience - 1 day
 
@@ -732,7 +732,7 @@ Record changes to architecture or scope here and mirror requirement changes in t
 
 ## 17. Immediate next actions
 
-1. Keep autonomous Paper entry disabled until `EXIT-AC-01` through `EXIT-AC-16` in the [exit review](./options_alpha_exit_policy_review_v0_1.md) are disposed and the applicable H0 evidence passes.
+1. Keep autonomous Paper entry disabled until `EXIT-AC-01` through `EXIT-AC-16` in the [exit review](options_alpha_exit_policy_review_v0_1.md) are disposed and the applicable H0 evidence passes.
 2. Implement durable pending/open/closing/flat strategy state from reconciled broker fills and positions; reconstruct it before the first post-restart decision.
 3. Replace free-text invalidation extraction and the DTE time stop with typed completed-session rules; ensure missing premium data cannot suppress independent exits.
 4. Add a post-submission entry-order deadline, terminal/partial/late-fill handling, and bounded close submit/replace/cancel/reconcile behavior; retain responsibility for every filled unit until Alpaca confirms flat.

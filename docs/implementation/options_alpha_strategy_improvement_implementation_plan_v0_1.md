@@ -10,9 +10,9 @@
 | Primary objective | Turn trading observations into reproducible, governed strategy evidence without online self-modification |
 | Trading environment | Alpaca Paper only |
 | Governing timezone | `America/New_York`, using the authoritative exchange calendar |
-| Related architecture | [Architecture Slice](./options_alpha_architecture_slice_v0_1.md) |
-| Related bot plan | [Bot Implementation Plan](./options_alpha_bot_implementation_plan_v0_1.md) |
-| Related lifecycle review | [Exit Policy and Position-Lifecycle Review](./options_alpha_exit_policy_review_v0_1.md) |
+| Related architecture | [Architecture Slice](options_alpha_architecture_slice_v0_1.md) |
+| Related bot plan | [Bot Implementation Plan](options_alpha_bot_implementation_plan_v0_1.md) |
+| Related lifecycle review | [Exit Policy and Position-Lifecycle Review](options_alpha_exit_policy_review_v0_1.md) |
 
 ## 1. Decision and boundaries
 

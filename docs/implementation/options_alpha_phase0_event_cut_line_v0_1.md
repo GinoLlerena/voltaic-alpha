@@ -142,7 +142,7 @@ backstop for a technical failure, never a planned part of the schedule.
 question the fallback was hedging against does not arise. The fallback is
 retired and pre-existing code is no longer tracked as an open risk.
 
-The [reuse ledger](./options_alpha_reuse_ledger.md) is kept, not because the
+The [reuse ledger](options_alpha_reuse_ledger.md) is kept, not because the
 question is still open, but because it is the evidence for the answer: it names
 the three pre-event modules the H0 path uses - the contracts, the ports and the
 workflow state machine - with their baseline commit and replacement cost, and it
@@ -392,6 +392,6 @@ owed by the start of Phase 5.
    (`DEC-006`) — cheap, and it settles `F-06`.
 5. Decide `D-01` no later than the start of Phase 5, and earlier if Phase 1
    configuration would otherwise encode a host assumption.
-6. Keep the [reuse ledger](./options_alpha_reuse_ledger.md) current from the
+6. Keep the [reuse ledger](options_alpha_reuse_ledger.md) current from the
    first Phase 1 module onward.
 7. Add "flip the repository to public" to the `G4` checklist (`F-J`).

@@ -13,8 +13,8 @@ not authorize concurrent entry.*
 | Target | Current hackathon runtime |
 | Directional effort | 3-5 engineer-days |
 | Required entry capacity after delivery | One open or pending strategy |
-| Master handoff | [Multi-Position Scaling Handoff](./options_alpha_multi_position_scaling_handoff_v0_1.md) |
-| Deferred task | [Task 2 — Portfolio Evidence and Cap Two](./options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) |
+| Master handoff | [Multi-Position Scaling Handoff](options_alpha_multi_position_scaling_handoff_v0_1.md) |
+| Deferred task | [Task 2 — Portfolio Evidence and Cap Two](options_alpha_multi_position_task_2_portfolio_entry_v0_1.md) |
 
 ## 1. Outcome
 

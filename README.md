@@ -66,7 +66,7 @@ deliberately separate layers:
    ports, and a bounded fail-closed decision workflow.
 
 Neither layer creates a trading bot or places orders. The architecture is
-documented in [Architecture Slice v0.1](docs/options_alpha_architecture_slice_v0_1.md).
+documented in [Architecture Slice v0.1](docs/implementation/options_alpha_architecture_slice_v0_1.md).
 
 It answers four early questions:
 
@@ -265,7 +265,7 @@ Disarm with `scripts/disarm_worker.sh`.
 profit-capture, and DTE rules with testable precedence. Those rules are not yet
 an approved exit policy. The disposition of every lifecycle finding is in
 section 0 of the
-[Exit Policy and Position-Lifecycle Review](docs/options_alpha_exit_policy_review_v0_1.md).
+[Exit Policy and Position-Lifecycle Review](docs/implementation/options_alpha_exit_policy_review_v0_1.md).
 
 ## The judge dashboard
 
@@ -311,7 +311,7 @@ The currently published event criteria are Application of Technology, Presentati
 
 ## Frontend design
 
-The judge-facing UX/UI baseline is defined in [Frontend Design v0.1](docs/options_alpha_frontend_design_v0_1.md). It specifies the five-view information architecture, lifecycle/refusal/recovery journeys, evidence and authority presentation, responsive behavior, accessibility, privacy, view-model boundaries, and staged implementation plan. It is a design specification; templates, styles, routes, and dashboard tests are not implemented yet.
+The judge-facing UX/UI baseline is defined in [Frontend Design v0.1](docs/implementation/options_alpha_frontend_design_v0_1.md). It specifies the five-view information architecture, lifecycle/refusal/recovery journeys, evidence and authority presentation, responsive behavior, accessibility, privacy, view-model boundaries, and staged implementation plan. It is a design specification; templates, styles, routes, and dashboard tests are not implemented yet.
 
 ## Next architecture increment
 
@@ -334,4 +334,4 @@ The project adopted their useful reproducibility, Paper-endpoint verification, e
 - PostgreSQL will be authoritative, while any filesystem run package must be a derived confidential/redacted export whose root is ignored by version control before creation; and
 - the generic backtest workflow informs replay artifacts, but options-spread selection, fills, expiry, and exercise/assignment require project-owned logic.
 
-See the [implementation-plan disposition](docs/options_alpha_bot_implementation_plan_v0_1.md#34-disposition-of-alpaca-trading-api-agent-skills), [execution-adapter obligations](docs/options_alpha_architecture_slice_v0_1.md#31-future-execution-adapter-obligations), and [traceability dispositions](docs/options_alpha_requirements_traceability_v0_1.md#33-alpaca-trading-api-skill-disposition-register).
+See the [implementation-plan disposition](docs/implementation/options_alpha_bot_implementation_plan_v0_1.md#34-disposition-of-alpaca-trading-api-agent-skills), [execution-adapter obligations](docs/implementation/options_alpha_architecture_slice_v0_1.md#31-future-execution-adapter-obligations), and [traceability dispositions](docs/options_alpha_requirements_traceability_v0_1.md#33-alpaca-trading-api-skill-disposition-register).

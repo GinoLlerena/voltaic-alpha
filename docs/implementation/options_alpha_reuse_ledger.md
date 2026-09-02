@@ -6,7 +6,7 @@
 |---|---|
 | Version | v0.1 |
 | Opened | 28 August 2026, Phase 0 |
-| Required by | Fallback `F-02` ([Phase 0 record](./options_alpha_phase0_event_cut_line_v0_1.md) §6) |
+| Required by | Fallback `F-02` ([Phase 0 record](options_alpha_phase0_event_cut_line_v0_1.md) §6) |
 | Owner | Gino Llerena (Voltaic Alpha) |
 | Baseline boundary | Tag `baseline-pre-event` |
 

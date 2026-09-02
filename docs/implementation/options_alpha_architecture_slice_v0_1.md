@@ -12,8 +12,8 @@
 | Scope | Decision snapshot through approved or rejected spread candidate |
 | Execution | Deliberately absent |
 | Legacy compatibility | Existing event-fixture interaction lab remains unchanged |
-| Implementation plan | [Bot Implementation Plan](./options_alpha_bot_implementation_plan_v0_1.md) |
-| Requirement tracker | [Requirements Traceability Matrix](./options_alpha_requirements_traceability_v0_1.md) |
+| Implementation plan | [Bot Implementation Plan](options_alpha_bot_implementation_plan_v0_1.md) |
+| Requirement tracker | [Requirements Traceability Matrix](../options_alpha_requirements_traceability_v0_1.md) |
 
 ## 1. Purpose
 

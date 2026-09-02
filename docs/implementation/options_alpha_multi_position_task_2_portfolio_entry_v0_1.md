@@ -13,8 +13,8 @@ not authorized by this document.*
 | Directional engineering effort | 12-21 engineer-days |
 | Evidence duration | Absolute minimum about six trading weeks; realistically several months |
 | Entry capacity during implementation | One open or pending strategy |
-| Dependency | [Task 1 — Manage Many, Enter One](./options_alpha_multi_position_task_1_manage_many_v0_1.md) |
-| Master handoff | [Multi-Position Scaling Handoff](./options_alpha_multi_position_scaling_handoff_v0_1.md) |
+| Dependency | [Task 1 — Manage Many, Enter One](options_alpha_multi_position_task_1_manage_many_v0_1.md) |
+| Master handoff | [Multi-Position Scaling Handoff](options_alpha_multi_position_scaling_handoff_v0_1.md) |
 
 ## 1. Outcome
 

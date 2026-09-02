@@ -473,7 +473,7 @@ Entry is only half of the system. Each open trade retains the original thesis, i
 
 ## 15.2 H0 operational disposition
 
-The current code implements provisional trigger arithmetic, but it does **not** yet validate the complete autonomous position lifecycle. The governing adversarial assessment is the [Exit Policy and Position-Lifecycle Review v0.1](./options_alpha_exit_policy_review_v0_1.md).
+The current code implements provisional trigger arithmetic, but it does **not** yet validate the complete autonomous position lifecycle. The governing adversarial assessment is the [Exit Policy and Position-Lifecycle Review v0.1](options_alpha_exit_policy_review_v0_1.md).
 
 For H0, the candidate policy separates broker integrity from economic exits. Reconciliation mismatch, unexpected or partial exposure, and ambiguous close state are handled first as incidents; the agent retains responsibility until Alpaca confirms the remaining filled quantity or flat state. Economic precedence is then expiry/calendar safety, scheduled-event control, typed completed-session thesis invalidation, a loss cap calculated from actual filled debit, a three-completed-session time stop, and profit capture calculated from actual fill. Missing option value is an integrity condition that halts new risk, not `HOLD` and not a reason to suppress independent exit rules.
 
