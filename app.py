@@ -41,6 +41,8 @@ from options_alpha_lab.persistence.models import (
 )
 from options_alpha_lab.presentation.decision import load as decision_view
 from options_alpha_lab.presentation.explain import why_decision
+from options_alpha_lab.presentation.export import digest as proof_digest
+from options_alpha_lab.presentation.export import render as proof_bytes
 from options_alpha_lab.presentation.proof import proof_tiles
 from options_alpha_lab.presentation.status import system_status
 from options_alpha_lab.presentation.tour import SCENES
@@ -402,6 +404,13 @@ chosen_id = st.sidebar.radio(
 )
 decision = next(d for d in decisions if d.id == chosen_id)
 
+# CIIP-006. One resolve, isolated by construction, instead of a dozen ad hoc
+# cross-table queries spread through five tab bodies. That scattering is how
+# CIIP-CV-003 happened: a single query forgot its filter, and nothing could
+# detect it while the evidence set held one lifecycle.
+with Session(engine()) as _lineage_session:
+    lineage = decision_view(_lineage_session, decision)
+
 shown = len(labels)
 st.sidebar.markdown(
     f'<div style="font-family:var(--mono);font-size:.62rem;color:var(--dim);'
@@ -461,6 +470,18 @@ else:
         st.query_params["tour"] = "1"
         st.rerun()
 
+# CIIP-007. A reviewer can leave with the proof chain as a file they can diff
+# and check without this application or its database. Redaction is by allowlist,
+# so a new column cannot leak into an export by default.
+_manifest = proof_bytes(lineage)
+st.download_button(
+    "Download proof manifest",
+    data=_manifest,
+    file_name=f"proof-{decision.snapshot_id}.json",
+    mime="application/json",
+    help=f"Deterministic and redacted · {proof_digest(lineage)[:19]}…",
+)
+
 # CIIP-005. The five tabs hold everything needed to reconstruct a decision, but
 # they make the reader do the reconstruction. This does it once, in authority
 # order, and renders a missing stage rather than skipping it — the refusal case
@@ -488,20 +509,13 @@ tabs = st.tabs([
 snapshot = rows(
     select(MarketSnapshot).where(MarketSnapshot.id == decision.market_snapshot_id)
 )[0]
-# CIIP-006. One resolve, isolated by construction, instead of a dozen ad hoc
-# cross-table queries spread through five tab bodies. That scattering is how
-# CIIP-CV-003 happened: a single query forgot its filter, and nothing could
-# detect it while the evidence set held one lifecycle.
-with Session(engine()) as _view_session:
-    view = decision_view(_view_session, decision)
-
-packs = view.packs
-theses = view.theses
+packs = lineage.packs
+theses = lineage.theses
 spreads = rows(
     select(SpreadCandidateRecord).where(SpreadCandidateRecord.decision_id == decision.id)
 )
-risks = view.risks
-intents = view.intents
+risks = lineage.risks
+intents = lineage.intents
 
 # ----------------------------------------------------------- 1 evidence/setup
 with tabs[0]:
@@ -518,7 +532,7 @@ with tabs[0]:
         ("Input hash", snapshot.payload_hash),
     ])
 
-    signals = view.signals
+    signals = lineage.signals
     cited = set(packs[0].evidence_ids) if packs else set()
     heading("Signals", "cited signals are lit; the rest were observed and not used")
     signals_panel(signals, cited, packs[0].direction if packs else "")
@@ -699,11 +713,11 @@ with tabs[3]:
     # CIIP-CV-003. This used to select every BrokerOrder in the database, which
     # looked coherent only while exactly one lifecycle existed. Traverse the
     # lineage instead: Decision -> OrderIntent -> BrokerOrder -> Fill.
-    orders = view.orders
+    orders = lineage.orders
     if orders:
         heading("Reconciled broker state", "acceptance is not a fill")
         for order in orders:
-            fills = view.fills_for(order.id)
+            fills = lineage.fills_for(order.id)
             leg_text = " · ".join(f"{f.leg_symbol} @ {money(f.price)}" for f in fills)
             block(
                 f'<div class="card" style="margin-bottom:.5rem">'

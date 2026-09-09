@@ -288,7 +288,7 @@ class SelectedDecisionIsolationTests(unittest.TestCase):
                 f"{forbidden} belongs in the read model, not the dashboard",
             )
         self.assertIn("decision_view(", source, "the dashboard must render a view model")
-        self.assertIn("view.fills_for(", source)
+        self.assertIn("lineage.fills_for(", source)
 
     def test_halt_state_selector_is_labelled_a_simulator(self) -> None:
         """`CIIP-CV-004`: it changes no durable state and must not look like a control."""
