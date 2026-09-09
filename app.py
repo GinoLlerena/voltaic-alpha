@@ -31,21 +31,15 @@ from sqlalchemy.orm import Session
 from options_alpha_lab.architecture.contracts import ExecutionState
 from options_alpha_lab.persistence.models import (
     AuditEvent,
-    BrokerOrder,
     Decision,
-    EvidencePack,
-    Fill,
     Incident,
     MarketSnapshot,
     ModelCall,
-    OrderIntent,
     Position,
     PreparedOrderRequest,
-    RiskDecisionRecord,
-    SignalRecord,
     SpreadCandidateRecord,
-    ThesisRecord,
 )
+from options_alpha_lab.presentation.decision import load as decision_view
 from options_alpha_lab.presentation.explain import why_decision
 from options_alpha_lab.presentation.proof import proof_tiles
 from options_alpha_lab.presentation.status import system_status
@@ -494,13 +488,20 @@ tabs = st.tabs([
 snapshot = rows(
     select(MarketSnapshot).where(MarketSnapshot.id == decision.market_snapshot_id)
 )[0]
-packs = rows(select(EvidencePack).where(EvidencePack.market_snapshot_id == snapshot.id))
-theses = rows(select(ThesisRecord).where(ThesisRecord.decision_id == decision.id))
+# CIIP-006. One resolve, isolated by construction, instead of a dozen ad hoc
+# cross-table queries spread through five tab bodies. That scattering is how
+# CIIP-CV-003 happened: a single query forgot its filter, and nothing could
+# detect it while the evidence set held one lifecycle.
+with Session(engine()) as _view_session:
+    view = decision_view(_view_session, decision)
+
+packs = view.packs
+theses = view.theses
 spreads = rows(
     select(SpreadCandidateRecord).where(SpreadCandidateRecord.decision_id == decision.id)
 )
-risks = rows(select(RiskDecisionRecord).where(RiskDecisionRecord.decision_id == decision.id))
-intents = rows(select(OrderIntent).where(OrderIntent.decision_id == decision.id))
+risks = view.risks
+intents = view.intents
 
 # ----------------------------------------------------------- 1 evidence/setup
 with tabs[0]:
@@ -517,7 +518,7 @@ with tabs[0]:
         ("Input hash", snapshot.payload_hash),
     ])
 
-    signals = rows(select(SignalRecord).where(SignalRecord.market_snapshot_id == snapshot.id))
+    signals = view.signals
     cited = set(packs[0].evidence_ids) if packs else set()
     heading("Signals", "cited signals are lit; the rest were observed and not used")
     signals_panel(signals, cited, packs[0].direction if packs else "")
@@ -698,16 +699,11 @@ with tabs[3]:
     # CIIP-CV-003. This used to select every BrokerOrder in the database, which
     # looked coherent only while exactly one lifecycle existed. Traverse the
     # lineage instead: Decision -> OrderIntent -> BrokerOrder -> Fill.
-    intent_ids = [i.id for i in intents]
-    orders = (
-        rows(select(BrokerOrder).where(BrokerOrder.order_intent_id.in_(intent_ids)))
-        if intent_ids
-        else []
-    )
+    orders = view.orders
     if orders:
         heading("Reconciled broker state", "acceptance is not a fill")
         for order in orders:
-            fills = rows(select(Fill).where(Fill.broker_order_id == order.id))
+            fills = view.fills_for(order.id)
             leg_text = " · ".join(f"{f.leg_symbol} @ {money(f.price)}" for f in fills)
             block(
                 f'<div class="card" style="margin-bottom:.5rem">'

@@ -270,19 +270,25 @@ class SelectedDecisionIsolationTests(unittest.TestCase):
     rendering is what happens to be true today.
     """
 
-    def test_outcome_orders_are_scoped_by_lineage(self) -> None:
+    def test_the_dashboard_does_not_query_orders_or_fills_itself(self) -> None:
+        """`CIIP-CV-003`, then `CIIP-006`: scoping moved into the read model.
+
+        The original defect was `select(BrokerOrder)` with no filter. Fixing the
+        filter in place would have left the next query free to forget it again,
+        so the stronger property is asserted instead: the dashboard does not
+        reach for orders or fills at all, and takes them from a view that cannot
+        contain another decision's records. Lineage isolation itself is proved
+        against two lifecycles in test_presentation_decision.py.
+        """
         source = APP.read_text(encoding="utf-8")
-        self.assertNotIn(
-            "rows(select(BrokerOrder))",
-            source,
-            "Outcome tab selects every BrokerOrder rather than the selected "
-            "decision's lineage (CIIP-CV-003)",
-        )
-        self.assertIn(
-            "BrokerOrder.order_intent_id.in_(intent_ids)",
-            source,
-            "orders must be reached through Decision -> OrderIntent -> BrokerOrder",
-        )
+        for forbidden in ("select(BrokerOrder)", "select(Fill)", "select(OrderIntent)"):
+            self.assertNotIn(
+                forbidden,
+                source,
+                f"{forbidden} belongs in the read model, not the dashboard",
+            )
+        self.assertIn("decision_view(", source, "the dashboard must render a view model")
+        self.assertIn("view.fills_for(", source)
 
     def test_halt_state_selector_is_labelled_a_simulator(self) -> None:
         """`CIIP-CV-004`: it changes no durable state and must not look like a control."""

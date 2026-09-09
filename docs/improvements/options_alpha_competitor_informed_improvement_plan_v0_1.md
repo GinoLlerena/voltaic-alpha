@@ -910,6 +910,13 @@ or defer that acceptance criterion until redeployment produces a second observed
 lifecycle. Do not weaken the criterion to one lifecycle — isolation is untestable
 against a single record.
 
+**Resolved 9 September 2026 by `CIIP-006`.** The first option was taken. A
+second complete lifecycle — snapshot, decision, memo, two intents, two orders,
+two fills, position — is constructed in `tests/test_presentation_decision.py`,
+and isolation is asserted across both: no view may contain the other's orders,
+fills, memo, position or intents. The criterion stands unweakened, and the tests
+would have failed against the pre-`CIIP-001` dashboard.
+
 #### `CIIP-VAL-003` — The first chart tranche is not buildable from evidence
 
 `CIIP-005` specifies two charts. One cannot be built, and the reason is
