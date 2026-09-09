@@ -160,6 +160,13 @@ health or configuration of a remote deployment.
 
 These are implementation findings, not aesthetic preferences.
 
+> **Status, 9 September 2026.** `CIIP-001` closed `CIIP-CV-001`, `CIIP-CV-003`
+> and `CIIP-CV-004` with regression tests, and `CIIP-002` closed `CIIP-CV-005`.
+> `CIIP-CV-002` is **partly open**: order scoping is fixed, but the correlation
+> check between a live decision and committed receipt/ablation artifacts belongs
+> to `CIIP-2`'s read models and is not yet built. Line numbers and file sizes
+> below describe the `2657a1e` baseline and are deliberately left as they were.
+
 #### `CIIP-CV-001` — The global safety strip is hardcoded
 
 `app.py` renders `Paper`, `Order writes: Disabled`, `Operator approval: Required`,
