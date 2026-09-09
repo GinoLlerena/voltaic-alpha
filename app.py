@@ -46,6 +46,7 @@ from options_alpha_lab.persistence.models import (
     SpreadCandidateRecord,
     ThesisRecord,
 )
+from options_alpha_lab.presentation.status import system_status
 
 ROOT = Path(__file__).resolve().parent
 DB = ROOT / "demo" / "h0_demo.db"
@@ -290,14 +291,21 @@ block(
     f'<div class="sub">{esc(source_label())}</div></div>'
 )
 
-annunciator([
-    ("Environment", "Paper", "ok"),
-    ("Order writes", "Disabled", "ok"),
-    ("Operator approval", "Required", "ok"),
-    ("Open positions", str(len(open_positions)), "ok" if not open_positions else "warn"),
-    ("Open incidents", str(len(incidents)), "ok" if not incidents else "bad"),
-    ("Live endpoint", "None", "off"),
-])
+# CIIP-CV-001. These were string constants, so the strip said the same
+# reassuring thing over a live database, a fixture, or nothing at all. Values now
+# come from `runs` and `worker_leases`; anything unsourceable renders UNKNOWN.
+with Session(engine()) as _status_session:
+    _status = system_status(_status_session)
+annunciator([(item.label, item.value, item.tone) for item in _status])
+block(
+    '<div class="note" style="margin-top:-.4rem;margin-bottom:.9rem">'
+    + " · ".join(
+        f"{esc(i.label)}: {esc(i.source)}"
+        + (f" ({esc(i.reason)})" if i.reason else "")
+        for i in _status
+    )
+    + "</div>"
+)
 
 # ------------------------------------------------------------------- selector
 st.sidebar.markdown(
@@ -591,7 +599,15 @@ with tabs[3]:
                 ("Maximum loss", money(spread.calculated_max_loss)),
             ])
 
-    orders = rows(select(BrokerOrder))
+    # CIIP-CV-003. This used to select every BrokerOrder in the database, which
+    # looked coherent only while exactly one lifecycle existed. Traverse the
+    # lineage instead: Decision -> OrderIntent -> BrokerOrder -> Fill.
+    intent_ids = [i.id for i in intents]
+    orders = (
+        rows(select(BrokerOrder).where(BrokerOrder.order_intent_id.in_(intent_ids)))
+        if intent_ids
+        else []
+    )
     if orders:
         heading("Reconciled broker state", "acceptance is not a fill")
         for order in orders:
@@ -720,7 +736,7 @@ with tabs[4]:
         "most needs reducing.</div>"
     )
 
-    heading("Halt states", "pick one to see what it permits")
+    heading("Halt states", "POLICY SIMULATOR · NO STATE CHANGE")
     state = st.selectbox(
         "Durable execution state", [s.value for s in ExecutionState], index=0,
         label_visibility="collapsed",
