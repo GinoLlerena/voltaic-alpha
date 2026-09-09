@@ -38,3 +38,5 @@ and the [video script](../options_alpha_video_script_v0_1.md).
 | [Validation test suite](options_alpha_agents_validation_test_suite.md) | The gates and what each one proves |
 | [Phase 0 event cut line](options_alpha_phase0_event_cut_line_v0_1.md) | What existed before the event, and the findings register |
 | [Reuse ledger](options_alpha_reuse_ledger.md) | Pre-existing code and its provenance |
+| [Winner analysis (`WA-`)](options_alpha_winner_analysis_v0_1.md) | Forensic analysis of the winning hackathon entry, ALPHA HUNTER, and what to learn from it |
+| [Runner-up analysis (`RA-`)](options_alpha_runnerup_analysis_v0_1.md) | Forensic analysis of the second-place entry, TradePilot AI, and why its packaging beat ours |

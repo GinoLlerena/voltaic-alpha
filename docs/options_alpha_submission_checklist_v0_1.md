@@ -63,6 +63,8 @@ option, with the real platform named in Additional Information.
 Paper-only engineering demonstration. The public Alibaba Cloud ECS dashboard is
 credential-free and cannot place orders. A separate worker executes only through
 Alpaca's Paper endpoint behind deterministic risk and authorization checks.
+Alpaca Paper Trading account: PA3WZR22ITRR (account_number as shown in the
+Alpaca dashboard). No API key or secret is included.
 Option quotes use the indicative feed because this account has no OPRA
 entitlement; displayed prices are therefore not executable marks. The current
 sample is too small to establish alpha, and all P&L is reported as a diagnostic
