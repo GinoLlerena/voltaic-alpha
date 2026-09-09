@@ -162,7 +162,8 @@ These are implementation findings, not aesthetic preferences.
 
 > **Status, 9 September 2026.** `CIIP-001` closed `CIIP-CV-001`, `CIIP-CV-003`
 > and `CIIP-CV-004` with regression tests, and `CIIP-002` closed `CIIP-CV-005`.
-> `CIIP-CV-002` is **partly open**: order scoping is fixed, but the correlation
+> `CIIP-003` and `CIIP-005` followed, with `CIIP-VAL-003` recording that one of
+> the two specified charts has no data source. `CIIP-CV-002` is **partly open**: order scoping is fixed, but the correlation
 > check between a live decision and committed receipt/ablation artifacts belongs
 > to `CIIP-2`'s read models and is not yet built. Line numbers and file sizes
 > below describe the `2657a1e` baseline and are deliberately left as they were.
@@ -908,3 +909,31 @@ with one entry and one close order.
 or defer that acceptance criterion until redeployment produces a second observed
 lifecycle. Do not weaken the criterion to one lifecycle — isolation is untestable
 against a single record.
+
+#### `CIIP-VAL-003` — The first chart tranche is not buildable from evidence
+
+`CIIP-005` specifies two charts. One cannot be built, and the reason is
+structural rather than a matter of effort.
+
+**Completed daily bars with the forming bar excluded** has no data source.
+Daily bars are fetched at decision time and used, but **never persisted**: no
+model stores them, and `market_snapshots.payload` carries `signals`,
+`option_chain`, `underlying_price` and provenance, with no `bars` key. Drawing
+this chart today would require inventing the series, which §3.4 of this plan
+explicitly rejects.
+
+The committed evidence set is thinner than the plan assumes in a second way:
+`position_observations` and `exit_decisions` both hold **zero rows**, so the
+mark-to-market curve that would be the natural substitute is equally unavailable.
+The live database that held 1,155 observations was destroyed on 9 September
+(`CIIP-VAL-001`).
+
+**Disposition taken.** The order-lifecycle chart, which *is* supported by
+`broker_orders` and `fills`, proceeds. The bars chart is deferred and its
+prerequisite recorded: **persisting the decision's bar window is new work**, and
+belongs with `CIIP-2`'s read models or `CIIP-I`'s schema changes, not with a
+presentation package. Until then `CIIP-005` ships one chart, not two.
+
+This is the plan's own rule applied to itself: an evidence-backed visualization
+whose evidence does not exist is not a visualization to build later, it is a
+persistence gap to record now.
