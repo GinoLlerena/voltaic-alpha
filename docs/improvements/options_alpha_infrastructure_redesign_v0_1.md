@@ -6,7 +6,7 @@
 |---|---|
 | Version | v0.1 |
 | Date | 9 September 2026 |
-| Status | Design; nothing rebuilt yet |
+| Status | **Partly executed 10 September 2026** — host, database, code and journald caps done; off-host archival and the worker are blocked on account actions. See section 10 |
 | Prefix | `CIIP-I-` |
 | Raised by | [`CIIP-VAL-001`](options_alpha_competitor_informed_improvement_plan_v0_1.md) — the plan assumes infrastructure that no longer exists |
 | Sequence | Before `CIIP-4`; the six-week evidence clock starts at redeployment |
@@ -218,3 +218,74 @@ deliberate, separate, recorded operator action, consistent with `HK-007`.
 - whether the 5-minute rollup keeps bid/ask or only the spread mark;
 - whether `CIIP-I-004` payload offload is ever worth the replay risk; and
 - who owns the quarterly restore drill once the hackathon cadence ends.
+
+## 10. Execution record — 10 September 2026
+
+What was built, what is blocked, and on whom.
+
+### Done
+
+| Item | State |
+|---|---|
+| `CIIP-I-001` consolidated host | `options-alpha-demo` restarted and now runs dashboard + PostgreSQL 16.15 on one box. Hostname was already `options-alpha`. |
+| Elastic IP | `47.236.50.157` live again; the submission URL is unchanged |
+| Database | Role and database created, credential generated **on the host** and never printed. `create_schema` then `alembic upgrade head`: **20 tables at `0003_reasoning_effort`** |
+| Code | `CIIP-001`–`007` deployed — `app.py` at 919 lines, all nine `presentation/` modules importing |
+| `CIIP-I-005` journald caps | `SystemMaxUse=200M`, `MaxRetentionSec=30day` applied |
+| Worker unit | Installed, **disabled and inactive**, `BOT_MODE=observe`, `ALPACA_TRADING_ENABLED=false`, `REQUIRE_OPERATOR_APPROVAL=true` |
+
+Three things worth recording because they were not in the design.
+
+**The migration path is not `alembic upgrade head`.** Against an empty database
+that produces `relation "positions" does not exist`, because `0001_h0_baseline`
+is a deliberate no-op marker. Its own docstring says so: the metadata is the
+source of truth for a new database, so `create_schema` builds and stamps, and
+only then does `upgrade` apply `0002` and `0003`. The runbook should say this
+where a rebuild will actually read it.
+
+**The deployed package was a copy, not an editable install.** Shipping into
+`/opt/options-alpha/src` therefore changed nothing, and the dashboard failed with
+`ModuleNotFoundError: options_alpha_lab.presentation` while `src/` visibly
+contained it. Reinstalled with `pip install --no-deps --no-build-isolation -e .`
+after adding `setuptools`, so the package now resolves from `src/` and a future
+ship takes effect on restart — which is what `restore_hosted_demo.sh` already
+assumed in a comment.
+
+**HTTP 200 is not a health check.** The URL returned 200 while the app was
+raising on import, because Streamlit serves the shell and renders the traceback
+client-side. Any future check must assert page content, not status.
+
+### Blocked, and on whom
+
+#### `CIIP-I-BLK-001` — OSS is disabled on the account
+
+Creating the archive bucket fails with `StatusCode=403, ErrorCode=UserDisable`.
+The account shows **$0.00 available with $21.93 of September ECS accrued and
+unsettled**; ECS keeps running (PostPaid, no lock) but OSS will not serve.
+
+This blocks `CIIP-I-002` — off-host WAL archiving — and therefore the restore
+drill, which is the one acceptance criterion that mattered most after a teardown
+destroyed backups that shared a disk with their source. **The system currently
+has no off-host copy of anything.**
+
+*Needs:* settle the balance or activate OSS in the console. Until then, the
+honest interim is a manual `pg_dump` pulled to a machine outside this account —
+off-host in the only sense that matters.
+
+#### `CIIP-I-BLK-002` — the worker has no Alpaca credentials
+
+`observe` mode still reads market data, so the worker refuses to start with
+`ProviderError: Alpaca credentials are required for read-only access`. The
+credentials lived on the released host and are gone from the infrastructure.
+`/etc/options-alpha.env` carries empty `ALPACA_API_KEY`, `ALPACA_SECRET_KEY` and
+`OPENAI_API_KEY` placeholders with the enable command beside them.
+
+*Needs:* paste the Paper credentials, then `systemctl enable --now
+options-alpha-worker`. **The evidence clock for `CIIP-4` starts at that moment,
+not at redeployment.**
+
+### Not started
+
+`CIIP-I-003` tiered partitioning (the table is empty; better done with the
+rollup job), and `CIIP-I-006`–`008` logging changes, which are code rather than
+infrastructure.
