@@ -39,6 +39,10 @@ from options_alpha_lab.persistence.models import (
     PreparedOrderRequest,
     SpreadCandidateRecord,
 )
+from options_alpha_lab.presentation.artifacts import (
+    correlate_ablation,
+    correlate_receipt,
+)
 from options_alpha_lab.presentation.decision import load as decision_view
 from options_alpha_lab.presentation.explain import why_decision
 from options_alpha_lab.presentation.export import digest as proof_digest
@@ -760,20 +764,46 @@ with tabs[3]:
             "one open position</div></div></div>"
         )
 
+    # CIIP-CV-002. The selected decision may come from a live database while the
+    # receipt and ablation always come from committed files. Placed together
+    # without a qualifier, the receipt reads as this decision's outcome — which
+    # it usually is not. Correlate explicitly; adjacency is not evidence.
+    receipt_link = correlate_receipt(lineage, receipt)
+    ablation_link = correlate_ablation(lineage, ablation)
+
     final = receipt.get("final_state") or {}
     if final:
-        heading("Realised result", "a diagnostic, not a score")
+        if receipt_link.belongs:
+            heading("Realised result", "a diagnostic, not a score")
+        else:
+            heading("Realised result — a different decision", receipt_link.relation)
+            block(
+                '<div class="card" style="border-color:var(--accent);margin-bottom:.6rem">'
+                f'<div class="note">{esc(receipt_link.reason)}'
+                + (
+                    f" (checked on <code>{esc(receipt_link.matched_on)}</code>)"
+                    if receipt_link.matched_on
+                    else ""
+                )
+                + "</div></div>"
+            )
         metrics = [
             ("Open positions", str(final.get("open_positions", "—")), "ok"),
             ("Equity", str(final.get("equity_after", "—")), "neutral"),
             ("Realised", str(final.get("realized", "—")), "warn"),
         ]
-        if ablation.get("metrics"):
-            metrics.append(
-                ("Decisions changed by the model",
-                 str(ablation["metrics"].get("decisions_changed_by_model", "—")), "warn")
-            )
         annunciator(metrics)
+        if ablation.get("metrics"):
+            # Corpus-level, so it is rendered as its own card rather than as a
+            # metric of the selected decision.
+            block(
+                '<div class="card" style="margin-top:.6rem">'
+                f'{badge("ABLATION", "neutral")} '
+                f'<b>{esc(str(ablation["metrics"].get("decisions_changed_by_model", "—")))}</b>'
+                " decisions changed by the model"
+                f'<div class="note" style="margin-top:.4rem">{esc(ablation_link.reason)}'
+                "</div></div>"
+            )
         opened = (receipt.get("open") or {}).get("filled_avg_price")
         closed = (receipt.get("close") or {}).get("filled_avg_price")
         if opened and closed:

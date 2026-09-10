@@ -163,7 +163,8 @@ These are implementation findings, not aesthetic preferences.
 > **Status, 9 September 2026.** `CIIP-001` closed `CIIP-CV-001`, `CIIP-CV-003`
 > and `CIIP-CV-004` with regression tests, and `CIIP-002` closed `CIIP-CV-005`.
 > `CIIP-003` and `CIIP-005` followed, with `CIIP-VAL-003` recording that one of
-> the two specified charts has no data source. `CIIP-CV-002` is **partly open**: order scoping is fixed, but the correlation
+> the two specified charts has no data source. `CIIP-CV-002` was closed by the correlation check in
+> `presentation/artifacts.py`, which surfaced `CIIP-VAL-004`. Previously it read: order scoping is fixed, but the correlation
 > check between a live decision and committed receipt/ablation artifacts belongs
 > to `CIIP-2`'s read models and is not yet built. Line numbers and file sizes
 > below describe the `2657a1e` baseline and are deliberately left as they were.
@@ -944,3 +945,41 @@ presentation package. Until then `CIIP-005` ships one chart, not two.
 This is the plan's own rule applied to itself: an evidence-backed visualization
 whose evidence does not exist is not a visualization to build later, it is a
 persistence gap to record now.
+
+#### `CIIP-VAL-004` — The committed receipt correlates to no committed decision
+
+Closing `CIIP-CV-002` surfaced a stronger version of the defect it describes.
+
+The plan's concern was that a decision from a live database could be rendered
+beside a committed artifact and read as that decision's outcome. The committed
+evidence set does not even satisfy the weaker case:
+
+```
+receipt  artifacts/h0_paper_lifecycle.json   spy-lifecycle-20260828T154747Z
+         decision_hash  sha256:c418fac0…
+
+database demo/h0_demo.db                     spy-lifecycle-20260828T154747Z
+         decision_hash  sha256:75a9cc71…
+```
+
+Same snapshot, **different decision hash**. The demo database was rebuilt at some
+point and the decision re-derived, while the receipt is from the original live
+run. So the realized `-7.10` round trip has been rendering directly beneath a
+decision it cannot be proved to describe, for the whole judging period.
+
+Nothing about the trade is false — it happened, the fills are real, and the
+receipt is an honest record of it. What was wrong is the *adjacency*: a reader
+had no way to know the two were not the same decision, and every visual cue said
+they were.
+
+**Disposition taken.** `presentation/artifacts.py` correlates on `decision_hash`
+first and `snapshot_id` only as a fallback, since a snapshot can replay into
+several decisions while a hash cannot. The same-snapshot mismatch now renders as
+its own labelled card reading *"this receipt records a different evaluation of
+the same snapshot"*, and the ablation renders as `NOT_DECISION_SCOPED`, because
+a corpus-level result over five frozen cases belongs to no decision at all.
+
+**Still open.** Regenerating the demo database so its lifecycle decision hash
+matches the receipt would let the two correlate honestly. That is a fixture task,
+not a presentation one, and it should be done when `CIIP-I` rebuilds the
+evidence set — at which point this row can close.
