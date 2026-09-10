@@ -30,7 +30,6 @@ from sqlalchemy.orm import Session
 
 from options_alpha_lab.architecture.contracts import ExecutionState
 from options_alpha_lab.persistence.models import (
-    AuditEvent,
     Decision,
     Incident,
     MarketSnapshot,
@@ -39,6 +38,7 @@ from options_alpha_lab.persistence.models import (
     PreparedOrderRequest,
     SpreadCandidateRecord,
 )
+from options_alpha_lab.presentation.activity import for_decision as decision_trail
 from options_alpha_lab.presentation.artifacts import (
     correlate_ablation,
     correlate_receipt,
@@ -826,12 +826,25 @@ with tabs[3]:
             "</div>"
         )
 
-    heading("Audit trail", "every transition, in order")
-    events = rows(
-        select(AuditEvent)
-        .where(AuditEvent.correlation_id == decision.snapshot_id)
-        .order_by(AuditEvent.sequence)
+    # CIIP-006. audit_events.sequence is contiguous by construction, so a gap
+    # means an event that should have been written was not. A trail rendered
+    # without checking looks complete either way.
+    with Session(engine()) as _trail_session:
+        trail = decision_trail(_trail_session, decision)
+    heading(
+        "Audit trail",
+        "every transition, in order"
+        if trail.complete
+        else f"INCOMPLETE — missing sequence {', '.join(str(g) for g in trail.gaps)}",
     )
+    if not trail.complete:
+        block(
+            '<div class="card" style="border-color:var(--bad);margin-bottom:.5rem">'
+            '<div class="note">This trail has gaps. An event that should have been '
+            "recorded was not, so the sequence below is not the whole story."
+            "</div></div>"
+        )
+    events = trail.events
     block(
         '<ul class="seq">'
         + "".join(

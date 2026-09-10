@@ -1,7 +1,7 @@
 {
   "categories": {
     "code": {
-      "app.py": "sha256:1b37265d87f0370c7761d6c1433eb49f74fbf37fd2022a1f6098b8ec2d82d7ed",
+      "app.py": "sha256:2097ac2e5664422ba460c786ae2cb203dc035f0a75ab2e24d59cb1a38747d1a0",
       "scripts/arm_worker.sh": "sha256:3468a56ea685b63a623b61d500fb38215ba3af384f6bdcce76b78cde3c7de013",
       "scripts/backup_database.sh": "sha256:c93f79a43b6c753eebb85d7a3e930b1ec9e9b0e204e480d63d6341b17798b0c0",
       "scripts/build_demo_db.py": "sha256:3ce62c83bb66c315e5ae017e41c0f426f33c9b3b812269abc336b9504af48b5b",
@@ -44,6 +44,7 @@
       "src/options_alpha_lab/persistence/models.py": "sha256:7ed57fd4c36cb353a3fad96c074086ee6f6106268e39da1958a1e1e73d3ff695",
       "src/options_alpha_lab/persistence/repository.py": "sha256:28d1d480b56e4e0c16298eebfe55e6e1744279d2d6ee7637368f282e64a12489",
       "src/options_alpha_lab/presentation/__init__.py": "sha256:9908c273a22d19b3ae0d636345e1da581279061b96e8e35d6a3a9e623e318ba5",
+      "src/options_alpha_lab/presentation/artifacts.py": "sha256:33e4bc4b3545f95bb4d7854cd3163c0ef3b9dabb0e088e70a37db5ae6e81e582",
       "src/options_alpha_lab/presentation/decision.py": "sha256:0db9456104363ed468d68682e7f8843b56eed0ec2c809bf2bab189c558838f57",
       "src/options_alpha_lab/presentation/explain.py": "sha256:b70fbacbad28ebca773f54d13843c82df3bb8067c78976868c082aa62b5a4a1e",
       "src/options_alpha_lab/presentation/export.py": "sha256:407e4ccef987546f6f03880c48ea9dd5a9a04fb93b81041e4cec675a7d4b8f8d",
@@ -98,8 +99,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:4ebb9c62c781d536cb91213588def9f9bb7f1f88",
-  "freeze_digest": "sha256:3b8de88ef750def55c918411dd04d32dcde7c955f5ed2b84f6cea25d22ccfdc1",
-  "frozen_at": "2026-09-10T00:04:27.528102+00:00",
+  "commit": "git:ae926cd9789935b93beb4eb0dab39017381bbee1",
+  "freeze_digest": "sha256:39331508e808fe5c65487cf6b9ab38f972309227dddd0a6b6647819b2c2523c8",
+  "frozen_at": "2026-09-10T01:23:52.970983+00:00",
   "manifest_version": "release_freeze.v1"
 }
