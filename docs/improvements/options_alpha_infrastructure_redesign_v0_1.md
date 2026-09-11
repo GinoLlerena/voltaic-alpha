@@ -405,16 +405,33 @@ is the clearest argument in this document for the single-host topology in §3.
   and neither had a snapshot, so this was permanent and was confirmed as such
   before it was done. Verified afterwards: one instance and one disk remain, no
   orphans. **−$0.20/day.**
-- **System disk `cloud_essd` PL1 → `cloud_essd_entry`**, scheduled for after the
-  US close rather than done immediately. The conversion requires the instance
-  stopped, and the observe-mode evidence clock started that morning; a Friday
-  close puts the whole weekend between the restart and the next session that
-  matters. Priced first: $0.0101/hr vs $0.0043/hr for 40 GB, matching the
-  observed $0.24 and $0.10 per day exactly. **−$0.14/day.** The rebuild had
-  picked the more expensive tier for a disk that is 90% empty and serves 17 rows,
-  where the PL1 IOPS ceiling buys nothing.
+- **System disk `cloud_essd` PL1 → `cloud_essd_entry`** — **attempted and
+  failed.** Recorded here because a plan that did not work is worth more in the
+  file than out of it.
 
-Run rate falls from $1.30/day to ~$0.96/day (~$29/month) with nothing lost.
+  It was scheduled for after the US close rather than done immediately: the
+  conversion requires the instance stopped, and the observe-mode evidence clock
+  had started that morning, so a Friday close put the whole weekend between the
+  restart and the next session that mattered. Priced first at $0.0101/hr against
+  $0.0043/hr for 40 GB, matching the observed $0.24 and $0.10 per day exactly.
+
+  `ModifyDiskSpec` refused it in both forms and in both instance states:
+  `InvalidDiskCategory.NotSupported` for the category change, running and
+  stopped, and `InvalidPerformanceLevel.Malformed` for a PL1 → PL0 downgrade.
+  The category of an in-place **system** disk is not modifiable on this API. The
+  script restarted the instance unconditionally, which is the reason a failed
+  conversion cost one minute of downtime rather than an outage: all six units
+  came back active, the dashboard answered 200, and the worker resumed its lease.
+
+  The remaining route is `ReplaceSystemDisk` with a `cloud_essd_entry` system
+  disk, which reinstalls the OS. That is a full rebuild — Postgres, schema,
+  credentials, units — for $4.23/month, against a live evidence clock and with
+  `CIIP-I-BLK-001` still meaning there is no off-host copy. Not worth it now.
+  Worth folding into the *next* rebuild that happens for another reason, where
+  the marginal cost is choosing a different category in one parameter.
+
+Actual saving is therefore **−$0.20/day** from the releases alone: run rate
+$1.30/day → **$1.10/day** (~$33/month), not the ~$0.96 projected above.
 
 ### Deliberately not done
 
