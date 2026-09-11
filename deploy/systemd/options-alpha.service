@@ -1,0 +1,19 @@
+[Unit]
+Description=Options Alpha judge dashboard (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/options-alpha
+EnvironmentFile=/etc/options-alpha-dashboard.env
+Environment=STREAMLIT_SERVER_HEADLESS=true
+Environment=STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+ExecStart=/opt/options-alpha/.venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.enableCORS=true --server.enableXsrfProtection=true
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

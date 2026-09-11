@@ -180,13 +180,20 @@ rather than only to the journal.
 2. Create the private OSS bucket and a RAM role scoped to it — write-only for the
    archiver, read for restore. No broker or account permissions.
 3. Install PostgreSQL 16, apply migrations to head, enable WAL archiving to OSS.
-4. Install the worker unit and drop-in; leave it **disarmed** (`recommend` mode).
-5. Apply journald caps and the partitioned `position_observations` schema.
-6. Restore drill: recover to a scratch host from OSS with the production host
+4. Install the units that live in version control:
+   `bash deploy/install_units.sh` (worker + dashboard). The base worker unit is
+   **disarmed** — it hard-codes `--mode observe` and no drop-in is installed here.
+5. Install the units written inline by the restore path:
+   `bash scripts/restore_hosted_demo.sh` (port 80 forward, backup timer,
+   watchdog timer). **Do not skip this step.** Omitting it on 10 September is
+   why the rebuilt host had no watchdog and no backups until 11 September; the
+   artifacts existed, the sequence simply never named them. See `CIIP-I-016`.
+6. Apply journald caps and the partitioned `position_observations` schema.
+7. Restore drill: recover to a scratch host from OSS with the production host
    stopped; verify row counts and one full lineage chain.
-7. Re-run `bash scripts/run_h0_validation.sh` and the dashboard suite against the
+8. Re-run `bash scripts/run_h0_validation.sh` and the dashboard suite against the
    rebuilt host.
-8. Arm the worker only when `CIIP-4` shadow evidence is ready to begin.
+9. Arm the worker only when `CIIP-4` shadow evidence is ready to begin.
 
 ## 7. Acceptance
 
@@ -446,6 +453,54 @@ after the 10 September rebuild **not** because no artifact existed — it did �
 because `restore_hosted_demo.sh` was not run as part of that rebuild. The gap is
 in §6's rebuild sequence, which does not name the script that installs them.
 
-Not fixed here — outside a cost review. It needs one change that captures the two
-missing units, names the install step in §6, and states the `EnvironmentFile`
-contract in one place. Do it before the next rebuild, not after.
+### `CIIP-I-016` — resolved, 11 September 2026
+
+Fixed in the commit that follows this record.
+
+- `deploy/systemd/options-alpha-worker.service` and
+  `deploy/systemd/options-alpha.service` now exist, copied from the running host
+  and **verified byte-identical** to it rather than retyped — 802 and 590 bytes,
+  diffed, not eyeballed.
+- `deploy/install_units.sh` installs them idempotently. It refuses to enable a
+  unit whose `EnvironmentFile` is absent, because systemd would otherwise fail
+  the unit at start with an error that reads like a code fault and is not one.
+  It does not restart a running worker; that would interrupt a live session
+  without being asked.
+- `deploy/systemd/README.md` states the environment contract for both files in
+  one place, keys only, no values.
+- §6 now names both install steps, including the
+  `scripts/restore_hosted_demo.sh` step whose omission caused the 10 September
+  loss.
+- `tests/test_deploy_units.py` — 12 tests. The one that earns the file asserts
+  the **base** worker unit is disarmed: `--mode observe`, no `paper_execute`, no
+  `--approve`, and `arm_worker.sh` writes a drop-in rather than overwriting the
+  base. A drop-in overrides something it assumes is present, so a hand-rebuilt
+  base unit with arming baked in would be inherited silently by the next arm.
+
+The five inline units in `restore_hosted_demo.sh` were deliberately **not**
+copied into `deploy/systemd/`. Two definitions of one unit drift, and the
+drifted copy is found at the worst moment. Consolidating them is worth doing and
+belongs in its own commit, because it changes a restore path that currently
+works.
+
+### `CIIP-I-017` — the dashboard's "read-only" is a code property, not a grant
+
+Found while writing the environment contract above, and worth separating from
+`CIIP-I-016` because it is a security finding rather than a reproducibility one.
+
+The dashboard unit is titled "read-only", and
+`scripts/check_no_write_path.py` does parse the tree to prove no broker write can
+be expressed outside the single named gateway file. That guard is real.
+
+The database grant is not. `DASHBOARD_DATABASE_URL` and `DATABASE_URL` resolve to
+the **same** Postgres role, `options_alpha`, which holds
+`INSERT`, `UPDATE`, `DELETE` and `TRUNCATE` on all 21 tables. The separate
+environment file gives the shape of least authority without the substance: a
+dashboard defect, or anything that reaches its credentials, can write to or
+truncate the evidence the project exists to protect.
+
+Recorded, not fixed. Creating a `SELECT`-only role and repointing
+`DASHBOARD_DATABASE_URL` at it changes a running service's credentials, and
+belongs in its own commit with a verification that the dashboard still renders
+and that the role genuinely cannot write. This is the same least-authority
+argument as `HK-006`, applied to a surface that predates it.
