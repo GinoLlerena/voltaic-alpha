@@ -272,7 +272,7 @@ has no off-host copy of anything.**
 honest interim is a manual `pg_dump` pulled to a machine outside this account —
 off-host in the only sense that matters.
 
-#### `CIIP-I-BLK-002` — the worker has no Alpaca credentials
+#### `CIIP-I-BLK-002` — the worker has no Alpaca credentials — **RESOLVED 11 September 2026**
 
 `observe` mode still reads market data, so the worker refuses to start with
 `ProviderError: Alpaca credentials are required for read-only access`. The
@@ -289,3 +289,50 @@ not at redeployment.**
 `CIIP-I-003` tiered partitioning (the table is empty; better done with the
 rollup job), and `CIIP-I-006`–`008` logging changes, which are code rather than
 infrastructure.
+
+
+## 11. Worker start and self-monitoring — 11 September 2026
+
+`CIIP-I-BLK-002` is closed. Paper credentials were transferred to
+`/etc/options-alpha.env` without passing through any transcript: the Aliyun CLI
+echoes the whole request URL, `CommandContent` included, on failure — it leaked
+an AccessKeyId earlier in this project — so the credential-bearing call runs with
+stderr suppressed and is verified by masked prefix only.
+
+**The evidence clock started here**, not at the 10 September redeployment.
+
+### Proven against live Alpaca
+
+| | |
+|---|---|
+| Worker | `active/enabled`, `observe` mode, writes disabled, approval required, `indicative` feed |
+| First decision | `spy-agent-20260911T172023Z` → `NO_TRADE`, `no_qualified_setup` |
+| `CIIP-I-006` | Every emitted line carries `kind`, `run_id`, `lease_owner`; the tick carries `correlation_id` |
+| `CIIP-I-008` | `worker_started`, `startup_reconcile`, `worker_stopped` persisted to `worker_events` |
+| Safety strip | `Worker: Live · 5s ago`, sourced from `worker_leases.heartbeat_at` — the cell that read `UNKNOWN` since the rebuild |
+
+### A gap the rebuild had left open
+
+The 10 September rebuild restored the worker and dashboard but **not the watchdog
+or backup timers**, though both code paths were deployed. A worker was therefore
+about to run unmonitored, with no dump of any kind, while `CIIP-I-002` remained
+blocked. Both are now installed and were each run once rather than merely
+scheduled:
+
+- **backup** — `verified: true`, 21 tables, 17 rows restored into a scratch
+  database and dropped, revision `0004_worker_events`;
+- **watchdog** — 8 of 8 checks passing, including `tick_recent` and
+  `lease_present`.
+
+Retention is `BACKUP_KEEP=12`, not the old 48. The unit file says why in a
+comment that should stay there: while OSS is disabled these dumps sit on the same
+disk as the database they protect, so they are a fast-restore convenience and
+**not a backup**. Forty-eight near-identical copies of one disk is not
+forty-eight backups — that is precisely the arithmetic that lost 209 decisions on
+9 September.
+
+### Still open
+
+`CIIP-I-BLK-001` is unchanged: OSS returns `UserDisable` against a $0.00
+balance, so there remains **no off-host copy of anything**, now including the
+live decisions the worker has begun recording.
