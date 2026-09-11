@@ -336,3 +336,116 @@ forty-eight backups — that is precisely the arithmetic that lost 209 decisions
 `CIIP-I-BLK-001` is unchanged: OSS returns `UserDisable` against a $0.00
 balance, so there remains **no off-host copy of anything**, now including the
 live decisions the worker has begun recording.
+
+## 12. Cost review — 11 September 2026
+
+Asked to reduce cost and why there was "so much data". The premise did not
+survive measurement, and the correction matters because it points the saving at
+a different place than expected.
+
+### There is no data problem
+
+| | |
+|---|---|
+| Root filesystem | 3.6 GB used of 40 GB (10%) |
+| OS and system | 3.0 GB |
+| `/opt` (code and venv) | 638 MB |
+| Postgres data directory | 64 MB |
+| journald | 31 MB |
+| Backups | 260 KB |
+| **The database itself** | **8.8 MB, 17 rows across 21 tables** |
+
+The application's own data is roughly 0.02% of the disk it sits on. This is the
+second time the volume question has been asked and the second time the answer
+has been that the data is not the cost — §2 recorded the same result on
+9 September, when 94% of a ~1 GB footprint turned out to be backup retention.
+
+The billing model is the reason, and it is worth stating plainly because it
+inverts the intuition: **ECS charges provisioned GB and CPU-hours, not bytes
+stored.** Deleting rows saves nothing. Yesterday's `BACKUP_KEEP` 48 → 12 change
+was correct — it stops the disk filling — but its effect on the bill is exactly
+$0.00. Only releasing provisioned capacity or stopping compute reduces spend.
+
+### Where the money went
+
+September 1–11, $22.45 pretax:
+
+| Line | Amount | Share |
+|---|---:|---:|
+| Compute (CPU/RAM hours) | $15.37 | 68% |
+| System disks, by provisioned size | $7.07 | 31% |
+| Network, Elastic IP, OS images | $0.01 | 0% |
+
+The Elastic IP retention fee bills at $0.00 while attached, confirming the
+earlier answer given on 9 September.
+
+A number recorded earlier in this project was wrong and is corrected here: the
+host was described as costing ~$4.83/day. The metered rate is **$1.10/day**
+running ($0.85 compute + $0.24 disk) and $0.24/day stopped — high by 4.4×.
+
+The single largest line, $9.78, belonged to `i-t4nfdbjx66so1we0aysh`, a second
+options-alpha host that ran at $1.10/day alongside `options-alpha-demo` from
+1–9 September and was released on the 9th. Forty-four percent of the month was
+paid for running two hosts where one was needed. That is already fixed, and it
+is the clearest argument in this document for the single-host topology in §3.
+
+### Actions taken
+
+- **Released `crypto-copilot-demo` and `agentops-demo`** (instances
+  `i-t4nhyplwm55uam20b3ry`, `i-t4n1w3s9onvpaterzson`). Both were stopped and
+  unrelated to this project, each still paying $0.10/day for a retained 40 GB
+  system disk. A system disk cannot be released independently of its instance,
+  and neither had a snapshot, so this was permanent and was confirmed as such
+  before it was done. Verified afterwards: one instance and one disk remain, no
+  orphans. **−$0.20/day.**
+- **System disk `cloud_essd` PL1 → `cloud_essd_entry`**, scheduled for after the
+  US close rather than done immediately. The conversion requires the instance
+  stopped, and the observe-mode evidence clock started that morning; a Friday
+  close puts the whole weekend between the restart and the next session that
+  matters. Priced first: $0.0101/hr vs $0.0043/hr for 40 GB, matching the
+  observed $0.24 and $0.10 per day exactly. **−$0.14/day.** The rebuild had
+  picked the more expensive tier for a disk that is 90% empty and serves 17 rows,
+  where the PL1 IOPS ceiling buys nothing.
+
+Run rate falls from $1.30/day to ~$0.96/day (~$29/month) with nothing lost.
+
+### Deliberately not done
+
+Stopping the host outside market hours is the largest remaining lever, worth
+about $0.67/day, and it was declined rather than overlooked. Compute is 68% of
+the bill, but the observe-mode worker began accumulating evidence that morning
+and overnight and weekend ticks are part of what proves the exit and
+reconciliation paths for `CIIP-4`. The lever trades away precisely what the
+spend is currently buying. Revisit once `CIIP-4` has its evidence.
+
+### `CIIP-I-016` — two units exist only on the host
+
+Found while verifying service health. The first version of this note claimed no
+unit was in the repository; that was wrong and is corrected here, because the
+accurate version points at a different fix.
+
+What is captured: `restore_hosted_demo.sh` writes `options-alpha-port80`,
+`options-alpha-backup{.service,.timer}` and `options-alpha-watchdog{.service,.timer}`
+as heredocs. `arm_worker.sh` writes the `10-paper-execute.conf` drop-in.
+
+What is not captured anywhere in this repository:
+
+- **`options-alpha.service`** — the Streamlit dashboard. The hosted demo the
+  judges were pointed at has no definition in version control at all.
+- **`options-alpha-worker.service`** — the base unit. `arm_worker.sh` writes a
+  drop-in that overrides its `ExecStart`, but the unit that drop-in modifies,
+  including the `EnvironmentFile`, `RuntimeDirectory` and the disarmed
+  `--mode observe` default, exists only on the host.
+
+The second is the sharper risk. A drop-in is an override of something assumed to
+be present; if the base unit is ever rebuilt by hand slightly differently, arming
+silently inherits whatever that hand-written base happened to say.
+
+This also corrects §11's account. The watchdog and backup timers were missing
+after the 10 September rebuild **not** because no artifact existed — it did — but
+because `restore_hosted_demo.sh` was not run as part of that rebuild. The gap is
+in §6's rebuild sequence, which does not name the script that installs them.
+
+Not fixed here — outside a cost review. It needs one change that captures the two
+missing units, names the install step in §6, and states the `EnvironmentFile`
+contract in one place. Do it before the next rebuild, not after.
