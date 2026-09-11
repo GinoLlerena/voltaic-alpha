@@ -557,3 +557,47 @@ One residual, recorded so it is not mistaken for finished: the role was created
 against the running database, so it exists on this host only. Until
 `CIIP-I-BLK-001` is resolved and an off-host copy exists, a host loss still
 takes the role, the credential and the evidence together.
+
+## 13. Stopping point — 11 September 2026
+
+State at stop, so the next session starts from a fact rather than a memory.
+
+| | |
+|---|---|
+| Branch | `improvements/ciip-001` at `996cad6`, pushed, **18 commits ahead** of `origin/main` (`2657a1e`) |
+| Host | `options-alpha-demo` (`i-t4n88bkfwsq0lhzmfjii`) — **Stopped** |
+| Worker | stopped gracefully; `worker_stopped` recorded in `worker_events` |
+| Evidence | 24 decisions, 48 audit events, 9 worker events |
+| Backups | 7 retained, newest verified: 2,562,051 bytes, 21 tables, 109 rows, rev `0004_worker_events` |
+| Run rate | $0.24/day stopped (from $1.10/day running) |
+
+### Why the host is stopped, correcting §12
+
+§12 declined the "stop outside market hours" lever on the grounds that overnight
+and weekend ticks prove the exit and reconciliation paths. Measured at the close,
+that was wrong for this configuration: the worker holds its lease and ticks, but
+recorded **no decision for 176 minutes** after 19:13 UTC, and in `observe` mode
+there is no open position for an exit path to act on. The weekend would have cost
+about $2.20 and produced nothing.
+
+The lever is therefore better than §12 judged it *while the worker is disarmed
+and flat*. It becomes a genuine trade again once `CIIP-4` runs with positions on,
+because then overnight state is worth recording. Re-evaluate then rather than
+treating this as settled.
+
+### To resume
+
+1. `aliyun ecs StartInstance --InstanceId i-t4n88bkfwsq0lhzmfjii` — **before
+   13:30 UTC Monday 14 September**, or Monday's session is lost.
+2. Confirm six units active: `postgresql`, `options-alpha`,
+   `options-alpha-port80`, `options-alpha-worker`, and the `watchdog` and
+   `backup` timers.
+3. `bash deploy/verify_readonly_role.sh` — expects exit 0.
+4. Check the dashboard by **loading the page**, not by its status code.
+
+### Unchanged and still first
+
+`CIIP-I-BLK-001`. OSS returns `UserDisable` against a $0.00 balance. All seven
+backups, the database, the read-only role and its credential sit on one disk on
+one stopped host. Nothing is off-host. The evidence is small enough now that
+losing it would cost little; that stops being true the moment `CIIP-4` starts.
