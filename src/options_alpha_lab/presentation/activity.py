@@ -22,7 +22,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..persistence.models import AuditEvent, Decision
+from ..persistence.models import AuditEvent, Decision, WorkerEvent
 
 
 @dataclass(frozen=True)
@@ -116,3 +116,62 @@ def recent(session: Session, *, limit: int = 40) -> tuple[ActivityEvent, ...]:
         .limit(limit)
     ).all()
     return tuple(_event(row) for row in rows)
+
+
+@dataclass(frozen=True)
+class WorkerActivity:
+    """One worker lifecycle or reconciliation event, from the durable record."""
+
+    event: str
+    kind: str
+    detail: dict[str, object]
+    occurred_at: datetime
+    run_id: str
+
+    @property
+    def is_fault(self) -> bool:
+        return self.kind == "fault"
+
+
+def worker_events(session: Session, *, limit: int = 40) -> tuple[WorkerActivity, ...]:
+    """What the agent itself has been doing, newest first.
+
+    `CIIP-I-008`. This is the feed a reviewer reads as "is it running, and has
+    anything gone wrong". Before the `worker_events` table existed it could only
+    have been synthesised, which is the defect both competitor analyses found in
+    other people's dashboards — a feed that shows whatever it was told rather
+    than what happened.
+    """
+    rows = session.scalars(
+        select(WorkerEvent).order_by(WorkerEvent.occurred_at.desc()).limit(limit)
+    ).all()
+    return tuple(
+        WorkerActivity(
+            event=str(row.event),
+            kind=str(row.kind),
+            detail=dict(row.detail or {}),
+            occurred_at=row.occurred_at,
+            run_id=str(row.run_id),
+        )
+        for row in rows
+    )
+
+
+def worker_faults(session: Session, *, limit: int = 20) -> tuple[WorkerActivity, ...]:
+    """Faults alone, selectable without parsing prose — which is why `kind` exists."""
+    rows = session.scalars(
+        select(WorkerEvent)
+        .where(WorkerEvent.kind == "fault")
+        .order_by(WorkerEvent.occurred_at.desc())
+        .limit(limit)
+    ).all()
+    return tuple(
+        WorkerActivity(
+            event=str(row.event),
+            kind=str(row.kind),
+            detail=dict(row.detail or {}),
+            occurred_at=row.occurred_at,
+            run_id=str(row.run_id),
+        )
+        for row in rows
+    )

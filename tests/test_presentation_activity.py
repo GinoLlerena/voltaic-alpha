@@ -19,7 +19,13 @@ from pathlib import Path
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from options_alpha_lab.persistence.models import AuditEvent, Base, Decision, Run
+from options_alpha_lab.persistence.models import (
+    AuditEvent,
+    Base,
+    Decision,
+    Run,
+    WorkerEvent,
+)
 from options_alpha_lab.presentation import activity
 
 DB = Path(__file__).resolve().parents[1] / "demo" / "h0_demo.db"
@@ -173,3 +179,109 @@ class GapDetectionTests(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class WorkerEventTests(unittest.TestCase):
+    """`CIIP-I-008`: worker lifecycle must be durable, not only in the journal."""
+
+    def setUp(self) -> None:
+        engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+        Base.metadata.create_all(engine)
+        self.session = Session(engine)
+        self.session.add(
+            Run(
+                id="r",
+                runtime_version="t",
+                policy_version="t",
+                bot_mode="observe",
+                trading_enabled=False,
+                started_at=NOW,
+            )
+        )
+        self.session.commit()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def _event(self, event: str, kind: str, offset: int, **detail: object) -> None:
+        self.session.add(
+            WorkerEvent(
+                id=f"w{offset}",
+                run_id="r",
+                kind=kind,
+                event=event,
+                detail=detail,
+                occurred_at=NOW + timedelta(seconds=offset),
+            )
+        )
+        self.session.commit()
+
+    def test_an_empty_table_is_not_an_error(self) -> None:
+        self.assertEqual(activity.worker_events(self.session), ())
+
+    def test_events_come_back_newest_first(self) -> None:
+        self._event("worker_started", "state", 0)
+        self._event("startup_reconcile", "state", 1)
+        self._event("worker_stopped", "state", 2)
+        names = [e.event for e in activity.worker_events(self.session)]
+        self.assertEqual(names, ["worker_stopped", "startup_reconcile", "worker_started"])
+
+    def test_detail_survives_the_round_trip(self) -> None:
+        self._event("worker_started", "state", 0, mode="observe", writes="disabled")
+        (event,) = activity.worker_events(self.session)
+        self.assertEqual(event.detail["mode"], "observe")
+        self.assertEqual(event.detail["writes"], "disabled")
+
+    def test_faults_are_selectable_without_parsing_prose(self) -> None:
+        """The reason `kind` is a column rather than something inferred."""
+        self._event("worker_started", "state", 0)
+        self._event("tick_failed", "fault", 1, error="ProviderError: boom")
+        self._event("worker_stopped", "state", 2)
+        faults = activity.worker_faults(self.session)
+        self.assertEqual([f.event for f in faults], ["tick_failed"])
+        self.assertTrue(faults[0].is_fault)
+
+    def test_a_state_event_is_not_a_fault(self) -> None:
+        self._event("worker_started", "state", 0)
+        (event,) = activity.worker_events(self.session)
+        self.assertFalse(event.is_fault)
+
+    def test_the_limit_is_respected(self) -> None:
+        for n in range(6):
+            self._event("tick_failed", "fault", n, error=str(n))
+        self.assertEqual(len(activity.worker_events(self.session, limit=2)), 2)
+        self.assertEqual(len(activity.worker_faults(self.session, limit=3)), 3)
+
+
+class RecorderDurabilityTests(unittest.TestCase):
+    """Recording must never be able to kill the single writer."""
+
+    def test_a_failed_write_is_reported_not_raised(self) -> None:
+        """A telemetry failure taking down a worker holding a position would be
+        far worse than a missing row — but it must still be visible."""
+        import io
+        from contextlib import redirect_stderr
+
+        from options_alpha_lab.persistence.repository import DecisionRecorder
+
+        engine = create_engine("sqlite+pysqlite:///:memory:", future=True)
+        Base.metadata.create_all(engine)
+
+        class _Settings:
+            schema_version = "h0.1"
+
+        recorder = DecisionRecorder.__new__(DecisionRecorder)
+        recorder._engine = engine  # type: ignore[attr-defined]
+        recorder._settings = _Settings()  # type: ignore[attr-defined]
+        recorder._sessions = None  # type: ignore[attr-defined]
+
+        err = io.StringIO()
+        with redirect_stderr(err):
+            # The session factory is absent, so the write raises inside the
+            # recorder. The specific failure does not matter; what matters is
+            # that no failure reaches the caller, and that it is still visible.
+            recorder.record_worker_event("absent-run", event="worker_started")
+        reported = err.getvalue()
+        self.assertIn("worker_event_not_recorded", reported)
+        self.assertIn("worker_started", reported, "the dropped event must be named")
+        self.assertIn('"kind": "fault"', reported)
