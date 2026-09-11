@@ -14,6 +14,7 @@ base unit is the thing under test precisely because the override is not.
 from __future__ import annotations
 
 import configparser
+import re
 import unittest
 from pathlib import Path
 
@@ -111,6 +112,93 @@ class UnitsParseTests(unittest.TestCase):
             self.assertIn("Unit", parsed)
             self.assertIn("Service", parsed)
             self.assertEqual(parsed["Install"]["WantedBy"], "multi-user.target")
+
+
+class ReadOnlyRoleScriptTests(unittest.TestCase):
+    """`CIIP-I-017`. The scripts handle a live credential, so the tests are
+    about the credential rather than about the SQL."""
+
+    CREATE = UNITS.parent / "create_readonly_role.sh"
+    VERIFY = UNITS.parent / "verify_readonly_role.sh"
+
+    def _sql_block(self) -> str:
+        """The `{ ... } | psql` heredoc-free block. Everything in it goes to
+        psql's stdin, not to the terminal."""
+        text = self.CREATE.read_text()
+        start = text.index("\n{\n")
+        end = text.index("} | sudo -u postgres psql", start)
+        return text[start:end]
+
+    def test_the_password_never_reaches_the_terminal(self) -> None:
+        """A password in stdout is a password in the journal and in a transcript.
+
+        The `printf` lines that carry it are piped into psql, so the check is
+        that every one of them sits inside that pipe and none is a bare `echo`.
+        """
+        sql_block = self._sql_block()
+        for line in self.CREATE.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or "$PW" not in stripped:
+                continue
+            if stripped.startswith("echo"):
+                self.fail(f"password echoed to the terminal: {stripped}")
+            if stripped.startswith("printf"):
+                self.assertIn(
+                    stripped, sql_block,
+                    f"printf carrying the password is not piped to psql: {stripped}",
+                )
+
+    def test_the_reported_url_is_masked(self) -> None:
+        """The script does print the URL shape, so it must redact the credential."""
+        for line in self.CREATE.read_text().splitlines():
+            if line.strip().startswith("echo") and "$NEW" in line:
+                self.assertIn("<pw>", line, f"URL printed unmasked: {line.strip()}")
+
+    def test_the_password_is_never_passed_through_argv(self) -> None:
+        """`psql -c "...$PW..."` would expose it to any user running `ps`."""
+        for path in (self.CREATE, self.VERIFY):
+            for match in re.findall(r"psql[^\n|]*", path.read_text()):
+                if "$PW" in match:
+                    self.fail(f"{path.name} puts the password in argv: {match}")
+
+    def test_sql_reaches_psql_over_stdin(self) -> None:
+        self.assertIn("-f -", self.CREATE.read_text())
+
+    def test_the_verifier_is_a_gate_not_a_report(self) -> None:
+        """It must fail the process, or a rebuild will 'pass' by not being read."""
+        text = self.VERIFY.read_text()
+        self.assertIn("exit \"$fail\"", text)
+        self.assertIn("fail=1", text)
+
+    def test_the_verifier_attempts_every_destructive_form(self) -> None:
+        text = self.VERIFY.read_text()
+        for sql in ("insert into", "update runs", "delete from", "truncate",
+                    "create table", "drop table"):
+            self.assertIn(sql, text.lower(), f"{sql} is never attempted")
+
+    def test_the_verifier_checks_reads_too(self) -> None:
+        """A role that can do nothing at all would pass a writes-only check."""
+        self.assertIn("expect allow", self.VERIFY.read_text())
+
+    def test_the_env_file_is_written_restrictively(self) -> None:
+        text = self.CREATE.read_text()
+        self.assertIn("umask 077", text)
+        self.assertIn("chmod 0600", text)
+
+    def test_a_rollback_copy_is_kept(self) -> None:
+        self.assertIn(".bak", self.CREATE.read_text())
+
+    def test_future_tables_stay_readable(self) -> None:
+        """Without this a migration silently breaks the dashboard."""
+        self.assertIn("ALTER DEFAULT PRIVILEGES", self.CREATE.read_text())
+
+    def test_the_rebuild_sequence_names_both_scripts(self) -> None:
+        """CIIP-I-016's lesson: an uncaptured step is a step the rebuild loses."""
+        doc = (UNITS.parents[1] / "docs" / "improvements"
+               / "options_alpha_infrastructure_redesign_v0_1.md").read_text()
+        section = doc.split("## 6. Rebuild sequence")[1].split("## 7.")[0]
+        self.assertIn("create_readonly_role.sh", section)
+        self.assertIn("verify_readonly_role.sh", section)
 
 
 if __name__ == "__main__":  # pragma: no cover

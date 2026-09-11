@@ -188,12 +188,18 @@ rather than only to the journal.
    watchdog timer). **Do not skip this step.** Omitting it on 10 September is
    why the rebuilt host had no watchdog and no backups until 11 September; the
    artifacts existed, the sequence simply never named them. See `CIIP-I-016`.
-6. Apply journald caps and the partitioned `position_observations` schema.
-7. Restore drill: recover to a scratch host from OSS with the production host
+6. Create the dashboard's read-only database role and point the dashboard at
+   it: `bash deploy/create_readonly_role.sh`, then
+   `systemctl restart options-alpha`, then `bash deploy/verify_readonly_role.sh`
+   — which exits non-zero if any write succeeds. Skipping this leaves the
+   dashboard holding `INSERT/UPDATE/DELETE/TRUNCATE` on the evidence tables. See
+   `CIIP-I-017`.
+7. Apply journald caps and the partitioned `position_observations` schema.
+8. Restore drill: recover to a scratch host from OSS with the production host
    stopped; verify row counts and one full lineage chain.
-8. Re-run `bash scripts/run_h0_validation.sh` and the dashboard suite against the
+9. Re-run `bash scripts/run_h0_validation.sh` and the dashboard suite against the
    rebuilt host.
-9. Arm the worker only when `CIIP-4` shadow evidence is ready to begin.
+10. Arm the worker only when `CIIP-4` shadow evidence is ready to begin.
 
 ## 7. Acceptance
 
@@ -516,8 +522,38 @@ environment file gives the shape of least authority without the substance: a
 dashboard defect, or anything that reaches its credentials, can write to or
 truncate the evidence the project exists to protect.
 
-Recorded, not fixed. Creating a `SELECT`-only role and repointing
-`DASHBOARD_DATABASE_URL` at it changes a running service's credentials, and
-belongs in its own commit with a verification that the dashboard still renders
-and that the role genuinely cannot write. This is the same least-authority
-argument as `HK-006`, applied to a surface that predates it.
+This is the same least-authority argument as `HK-006`, applied to a surface that
+predates it.
+
+### `CIIP-I-017` — resolved, 11 September 2026
+
+`options_alpha_ro` now exists, holding `SELECT` and nothing else, and
+`DASHBOARD_DATABASE_URL` points at it. The worker's own credential is untouched.
+
+Verified against the live database rather than asserted. Reads on `decisions`,
+`worker_events` and `audit_events` succeed; `INSERT`, `UPDATE`, `DELETE`,
+`TRUNCATE`, `CREATE TABLE` and `DROP TABLE` are each attempted for real and each
+refused. `deploy/verify_readonly_role.sh` performs exactly those probes and
+**exits non-zero if any write succeeds**, which makes it a gate rather than a
+reassurance — a check that cannot fail proves nothing.
+
+The dashboard was then confirmed to still work, and confirmed the way this
+project learned to confirm it on 9 September: not by an HTTP 200, which Streamlit
+returns while rendering a traceback client-side, but by loading the page and
+reading the DOM. It renders 24 decisions from the live worker database with zero
+exception blocks.
+
+Both halves are captured as scripts — `deploy/create_readonly_role.sh` and
+`deploy/verify_readonly_role.sh` — and §6 now names them. That is `CIIP-I-016`'s
+lesson applied immediately: a role created by hand is a role the next rebuild
+loses, and this one would be lost silently, because a read-write dashboard looks
+exactly like a read-only one until something goes wrong.
+
+The password is generated on the host, never printed, never passed through
+`argv` where `ps` would expose it, and written only to the `0600` environment
+file. The previous file is kept alongside it as a rollback.
+
+One residual, recorded so it is not mistaken for finished: the role was created
+against the running database, so it exists on this host only. Until
+`CIIP-I-BLK-001` is resolved and an off-host copy exists, a host loss still
+takes the role, the credential and the evidence together.

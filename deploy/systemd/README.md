@@ -57,13 +57,22 @@ hand slightly differently would be inherited silently by the next arming.
 
 `tests/test_deploy_units.py` asserts both halves of this.
 
-**The dashboard's "read-only" is enforced by code, not by the database.** The
-unit describes a read-only dashboard, and `scripts/check_no_write_path.py`
-parses the tree to prove no broker write can be expressed outside the single
-named gateway file. But `DASHBOARD_DATABASE_URL` and `DATABASE_URL` currently
-resolve to the **same** Postgres role, `options_alpha`, which holds
-`INSERT/UPDATE/DELETE/TRUNCATE` on all 21 tables. The separate env file gives
-the shape of least authority without the substance.
+**The dashboard's "read-only" is enforced twice.** In code, by
+`scripts/check_no_write_path.py`, which parses the tree to prove no broker write
+can be expressed outside the single named gateway file. And in the database, by
+the grant: `DASHBOARD_DATABASE_URL` resolves to `options_alpha_ro`, which holds
+`SELECT` and nothing else.
 
-This is recorded, not fixed. Granting a genuinely read-only role is a change to
-a running service's credentials and wants its own commit — see `CIIP-I-017`.
+That second half is new as of `CIIP-I-017`. Until then both URLs resolved to the
+same `options_alpha` role, which holds `INSERT/UPDATE/DELETE/TRUNCATE` on every
+table — the separate environment file had the shape of least authority without
+the substance.
+
+`deploy/create_readonly_role.sh` creates or re-keys the role and repoints the
+env file; `deploy/verify_readonly_role.sh` proves the property and **exits
+non-zero if any write succeeds**, so it is a gate after a rebuild rather than
+something a human skims. The writes it attempts are real: a check that cannot
+fail proves nothing.
+
+`ALTER DEFAULT PRIVILEGES` is set for role `options_alpha`, so a table created
+by a future migration is readable by the dashboard without re-running anything.
