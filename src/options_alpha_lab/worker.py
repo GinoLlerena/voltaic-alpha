@@ -233,7 +233,6 @@ def worker_identity() -> str:
 
 def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup sequence
     import argparse
-    import json
     import signal
     import sys
     import time
@@ -255,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
     from .execution.reconcile import Reconciler
     from .persistence.repository import DecisionRecorder, build_engine, create_schema
     from .providers.alpaca_readonly import ReadOnlyAlpacaClient
+    from .telemetry import CadenceFilter, Context, emit
 
     parser = argparse.ArgumentParser(
         prog="python -m options_alpha_lab.worker",
@@ -295,8 +295,12 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
     create_schema(engine)
 
     lease = LeaseManager(engine, name=args.lease)
+    telemetry_context = Context()
+    cadence = CadenceFilter()
+
     try:
         held = lease.acquire()
+        telemetry_context.lease_owner = held.owner
     except LeaseUnavailable as exc:
         # Refusing to start is the correct outcome, not an error to work around.
         print(f"not starting: {exc}", file=sys.stderr)
@@ -346,6 +350,10 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         calendar=calendar, symbol=args.symbol, operator_approval=args.approve,
     )
     agent.run_id = recorder.start_run()
+    # CIIP-I-006. Identity travels with every line from here on, so journalctl
+    # output and the database describe the same events rather than two parallel
+    # stories that cannot be joined.
+    telemetry_context.run_id = agent.run_id
 
     health = WorkerHealth(started_at=datetime.now(UTC))
     stopping = {"now": False}
@@ -365,8 +373,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
             result = call()
         except Exception as exc:  # noqa: BLE001 - as for a tick, never fatal
             health.last_error = f"{name}: {type(exc).__name__}: {exc}"
-            print(json.dumps({"event": f"{name}_failed", "error": health.last_error}),
-                  file=sys.stderr, flush=True)
+            emit(f"{name}_failed", kind="fault", context=telemetry_context,
+                 error=health.last_error, stream=sys.stderr)
             return
         if result is None:
             return
@@ -377,31 +385,33 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         health.last_action = result.action
         if agent.last_cycle is not None:
             health.record_cycle(agent.last_cycle)
-        print(json.dumps({
-            "event": name, "at": result.at.isoformat(),
-            "action": result.action, "detail": result.detail,
-        }), flush=True)
+        # CIIP-I-007. A clock that reports the same action every 60 seconds is a
+        # metronome. Emit when the action changes, and otherwise at a heartbeat,
+        # so a quiet system still proves it is alive without burying the line
+        # where something actually moved.
+        if cadence.should_emit(name, result.action):
+            emit(name, kind="cadence", context=telemetry_context,
+                 at=result.at.isoformat(), action=result.action,
+                 detail=result.detail, suppressed=cadence.suppressed(name))
         health.write(args.health_file)
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    print(json.dumps({
-        "event": "worker_started", "lease_owner": held.owner, "host": held.host,
-        "mode": settings.bot_mode.value,
-        "writes": "enabled" if settings.may_write_orders else "disabled",
-        "approval": "required" if settings.require_operator_approval else "not required",
-        "feed": client.option_feed, "sessions_loaded": len(calendar),
-        "interval_seconds": args.interval,
-        "order_clock_seconds": args.order_clock_interval,
-        "position_clock_seconds": args.position_clock_interval,
-    }), flush=True)
+    emit("worker_started", context=telemetry_context, host=held.host,
+         mode=settings.bot_mode.value,
+         writes="enabled" if settings.may_write_orders else "disabled",
+         approval="required" if settings.require_operator_approval else "not required",
+         feed=client.option_feed, sessions_loaded=len(calendar),
+         interval_seconds=args.interval,
+         order_clock_seconds=args.order_clock_interval,
+         position_clock_seconds=args.position_clock_interval)
 
     # Reconcile before the agent is permitted to consider any new risk.
     startup = agent.startup()
     if startup is not None:
-        print(json.dumps({"event": "startup_reconcile", "summary": startup.summary(),
-                          "clean": startup.clean}), flush=True)
+        emit("startup_reconcile", context=telemetry_context,
+             summary=startup.summary(), clean=startup.clean)
 
     try:
         while not stopping["now"]:
@@ -410,7 +420,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                 # against a position we no longer own.
                 health.lease_lost = True
                 health.write(args.health_file)
-                print(json.dumps({"event": "lease_lost", "action": "stopping"}), flush=True)
+                emit("lease_lost", context=telemetry_context, action="stopping")
                 return 4
             try:
                 result = agent.tick()
@@ -420,15 +430,14 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                 health.last_error = None
                 if agent.last_cycle is not None:
                     health.record_cycle(agent.last_cycle)
-                print(json.dumps({
-                    "event": "tick", "at": result.at.isoformat(), "action": result.action,
-                    "detail": result.detail, "snapshot": result.snapshot_id,
-                    "order": result.submitted,
-                }), flush=True)
+                emit("tick", context=telemetry_context,
+                     correlation_id=result.snapshot_id,
+                     at=result.at.isoformat(), action=result.action,
+                     detail=result.detail, order=result.submitted)
             except Exception as exc:  # noqa: BLE001 - a tick failure must not kill the worker
                 health.last_error = f"{type(exc).__name__}: {exc}"
-                print(json.dumps({"event": "tick_failed", "error": health.last_error}),
-                      file=sys.stderr, flush=True)
+                emit("tick_failed", kind="fault", context=telemetry_context,
+                     error=health.last_error, stream=sys.stderr)
             health.write(args.health_file)
 
             if args.max_ticks and health.ticks >= args.max_ticks:
@@ -445,8 +454,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                 if waited % HEARTBEAT_INTERVAL_SECONDS == 0 and not lease.heartbeat():
                     health.lease_lost = True
                     health.write(args.health_file)
-                    print(json.dumps({"event": "lease_lost", "action": "stopping"}),
-                          flush=True)
+                    emit("lease_lost", context=telemetry_context, action="stopping")
                     return 4
                 # Each clock is due independently, and a zero interval
                 # disables one without disabling the other. Written as calls
@@ -466,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         lease.release()
         client.close()
         health.write(args.health_file)
-        print(json.dumps({"event": "worker_stopped", "ticks": health.ticks}), flush=True)
+        emit("worker_stopped", context=telemetry_context, ticks=health.ticks)
     return 0
 
 
