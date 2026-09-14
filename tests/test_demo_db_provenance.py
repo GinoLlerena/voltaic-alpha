@@ -52,7 +52,7 @@ class BuilderIsDeterministicTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls._tmp = tempfile.TemporaryDirectory()
         rebuilt = Path(cls._tmp.name) / "rebuilt.db"
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603 - fixed argv, no user input
             [sys.executable, str(BUILDER), str(rebuilt)],
             cwd=ROOT, capture_output=True, text=True,
         )
