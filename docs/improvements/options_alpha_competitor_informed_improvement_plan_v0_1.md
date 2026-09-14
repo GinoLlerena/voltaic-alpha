@@ -979,7 +979,32 @@ its own labelled card reading *"this receipt records a different evaluation of
 the same snapshot"*, and the ablation renders as `NOT_DECISION_SCOPED`, because
 a corpus-level result over five frozen cases belongs to no decision at all.
 
-**Still open.** Regenerating the demo database so its lifecycle decision hash
-matches the receipt would let the two correlate honestly. That is a fixture task,
-not a presentation one, and it should be done when `CIIP-I` rebuilds the
-evidence set — at which point this row can close.
+**Closed, 14 September 2026 — the prescribed fix does not exist.**
+
+The disposition above assumed the demo database was stale and that rebuilding it
+would make the hashes agree. Measured rather than assumed, that is false.
+
+`scripts/build_demo_db.py` is deterministic. Two fresh builds agree with each
+other and with the committed file on every decision's `snapshot_id`,
+`decision_hash` and `input_hash`. `demo/h0_demo.db` is therefore already the
+builder's current output, and regenerating it reproduces `75a9cc71…` exactly —
+never `c418fac0…`.
+
+The reason is not a defect. The receipt's hash was produced by the original live
+Paper run on 28 August under that day's code; the same snapshot replays under
+today's code to a different decision. A decision hash that survived a policy
+change would be the real defect, because it is precisely what the hash exists to
+detect.
+
+So the two can correlate honestly only if a fresh Paper lifecycle is run under
+current code, producing a new receipt and a matching decision together. That
+requires arming the worker — a deliberate, approval-gated action belonging to
+`CIIP-4`, not a fixture task. Until then the correct behaviour is the one already
+shipped: `presentation/artifacts.py` labels the pair *"this receipt records a
+different evaluation of the same snapshot"*, which is true and is tested against
+the real committed pair.
+
+`tests/test_demo_db_provenance.py` pins both halves — that the committed database
+matches a fresh build, and that no committed decision can claim the receipt. The
+second test is written to fail loudly if that ever changes, with the instruction
+to update this row rather than the test.
