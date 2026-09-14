@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from options_alpha_lab.architecture.contracts import ExecutionState
@@ -48,6 +48,7 @@ from options_alpha_lab.presentation.explain import why_decision
 from options_alpha_lab.presentation.export import digest as proof_digest
 from options_alpha_lab.presentation.export import render as proof_bytes
 from options_alpha_lab.presentation.proof import proof_tiles
+from options_alpha_lab.presentation.source import resolve as resolve_source
 from options_alpha_lab.presentation.status import system_status
 from options_alpha_lab.presentation.tour import SCENES
 from options_alpha_lab.presentation.tour import scene as tour_scene
@@ -102,23 +103,11 @@ def block(markup: str) -> None:
 def _resolve_source():  # type: ignore[no-untyped-def]
     """Prefer the live worker database, but never show a judge an empty page.
 
-    The live database is empty until the worker has decided something, and a
-    worker started outside market hours has not. Falling back to the committed
-    evidence keeps the demo honest and working; the sidebar always says which
-    source is in use, so "live" is never implied when it is not true.
+    The rule lives in `presentation/source.py` so the presentation API cannot
+    disagree with this page about where its data came from.
     """
-    committed = create_engine(f"sqlite+pysqlite:///{DB}", future=True)
-    if not LIVE_DATABASE_URL:
-        return committed, "committed evidence"
-    try:
-        live = create_engine(LIVE_DATABASE_URL, future=True, pool_pre_ping=True)
-        with Session(live) as session:
-            count = session.scalar(select(func.count()).select_from(Decision)) or 0
-        if count:
-            return live, f"live worker database ({count} decisions)"
-        return committed, "committed evidence (live worker has decided nothing yet)"
-    except Exception as exc:  # noqa: BLE001 - a broken live source must not break the page
-        return committed, f"committed evidence (live source unavailable: {type(exc).__name__})"
+    resolved = resolve_source(LIVE_DATABASE_URL, DB)
+    return resolved.engine, resolved.label
 
 
 def engine():  # type: ignore[no-untyped-def]

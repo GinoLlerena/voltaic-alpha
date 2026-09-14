@@ -986,9 +986,16 @@ would make the hashes agree. Measured rather than assumed, that is false.
 
 `scripts/build_demo_db.py` is deterministic. Two fresh builds agree with each
 other and with the committed file on every decision's `snapshot_id`,
-`decision_hash` and `input_hash`. `demo/h0_demo.db` is therefore already the
-builder's current output, and regenerating it reproduces `75a9cc71…` exactly —
-never `c418fac0…`.
+`decision_hash` and `input_hash`. Regenerating the database therefore reproduces
+`75a9cc71…` exactly — never `c418fac0…`.
+
+*Correction, same day:* the decision rows are current, but the file as a whole is
+not. It is at migration `0003_reasoning_effort`, one behind head, and lacks the
+`worker_events` table — found when `RUI-1`'s API queried it. The conclusion below
+is unaffected, because a rebuild changes the schema and not the decision hashes;
+but "the committed database is already the builder's current output" was too
+broad a claim, and the provenance test only compared decisions, which is why it
+did not catch this.
 
 The reason is not a defect. The receipt's hash was produced by the original live
 Paper run on 28 August under that day's code; the same snapshot replays under

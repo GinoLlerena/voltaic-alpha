@@ -82,6 +82,31 @@ class BuilderIsDeterministicTests(unittest.TestCase):
         self.assertEqual(len(hashes), len(set(hashes)))
 
 
+class CommittedSchemaIsCurrentTests(unittest.TestCase):
+    """The decision rows are current; the file's schema is not. Known, and pinned.
+
+    Found by `RUI-1`: the committed database is at `0003_reasoning_effort` and has
+    no `worker_events` table. The determinism tests above compare decisions only,
+    which is exactly why they did not catch it.
+
+    Marked `expectedFailure` rather than skipped or left out. Rebuilding the file
+    changes its digest in `artifacts/release_freeze.json`, a release artifact, so
+    that is the owner's decision -- but the gap should be recorded in code, not
+    only in prose. When the database is rebuilt this becomes an unexpected
+    success, which unittest reports as a failure: the marker has to be removed
+    by whoever closes the gap, rather than outliving it.
+    """
+
+    @unittest.expectedFailure
+    def test_the_committed_database_is_at_the_migration_head(self) -> None:
+        # Derived rather than named, as in test_learning_capture.py.
+        versions = ROOT / "migrations" / "versions"
+        head = max(path.name.split("_")[0] for path in versions.glob("[0-9]*.py"))
+        with sqlite3.connect(DB) as conn:
+            stamped = conn.execute("select version_num from alembic_version").fetchone()[0]
+        self.assertTrue(stamped.startswith(head), f"committed evidence at {stamped}, head {head}")
+
+
 class ReceiptCorrelatesToNoCommittedDecisionTests(unittest.TestCase):
     """`CIIP-VAL-004` itself, pinned so it cannot regress silently."""
 

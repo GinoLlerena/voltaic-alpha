@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from ..persistence.models import AuditEvent, Decision, WorkerEvent
@@ -118,6 +118,33 @@ def recent(session: Session, *, limit: int = 40) -> tuple[ActivityEvent, ...]:
     return tuple(_event(row) for row in rows)
 
 
+#: A position in the system-wide feed: `(occurred_at, row id)`.
+Cursor = tuple[datetime, str]
+
+
+def page(
+    session: Session, *, limit: int = 40, before: Cursor | None = None
+) -> tuple[tuple[ActivityEvent, ...], Cursor | None]:
+    """One page of the system-wide feed, newest first, and the cursor after it.
+
+    `audit_events.sequence` restarts at zero for every decision, so it cannot
+    order a feed that spans decisions: five decisions all own a "sequence 3".
+    The feed is keyed on `(occurred_at, id)` instead, which is total and stable.
+    `sequence` stays what it is -- the per-decision gap check in `for_decision`.
+    """
+    stmt = select(AuditEvent).order_by(AuditEvent.occurred_at.desc(), AuditEvent.id.desc())
+    if before is not None:
+        at, row_id = before
+        stmt = stmt.where(
+            (AuditEvent.occurred_at < at)
+            | ((AuditEvent.occurred_at == at) & (AuditEvent.id < row_id))
+        )
+    rows = session.scalars(stmt.limit(limit + 1)).all()
+    shown = rows[:limit]
+    after = (shown[-1].occurred_at, str(shown[-1].id)) if len(rows) > limit else None
+    return tuple(_event(row) for row in shown), after
+
+
 @dataclass(frozen=True)
 class WorkerActivity:
     """One worker lifecycle or reconciliation event, from the durable record."""
@@ -131,6 +158,17 @@ class WorkerActivity:
     @property
     def is_fault(self) -> bool:
         return self.kind == "fault"
+
+
+def worker_events_recorded(session: Session) -> bool:
+    """Whether this source can hold worker events at all.
+
+    Committed evidence built before migration `0004_worker_events` has no such
+    table, and a live database mid-migration may not either. "Not recorded here"
+    must be reportable as itself -- not as an empty feed, which would read as a
+    worker that did nothing, and not as a crash.
+    """
+    return inspect(session.get_bind()).has_table(WorkerEvent.__tablename__)
 
 
 def worker_events(session: Session, *, limit: int = 40) -> tuple[WorkerActivity, ...]:

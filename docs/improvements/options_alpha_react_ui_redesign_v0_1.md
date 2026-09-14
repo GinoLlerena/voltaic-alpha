@@ -1021,10 +1021,15 @@ a second full-stack runtime is right. Only the justification needs restating as
 forward-looking, because a reader checking the premise will find it false and
 discount the rest.
 
-A second observation falls out of it. Three transitive-heavy packages ship in the
-locked environment and are never imported. That is dependency surface bought and
-not used, and it predates this design — worth removing or consciously retaining
-as an `RUI-1` prerequisite rather than left ambiguous.
+~~A second observation falls out of it. Three transitive-heavy packages ship in the
+locked environment and are never imported.~~ **Corrected 14 September:** wrong for
+two of the three. `starlette` and `uvicorn` are required by Streamlit itself
+(`streamlit` declares `starlette<2,>=0.46.0` and `uvicorn<1,>=0.30.0`) — the
+dashboard journal reports "Uvicorn server started" on every boot. Removing them
+would have broken the running dashboard. "No source file imports it" was the
+wrong test for "unused"; the installed dependency graph was the right one, and it
+was not checked. Only `fastapi` was genuinely unused, and `RUI-1` below now uses
+it, which closes the rest of this finding.
 
 ### `RUI-VAL-002` — §16.3's database gate is already met
 
@@ -1060,3 +1065,111 @@ The UX judgements in §3.2, §8 and §10 — hierarchy, comprehension speed, col
 semantics, choreography. They are design positions, not factual claims, and the
 document already concedes that a rendered browser audit is a mandatory release
 gate rather than something this review can stand in for.
+
+### `RUI-VAL-004` — §13.1's activity cursor cannot work as specified
+
+`GET /api/v1/activity?after_sequence=` assumes `audit_events.sequence` orders the
+system-wide feed. It does not: the repository assigns it with
+`enumerate(outcome.transitions)`, so it restarts at zero for every decision. The
+committed evidence holds 26 events sharing **six** sequence values. A cursor of
+`after_sequence=3` names no position in a feed that spans decisions, and paging
+by it would silently skip or repeat most events. §13.1's SSE note ("Event IDs map
+to a stable cursor/sequence") inherits the same flaw.
+
+`sequence` is still exactly right for what it already does — the per-decision
+gap check in `presentation/activity.for_decision`. The feed needs a different key.
+Resolved in `RUI-1`: an opaque cursor over `(occurred_at, id)`, which is total and
+stable. `tests/test_api.py` pages all 26 events seven at a time and asserts every
+event is seen exactly once — the test a sequence cursor would fail.
+
+### `RUI-VAL-005` — a decision's public identity must be its hash
+
+§13.1's `/decisions/{id}` leaves `id` unspecified, and the dashboard selects by
+`snapshot_id`, which reads like a natural key. It is not one: `decisions.snapshot_id`
+is indexed but **not unique**, because one snapshot can replay into several
+decisions (the case `CIIP-VAL-004` turned on). `decisions.id` is unique but an
+internal row key. `decision_hash` carries a unique constraint and is already
+public — on the dashboard, in receipts, in proof manifests.
+
+Resolved in `RUI-1`: the path identifier is the 64-character `decision_hash` hex.
+A malformed identifier is a 422 and an unknown one a 404, never a guess.
+
+### `RUI-VAL-006` — the live source label freezes its count at process start
+
+Found while extracting source resolution, and it applies to the existing
+dashboard, not only to the API. The label reads "live worker database (24
+decisions)", but the count is taken once: `app.py` wraps resolution in
+`@st.cache_resource`, and the API resolves once at startup. As the worker records
+decisions the label keeps the startup number. The mode (`LIVE`) stays true; the
+parenthetical becomes stale within five minutes of a market session.
+
+Recorded, not fixed here — fixing it in one surface would make the two disagree,
+which is the exact failure the shared resolver exists to prevent. The fix belongs
+in `presentation/source.py`: separate the cached engine from a label computed per
+request.
+
+## 21. `RUI-1` progress — 14 September 2026
+
+First increment landed. The API is built, tested, served over real HTTP on
+loopback, and **not deployed** — nothing listens on the host.
+
+### Built
+
+| Route | Serves |
+|---|---|
+| `GET /api/v1/system/status` | `presentation/status` |
+| `GET /api/v1/system/proof` | `presentation/proof` tiles |
+| `GET /api/v1/decisions` | keyset-paged list, `action` filter |
+| `GET /api/v1/decisions/{hash}/summary` | identity, observation, broker/model flags, `why` in authority order |
+| `GET /api/v1/decisions/{hash}/proof` | enveloped manifest plus its digest |
+| `GET /api/v1/proof/{hash}.json` | the exact manifest bytes, `X-Proof-Digest` header — deliberately unenveloped, since wrapping would change the digest a reviewer checks |
+| `GET /api/v1/activity` | keyset-paged audit feed (`RUI-VAL-004`) |
+| `GET /api/v1/worker/events` | allowlisted worker events, `faults_only` |
+
+`presentation/source.py` now holds the one source rule; `app.py` delegates to it,
+so the dashboard and the API cannot disagree about where their data came from.
+
+### Boundary, as tests rather than claims
+
+`tests/test_api.py`, 22 tests. The ones that matter most were each shown to fail
+against an injected violation, with the source restored afterwards:
+
+- OpenAPI publishes only `get`, and a walk of every mounted route finds no write
+  method. Injecting a `POST` route fails both. The walk asserts it found every
+  API route, because this FastAPI release nests included routers and a naive walk
+  passes having checked nothing — which the first version of the test did.
+- A clean interpreter importing the API loads no `alpaca`, `openai`,
+  `execution.*`, `providers.*`, `worker`, `agent`, `config`, `secrets_setup` or
+  `lifecycle`. Injecting one import of the execution gateway fails it.
+- Worker event detail is allowlisted; `host`, `error` and `summary` are withheld
+  and **named** in `withheld`, so a held-back field is visible as held back.
+  Adding `host` to the allowlist fails it.
+- `build_app` reads `DASHBOARD_DATABASE_URL`, the `SELECT`-only role, and ignores
+  the worker's `DATABASE_URL` (`RUI-VAL-002`).
+- Every response carries the envelope; timestamps are UTC with an offset even from
+  SQLite's naive values; prices are decimal strings; the proof file is
+  byte-identical to `export.render`.
+
+A source without the `worker_events` table returns `available: false` with the
+reason, not an empty feed (which would read as a worker that did nothing) and
+not a 500. The committed evidence is such a source — see below.
+
+### Remaining for `RUI-1`'s exit
+
+"React could render the full existing dashboard without ORM knowledge" is not yet
+true:
+
+- `/decisions/{hash}/market`, `/structure`, `/risk`, `/lifecycle` and
+  `/incidents` are not built; money in those payloads is where the decimal-string
+  rule will do most of its work.
+- `app.py` still runs its own list queries; it delegates source resolution only.
+- `RUI-VAL-006`'s per-request label.
+- A deployment unit, if the API is to run on the host before `RUI-6`.
+
+### Blocking a decision, not code
+
+`demo/h0_demo.db` is at migration `0003`, one behind head, and lacks
+`worker_events`. The API handles that honestly, but the committed evidence cannot
+demonstrate worker activity until it is rebuilt — and rebuilding changes the
+demo database's digest in `artifacts/release_freeze.json`, a release artifact.
+Left for the owner to decide rather than changed in passing.

@@ -1,7 +1,7 @@
 {
   "categories": {
     "code": {
-      "app.py": "sha256:2097ac2e5664422ba460c786ae2cb203dc035f0a75ab2e24d59cb1a38747d1a0",
+      "app.py": "sha256:0b4cb2ce198667e43230a5627189bcab716ca91b830199055be40ea5f140e89a",
       "scripts/arm_worker.sh": "sha256:3468a56ea685b63a623b61d500fb38215ba3af384f6bdcce76b78cde3c7de013",
       "scripts/backup_database.sh": "sha256:c93f79a43b6c753eebb85d7a3e930b1ec9e9b0e204e480d63d6341b17798b0c0",
       "scripts/build_demo_db.py": "sha256:3ce62c83bb66c315e5ae017e41c0f426f33c9b3b812269abc336b9504af48b5b",
@@ -18,6 +18,10 @@
       "src/options_alpha_lab/ablation.py": "sha256:25172bdf16d4de7b095d20beedb268a8ccdacd50d14c7e4ab3746460fb764196",
       "src/options_alpha_lab/agent.py": "sha256:b0f0d9b2998b6529ee6995539f77768a7e04a8686a36fb6fc32f43cb677ca99f",
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
+      "src/options_alpha_lab/api/__init__.py": "sha256:4430b1f87ec17e889ded8dac44683c16c6906d0862b33cc14a02bfa9008f3e0c",
+      "src/options_alpha_lab/api/__main__.py": "sha256:20571ffdb01f5602a76937e71794f135c38ab8cd9fcf0a995ebf0a41d4b6152f",
+      "src/options_alpha_lab/api/dto.py": "sha256:8ee7b8ff3a75a7710223080cdcfb62f32af737920ede3946b58d1d8156498dc9",
+      "src/options_alpha_lab/api/server.py": "sha256:4aeb25b3552db509ea8eb609de70419277eb066b35bf702060ac3e6180493ef7",
       "src/options_alpha_lab/architecture/__init__.py": "sha256:b9ec27fa878d4c68c402434339bad7a35db69868d14fad68ecb67b086b540d1a",
       "src/options_alpha_lab/architecture/contracts.py": "sha256:ae85b7100b48ee9dd4d5baa2e4745f352296109dbb3ad22d0818dc17c82e4be7",
       "src/options_alpha_lab/architecture/ports.py": "sha256:979fe77c8f82bb7df30af834f35e3277e70ea83577d0f66a4129efeeed624097",
@@ -44,12 +48,13 @@
       "src/options_alpha_lab/persistence/models.py": "sha256:600baa3560048e45e370dec9899b8cd2d6ae1f0a4b75d28fc89c19eb9a8f0245",
       "src/options_alpha_lab/persistence/repository.py": "sha256:c5fa26cd426a3f391d2d9248eb6b7c2a8970d474e1305bb1498c1ab4223db666",
       "src/options_alpha_lab/presentation/__init__.py": "sha256:9908c273a22d19b3ae0d636345e1da581279061b96e8e35d6a3a9e623e318ba5",
-      "src/options_alpha_lab/presentation/activity.py": "sha256:d700edd5146b6f74d008302a4466f4145b579929655783253472911dc301018a",
+      "src/options_alpha_lab/presentation/activity.py": "sha256:261425fb0065b7b891fdcb48d1434ded7da2270ec10e40393f6908b2cd64a90d",
       "src/options_alpha_lab/presentation/artifacts.py": "sha256:33e4bc4b3545f95bb4d7854cd3163c0ef3b9dabb0e088e70a37db5ae6e81e582",
-      "src/options_alpha_lab/presentation/decision.py": "sha256:0db9456104363ed468d68682e7f8843b56eed0ec2c809bf2bab189c558838f57",
+      "src/options_alpha_lab/presentation/decision.py": "sha256:0ab0eac1e38200d4403993e179a08dbe7b94a5fb4a91e770118e27dca5379d3c",
       "src/options_alpha_lab/presentation/explain.py": "sha256:b70fbacbad28ebca773f54d13843c82df3bb8067c78976868c082aa62b5a4a1e",
       "src/options_alpha_lab/presentation/export.py": "sha256:407e4ccef987546f6f03880c48ea9dd5a9a04fb93b81041e4cec675a7d4b8f8d",
       "src/options_alpha_lab/presentation/proof.py": "sha256:0c1ebb480a1507be9a5856fc4e18f1166bc0f70372a61783e2109cbed6eb9574",
+      "src/options_alpha_lab/presentation/source.py": "sha256:576e36cd51777eccd88be86940110e618aa1ed3a0f848c97e1ccf17a20e0a279",
       "src/options_alpha_lab/presentation/status.py": "sha256:8773030c11b8ed73d67652bed1fdb9e074cf9d0363016690070509a7765389ef",
       "src/options_alpha_lab/presentation/tour.py": "sha256:eaa73eef805bcbc7e20d35ffb3b88ce97ff45193c4485f10412bbeab086e7a2f",
       "src/options_alpha_lab/providers/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -101,8 +106,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:da66ea25822140a3810cfcf420c16879c0957744",
-  "freeze_digest": "sha256:f8d99e773321db29d8d2af45003427e969fdada62838a79e88b757f459bb526a",
-  "frozen_at": "2026-09-11T01:39:21.850423+00:00",
+  "commit": "git:8f1bb7b8167634858a334c2eb2bfa09a3bbd18eb",
+  "freeze_digest": "sha256:11b932d780c6856dba5d3d309489a9e65936f67731c13c0b37f03664e5c13e10",
+  "frozen_at": "2026-09-14T20:32:38.607021+00:00",
   "manifest_version": "release_freeze.v1"
 }

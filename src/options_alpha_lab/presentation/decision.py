@@ -19,6 +19,7 @@ reading.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -177,3 +178,42 @@ def load(session: Session, decision: Decision) -> DecisionView:
         positions=positions,
         exits=exits,
     )
+
+
+#: A position in the decision list: `(decided_at, decision_hash)`.
+DecisionCursor = tuple[datetime, str]
+
+
+def by_hash(session: Session, decision_hash: str) -> Decision | None:
+    """Look a decision up by the only identifier the schema guarantees unique.
+
+    `RUI-1`. `snapshot_id` is indexed but not unique -- one snapshot can replay
+    into several decisions -- so it cannot address a decision in a public
+    contract. `decision_hash` carries a unique constraint and is already public.
+    """
+    return session.scalars(
+        select(Decision).where(Decision.decision_hash == decision_hash)
+    ).one_or_none()
+
+
+def listing(
+    session: Session,
+    *,
+    action: str | None = None,
+    limit: int = 50,
+    before: DecisionCursor | None = None,
+) -> tuple[list[Decision], DecisionCursor | None]:
+    """Decisions newest first, one page at a time, keyed on a total order."""
+    stmt = select(Decision).order_by(Decision.decided_at.desc(), Decision.decision_hash.desc())
+    if action:
+        stmt = stmt.where(Decision.action == action)
+    if before is not None:
+        at, key = before
+        stmt = stmt.where(
+            (Decision.decided_at < at)
+            | ((Decision.decided_at == at) & (Decision.decision_hash < key))
+        )
+    rows = list(session.scalars(stmt.limit(limit + 1)).all())
+    shown = rows[:limit]
+    after = (shown[-1].decided_at, shown[-1].decision_hash) if len(rows) > limit else None
+    return shown, after
