@@ -23,6 +23,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -556,6 +557,99 @@ class ExitDecisionRecord(Base):
     decided_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
+class ReviewJob(Base):
+    """One scheduled look back at a decision, at a declared horizon.
+
+    `CIIP-008`. A decision's quality is not knowable when it is made, so the
+    question is deferred rather than guessed: a job per decision per horizon,
+    created when the decision is recorded and resolved only once the horizon has
+    actually elapsed in completed trading sessions.
+
+    `NO_TRADE` decisions get the same horizons as trades. Reviewing only the
+    decisions that traded would measure the strategy on the half of its
+    behaviour it already liked, which is how a refusal-heavy policy comes to look
+    better than it is.
+
+    Unique on `(decision_id, horizon)`: a horizon is asked once. Re-running the
+    reviewer must be a no-op, not a second opinion.
+    """
+
+    __tablename__ = "review_jobs"
+    __table_args__ = (UniqueConstraint("decision_id", "horizon", name="uq_review_job_horizon"),)
+
+    id: Mapped[str] = _pk()
+    decision_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("decisions.id"), nullable=False, index=True
+    )
+    #: Label, e.g. `T+1`. `horizon_sessions` is what the calendar counts.
+    horizon: Mapped[str] = mapped_column(String(16), nullable=False)
+    horizon_sessions: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: `PENDING` until the horizon elapses and a completed close is available;
+    #: `COMPLETE` once an outcome row exists; `UNRESOLVABLE` when the evidence
+    #: needed will not arrive, which is a result rather than a silence.
+    state: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
+class DecisionOutcomeRecord(Base):
+    """What was observable about a decision once its horizon had passed.
+
+    `CIIP-008`. Append-only by construction and by test: enrichment writes a new
+    row and never edits the decision it describes, so the record of what was
+    decided cannot drift toward what happened.
+
+    Deliberately not a verdict. It records the underlying's completed-session
+    move over the horizon and, when the decision traded and closed, the realized
+    result. `direction_agreed` is a plain comparison, not a claim that a decision
+    was right: at this sample size no such claim is available, and a column that
+    reads like a score invites one.
+
+    The horizon price comes from a later snapshot's completed daily close -- the
+    same look-ahead protection the decision itself used -- so enrichment needs no
+    provider call and cannot see inside the session it is measuring.
+    """
+
+    __tablename__ = "decision_outcomes"
+    __table_args__ = (
+        UniqueConstraint("decision_id", "horizon", name="uq_decision_outcome_horizon"),
+    )
+
+    id: Mapped[str] = _pk()
+    decision_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("decisions.id"), nullable=False, index=True
+    )
+    review_job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("review_jobs.id"), nullable=False, unique=True
+    )
+    horizon: Mapped[str] = mapped_column(String(16), nullable=False)
+    horizon_sessions: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: `TRADE` or `NO_TRADE`: the same horizons, recorded as different kinds.
+    outcome_kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    #: The snapshot whose completed daily close supplied the horizon price.
+    observed_snapshot_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    observed_source_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    sessions_elapsed: Mapped[int] = mapped_column(Integer, nullable=False)
+    underlying_at_decision: Mapped[Any] = mapped_column(Numeric(18, 6), nullable=False)
+    underlying_at_horizon: Mapped[Any] = mapped_column(Numeric(18, 6), nullable=False)
+    underlying_change: Mapped[Any] = mapped_column(Numeric(18, 6), nullable=False)
+    #: None when the decision expressed no direction, or the move was exactly flat.
+    direction_agreed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    #: Present only for a trade that reached a closed position.
+    realized: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
     recorded_at: Mapped[datetime] = _recorded_at()
     schema_version: Mapped[str] = _schema_version()
 
