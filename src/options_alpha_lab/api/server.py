@@ -180,7 +180,7 @@ def create_app(
         pin_missing = built.pin_missing or (pin is not None and pinned is None)
 
         def hex_id(d: Any) -> str:
-            return d.decision_hash.removeprefix("sha256:")
+            return str(d.decision_hash).removeprefix("sha256:")
 
         return envelope(db, dto.DecisionListOut(
             view=view,  # type: ignore[arg-type]
@@ -359,7 +359,10 @@ def create_app(
         read = activity.worker_faults if faults_only else activity.worker_events
         out = []
         for e in read(db, limit=limit):
-            detail = {k: v for k, v in e.detail.items() if k in dto.WORKER_DETAIL_ALLOWLIST}
+            # dto.scalar also keeps the no-float rule for any numeric detail value.
+            detail = {
+                k: dto.scalar(v) for k, v in e.detail.items() if k in dto.WORKER_DETAIL_ALLOWLIST
+            }
             out.append(dto.WorkerEventOut(
                 event=e.event, kind=e.kind, occurred_at=dto.utc(e.occurred_at),
                 detail=detail,
