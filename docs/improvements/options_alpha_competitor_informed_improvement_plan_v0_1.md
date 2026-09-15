@@ -1015,3 +1015,85 @@ the real committed pair.
 matches a fresh build, and that no committed decision can claim the receipt. The
 second test is written to fail loudly if that ever changes, with the instruction
 to update this row rather than the test.
+
+## 17. `CIIP-008` — outcomes and review jobs — 15 September 2026
+
+Persistence and logic landed. The worker does not yet call it: this change adds
+no behaviour to the running single writer, which is a separate step.
+
+### What exists now
+
+Migration `0005_decision_outcomes` adds two tables, and the split is the point.
+A `review_jobs` row is the **question** — one per decision per horizon, created
+with the decision, resolved only once the horizon has elapsed in completed
+sessions. A `decision_outcomes` row is the **answer**, written once. Neither
+touches `decisions`, so enrichment is append-only and the record of what was
+decided cannot drift toward what happened. Not back-filled: inventing jobs for
+older decisions would date a question to a moment nobody asked it.
+
+`src/options_alpha_lab/outcomes.py` holds the logic. Horizons are declared once —
+`T+1` and `T+3`, where `T+3` is the strategy's own `exits.SESSION_STOP`, so a
+decision is reviewed on the clock its exit policy already runs on.
+
+### The three properties, and why each has a test
+
+**Refusals are reviewed on the same clock as trades.** Reviewing only what traded
+measures a policy on the half of its behaviour it already liked; a refusal-heavy
+policy would look better the more it refused.
+
+**No look-ahead, by construction.** The horizon price is a later snapshot's
+`underlying_price`, which is the last *completed* daily close — the same
+protection the decision used. Enrichment needs no provider call and cannot see
+inside the session it measures. The earliest qualifying close is taken, not the
+latest, because taking the most recent available would silently lengthen the
+horizon as time passed.
+
+**Asking twice yields one answer.** A unique constraint on
+`(decision_id, horizon)` is the guarantee; the reviewer's check is the courtesy.
+A resolved horizon is never asked again.
+
+A pending job whose evidence has not arrived stays `PENDING`. That is not an
+outcome of zero, and recording it as one would be the same defect as a status
+tile that cannot be unknown.
+
+### What it deliberately does not do
+
+It does not score. `direction_agreed` compares a stated direction with a realised
+move; it is not a claim that a decision was right, and it is `NULL` when the
+decision stated no direction or the move was exactly flat — because a column that
+reads like a score invites averaging, and at this sample size no such claim is
+available.
+
+### `CIIP-VAL-011` — the published realised figure is not reproducible from the fills
+
+Found while deciding what `decision_outcomes.realized` should hold. The project
+has **no code that computes realised P&L**; the only such number is the committed
+receipt's `final_state.realized` of **−7.10**, which is an account-equity delta
+(100000.00 → 99992.90).
+
+Both fill-based computations disagree with it. The order averages give
+(3.06 − 3.13) × 100 = **−7.00**, and the leg prices give the same: entry
+6.90 − 3.77 = 3.13, close 6.87 − 3.81 = 3.06. A gap of 0.10, unexplained — plausibly
+a fee or a rounding the equity delta includes and the fills do not.
+
+Disposition: `realized` is computed from recorded fills, so a figure written into
+the database is reproducible from the records it cites. The receipt's number is
+left as it is, displayed as what it is — an equity delta. Closing this properly
+means finding the 0.10, which needs the broker activity record that `CIIP-012`
+adds (`Fill` has a local id but no Alpaca execution id).
+
+### Committed evidence cannot demonstrate this
+
+Its decisions are dated by replay wall-clock, *after* the observations they used,
+and its snapshots are independent scenarios rather than one instrument's path —
+641.25 and 771.10 are two different cases. Anchoring the horizon on `decided_at`
+keeps that shape inert: nothing resolves, which is correct. Anchoring on the
+observation instead would have manufactured a +129.85 one-session move between
+unrelated fixtures. A test pins the replay shape; another exercises a live-shaped
+series end to end, where both horizons resolve from the right closes.
+
+### Next
+
+Wire it into the worker: `ensure_jobs` when a decision is recorded, `review` on a
+slow clock. That changes the live single writer and belongs in its own change,
+deployed outside market hours.
