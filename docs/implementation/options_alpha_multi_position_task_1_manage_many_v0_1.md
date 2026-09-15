@@ -9,7 +9,7 @@ not authorize concurrent entry.*
 |---|---|
 | Version | 0.1.0 |
 | Date | 31 August 2026 |
-| Status | **Implemented 31 August 2026**; not yet deployed (see section 7) |
+| Status | **Implemented 31 August 2026; deployed and exercised in production.** Ran on the Paper worker from 31 August until the hosts were retired on 9 September 2026, managing a live position across restarts and an unplanned `needrestart` bounce. The "not yet deployed" note that stood here was correct for one day |
 | Target | Current hackathon runtime |
 | Directional effort | 3-5 engineer-days |
 | Required entry capacity after delivery | One open or pending strategy |

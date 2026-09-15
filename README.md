@@ -1,5 +1,30 @@
 # Options Alpha — an auditable AI execution firewall
 
+> ## Current build — 9 September 2026
+>
+> This is the single statement of what is true now. Sections further down that
+> describe a narrower system are **historical design decisions**, kept because
+> they record why choices were made, and marked where they are no longer current.
+>
+> - **The system trades.** Between 28 August and 9 September 2026 the worker
+>   autonomously selected, submitted, managed and closed SPY debit verticals on
+>   Alpaca **Paper**, under deterministic risk and an operator arming token. One
+>   completed round trip is recorded in `artifacts/h0_paper_lifecycle.json`.
+> - **Authority is unchanged.** The model writes a memo. Deterministic code owns
+>   direction, invalidation, sizing, contract choice, eligibility and every broker
+>   write. One file may express a write, enforced by a static gate.
+> - **Cap one.** A maximum of one open or pending strategy. Multi-position entry
+>   is designed but not authorized.
+> - **No deployment is running.** The hosts were retired on 9 September 2026 after
+>   the hackathon closed; the live evidence database was destroyed with them. The
+>   dashboard and worker are rebuilt under
+>   [`CIIP-I`](docs/improvements/options_alpha_infrastructure_redesign_v0_1.md).
+> - **No alpha is claimed.** See [Disclosures](#disclosures). The sample is two
+>   trades and the null hypothesis is not rejected.
+>
+> Next work is planned in the
+> [competitor-informed improvement plan](docs/improvements/options_alpha_competitor_informed_improvement_plan_v0_1.md).
+
 **Team:** Voltaic Alpha · **Repository:** `github.com/GinoLlerena/voltaic-alpha`
 
 The interesting part of this project is not the strategy. It is the firewall
@@ -57,16 +82,23 @@ submits no order.
 
 A durable audit schema, a replayable decision path, and a deterministic
 execution gateway that is the only code permitted to express a broker write.
-Two hosts are deployed: a credential-free judge dashboard, and a credentialed
-worker running `recommend` mode with order writes disabled. Underneath sit two
-deliberately separate layers:
+Two hosts were deployed until 9 September 2026: a credential-free judge
+dashboard, and a credentialed worker that ran in `paper_execute` mode with an
+operator arming token. Both are now retired. Underneath sit two deliberately
+separate layers:
 
 1. the original synthetic interaction lab, which tests spread and risk feedback;
 2. a production-facing architecture slice with timestamped contracts, provider
    ports, and a bounded fail-closed decision workflow.
 
-Neither layer creates a trading bot or places orders. The architecture is
-documented in [Architecture Slice v0.1](docs/implementation/options_alpha_architecture_slice_v0_1.md).
+The architecture is documented in
+[Architecture Slice v0.1](docs/implementation/options_alpha_architecture_slice_v0_1.md).
+
+*Corrected 9 September 2026: this paragraph previously read "Neither layer
+creates a trading bot or places orders." That was true when written and became
+false on 28 August 2026, when the worker began submitting to Alpaca Paper. The
+sentence is removed rather than softened, because it was the opposite of what
+the system does.*
 
 It answers four early questions:
 
@@ -77,19 +109,30 @@ It answers four early questions:
    revision?
 4. Can the final decision explain why it is a trade candidate or no-trade?
 
-## Deliberately out of scope
+## Out of scope
 
-- Alpaca order submission, replacement, cancellation, or position changes
-- Live credentials or any live endpoint. Paper credentials are used only by the
-  opt-in read-only integration test described below; normal runs need none.
-- Autonomous execution
-- Portfolio optimization
-- Backtesting
-- Multiple concurrent strategies
-- A production UI
+Still genuinely out of scope:
 
-The fixture contains synthetic prices. Nothing in this repository is an
-investment recommendation.
+- **Live credentials or any live endpoint.** The gateway refuses any resolved
+  endpoint that is not the Paper host, checked against the client about to be
+  used rather than the flag that configured it.
+- **Portfolio optimization.**
+- **Backtesting.** No backtester exists, and none of the recorded results is a
+  backtest.
+- **Multiple concurrent strategies.** Cap one is enforced and is the rollback
+  target. Multi-position entry is designed in
+  [Task 2](docs/implementation/options_alpha_multi_position_task_2_portfolio_entry_v0_1.md)
+  but not authorized.
+
+*Corrected 9 September 2026.* This list previously also declared Alpaca order
+submission, autonomous execution and a production UI out of scope. All three
+shipped: the worker submitted, replaced, cancelled and closed Paper orders
+autonomously from 28 August, and the Streamlit dashboard was publicly deployed
+from 30 August. The entries are removed rather than reworded, because a scope
+list that contradicts the shipped system is worse than no scope list.
+
+Fixtures contain synthetic prices, and are labelled as such in the dashboard.
+Nothing in this repository is an investment recommendation.
 
 ## Configure local credentials
 
@@ -311,7 +354,9 @@ The currently published event criteria are Application of Technology, Presentati
 
 ## Frontend design
 
-The judge-facing UX/UI baseline is defined in [Frontend Design v0.1](docs/implementation/options_alpha_frontend_design_v0_1.md). It specifies the five-view information architecture, lifecycle/refusal/recovery journeys, evidence and authority presentation, responsive behavior, accessibility, privacy, view-model boundaries, and staged implementation plan. It is a design specification; templates, styles, routes, and dashboard tests are not implemented yet.
+The judge-facing UX/UI baseline is defined in [Frontend Design v0.1](docs/implementation/options_alpha_frontend_design_v0_1.md). It specifies the five-view information architecture, lifecycle/refusal/recovery journeys, evidence and authority presentation, responsive behavior, accessibility, privacy, and view-model boundaries.
+
+*Historical, corrected 9 September 2026:* that document names a FastAPI / Jinja2 / HTMX stack and says templates, routes and dashboard tests are unimplemented. The shipped product took a different route — a Streamlit application in `app.py` with 19 dashboard tests. The design document is retained for its information architecture and accessibility requirements, which still govern; its stack section is a superseded decision, not a current plan.
 
 ## Next architecture increment
 

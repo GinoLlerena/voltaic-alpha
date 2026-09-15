@@ -134,7 +134,12 @@ class DashboardBoundaryTests(unittest.TestCase):
         self.assertGreaterEqual(orders or 0, 2, "need the open and close lifecycle")
 
     def test_every_required_disclosure_is_present(self) -> None:
-        text = APP.read_text(encoding="utf-8")
+        # Asserted on the rendered page rather than on app.py's source: the copy
+        # moved to presentation/copy.py (RUI-1), and a disclosure that exists in a
+        # file but is not rendered discloses nothing.
+        run = AppTest.from_file(str(APP), default_timeout=120).run()
+        self.assertFalse(run.exception)
+        text = " ".join(m.value for m in run.sidebar.markdown)
         for phrase in ("Paper", "indicative", "No alpha is claimed", "investment advice"):
             self.assertIn(phrase, text)
 
@@ -235,9 +240,23 @@ class SelectorScaleTests(unittest.TestCase):
     def test_the_query_is_bounded(self) -> None:
         # Without a limit the page loads the whole decisions table on every
         # interaction, which is a different failure from the list being long.
+        # The query moved into `presentation/decision.listing` (RUI-1), so this
+        # asserts the bound where it now lives, by behaviour, and that the page
+        # still passes its limit rather than asking for everything.
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from options_alpha_lab.presentation.decision import listing
+
         source = APP.read_text(encoding="utf-8")
         self.assertIn("DECISION_LIMIT", source)
-        self.assertIn(".limit(", source)
+        self.assertIn("listing(session, limit=limit)", source)
+        demo = APP.parent / "demo" / "h0_demo.db"
+        engine = create_engine(f"sqlite+pysqlite:///{demo}", future=True)
+        with Session(engine) as session:
+            rows, after = listing(session, limit=2)
+        self.assertEqual(len(rows), 2)
+        self.assertIsNotNone(after, "a bounded page must say there is more")
 
     def test_every_filter_renders(self) -> None:
         import os
@@ -258,3 +277,45 @@ class SelectorScaleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SelectedDecisionIsolationTests(unittest.TestCase):
+    """`CIIP-CV-003`: the Outcome tab must not show another decision's orders.
+
+    The old query was `select(BrokerOrder)` with no filter. That looked correct
+    only because the evidence database happens to hold one lifecycle; it becomes
+    false the moment a second exists, which is exactly when a judge would be
+    looking hardest. Assert the traversal, not the rendering, because the
+    rendering is what happens to be true today.
+    """
+
+    def test_the_dashboard_does_not_query_orders_or_fills_itself(self) -> None:
+        """`CIIP-CV-003`, then `CIIP-006`: scoping moved into the read model.
+
+        The original defect was `select(BrokerOrder)` with no filter. Fixing the
+        filter in place would have left the next query free to forget it again,
+        so the stronger property is asserted instead: the dashboard does not
+        reach for orders or fills at all, and takes them from a view that cannot
+        contain another decision's records. Lineage isolation itself is proved
+        against two lifecycles in test_presentation_decision.py.
+        """
+        source = APP.read_text(encoding="utf-8")
+        for forbidden in ("select(BrokerOrder)", "select(Fill)", "select(OrderIntent)"):
+            self.assertNotIn(
+                forbidden,
+                source,
+                f"{forbidden} belongs in the read model, not the dashboard",
+            )
+        self.assertIn("decision_view(", source, "the dashboard must render a view model")
+        self.assertIn("lineage.fills_for(", source)
+
+    def test_halt_state_selector_is_labelled_a_simulator(self) -> None:
+        """`CIIP-CV-004`: it changes no durable state and must not look like a control."""
+        self.assertIn("POLICY SIMULATOR", APP.read_text(encoding="utf-8"))
+
+    def test_safety_strip_is_not_hardcoded(self) -> None:
+        """`CIIP-CV-001`: status comes from records, not literals."""
+        source = APP.read_text(encoding="utf-8")
+        self.assertIn("system_status", source)
+        for literal in ('("Order writes", "Disabled"', '("Live endpoint", "None"'):
+            self.assertNotIn(literal, source, f"hardcoded status tile remains: {literal}")

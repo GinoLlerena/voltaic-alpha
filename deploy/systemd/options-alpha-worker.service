@@ -1,0 +1,24 @@
+[Unit]
+Description=Options Alpha worker (single-writer decision agent)
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/options-alpha
+EnvironmentFile=/etc/options-alpha.env
+RuntimeDirectory=options-alpha
+RuntimeDirectoryMode=0755
+# Disarmed on purpose. `observe` decides and records but prepares no order and
+# reaches no broker. Arming is a separate, deliberate, recorded action that adds
+# a paper_execute drop-in and an operator approval token.
+ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.worker \
+  --mode observe --symbol SPY --interval 300 \
+  --health-file /var/run/options-alpha/health.json
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -4,9 +4,9 @@
 
 | Field | Value |
 |---|---|
-| Status | H0 implementation-ready UX/UI handoff |
+| Status | **Partly superseded, 9 September 2026.** The information architecture, journeys, accessibility and view-model boundaries still govern. The stack, template, route and HTMX sections are historical design decisions, not current plans — the product shipped on Streamlit with 19 dashboard tests |
 | Audience | Hackathon judges, authenticated operator, post-run reviewer |
-| Frontend stack | FastAPI, Jinja2, HTMX, Plotly |
+| Frontend stack | **Superseded.** Specified FastAPI, Jinja2, HTMX, Plotly; shipped as Streamlit (`app.py`) |
 | Primary viewport | Desktop judge demo; responsive down to 360 px |
 | Authority boundary | Read-only by default; UI actions never create trading authority |
 

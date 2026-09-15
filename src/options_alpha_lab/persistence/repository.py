@@ -8,6 +8,8 @@ or none of it was written.
 
 from __future__ import annotations
 
+import json
+import sys
 import uuid
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -35,6 +37,7 @@ from .models import (
     SignalRecord,
     SpreadCandidateRecord,
     ThesisRecord,
+    WorkerEvent,
 )
 
 
@@ -149,6 +152,53 @@ class DecisionRecorder:
                 raise LookupError(f"run {run_id} not found")
             run.ended_at = datetime.now(UTC)
             run.health_result = health_result
+
+    def record_worker_event(
+        self,
+        run_id: str,
+        *,
+        event: str,
+        kind: str = "state",
+        occurred_at: datetime | None = None,
+        **detail: Any,
+    ) -> None:
+        """Persist one worker lifecycle or reconciliation event.
+
+        `CIIP-I-008`. Deliberately never raises: a worker must not die because
+        it could not write a log row. A telemetry failure that takes down the
+        single writer holding an open position would be a far worse outcome than
+        a missing row, so the exception is swallowed here rather than at every
+        call site, where it would eventually be forgotten.
+        """
+        try:
+            with self._session() as session:
+                session.add(
+                    WorkerEvent(
+                        id=_new_id(),
+                        run_id=run_id,
+                        kind=kind,
+                        event=event,
+                        detail=detail,
+                        occurred_at=occurred_at or datetime.now(UTC),
+                    )
+                )
+        except Exception as exc:  # noqa: BLE001 - see the docstring; never fatal
+            # Reported rather than swallowed. A row that could not be written is
+            # exactly the kind of thing this project refuses to hide, and the
+            # journal line is the only remaining trace that the event happened.
+            print(
+                json.dumps(
+                    {
+                        "event": "worker_event_not_recorded",
+                        "kind": "fault",
+                        "run_id": run_id,
+                        "dropped_event": event,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    }
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
 
     def record_decision(
         self,

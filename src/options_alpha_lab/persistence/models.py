@@ -423,6 +423,41 @@ class AuditEvent(Base):
     schema_version: Mapped[str] = _schema_version()
 
 
+class WorkerEvent(Base):
+    """Worker lifecycle and reconciliation, durable rather than only in the journal.
+
+    `CIIP-I-008`. `audit_events` records what happened to a *decision*, keyed by
+    its correlation id. It has nowhere to put the things that happen to the
+    *worker* — starting, stopping, losing a lease, reconciling at startup, a tick
+    that raised — because those are run-scoped and belong to no decision.
+
+    Those events lived only in journald, which is expendable by design: the
+    retention standard caps it at thirty days and a reinstall discards it. A
+    product surface that shows "what the agent is doing" therefore had nothing
+    durable to read, and would have had to synthesise it — the defect this
+    project keeps finding in other people's dashboards.
+
+    `detail` is free-form because these events genuinely differ in shape, and
+    inventing a common schema across "started with this configuration" and "a
+    tick raised" would flatten both. What is *not* free-form is `kind`: a fault
+    must be selectable without parsing prose.
+    """
+
+    __tablename__ = "worker_events"
+
+    id: Mapped[str] = _pk()
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), nullable=False, index=True)
+    #: `state` or `fault`. Cadence is never persisted; see `telemetry.Kind`.
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    event: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
 class PositionObservation(Base):
     """The exact mark an exit decision was made on.
 

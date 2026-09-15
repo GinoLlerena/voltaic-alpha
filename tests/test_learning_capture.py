@@ -193,7 +193,19 @@ class MigrationTests(unittest.TestCase):
             stamped = session.execute(
                 text("select version_num from alembic_version")
             ).scalar_one()
-        self.assertEqual(stamped, "0003_reasoning_effort")
+        # Derived rather than named. Hardcoding the head revision makes every
+        # future migration fail this test for the wrong reason, which trains
+        # people to edit the literal instead of reading what broke.
+        head = max(
+            path.name.split("_")[0]
+            for path in (
+                Path(__file__).resolve().parents[1] / "migrations" / "versions"
+            ).glob("[0-9]*.py")
+        )
+        self.assertTrue(
+            stamped.startswith(head),
+            f"create_schema stamped {stamped}, but head is {head}",
+        )
 
         upgrade_schema(self.engine)  # must not raise on an already-current database
         self.assertIn("exit_decisions", inspect(self.engine).get_table_names())
