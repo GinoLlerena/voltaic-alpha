@@ -30,13 +30,25 @@ from fastapi import Path as PathParam
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from ..presentation import activity, book, decision, explain, export, proof, status, tour
+from ..presentation import (
+    activity,
+    book,
+    decision,
+    explain,
+    export,
+    listing,
+    proof,
+    status,
+    tour,
+)
+from ..presentation import copy as public_copy
 from ..presentation.source import Resolver, Source
 from . import dto, views
 
 ROOT = Path(__file__).resolve().parents[3]
 COMMITTED = ROOT / "demo" / "h0_demo.db"
 DIGEST = r"^[0-9a-f]{64}$"
+VIEW_PATTERN = "^(" + "|".join(listing.VIEWS) + ")$"
 Digest = Annotated[str, PathParam(pattern=DIGEST, description="decision_hash hex, no prefix")]
 
 
@@ -146,6 +158,62 @@ def create_app(
                 for r in rows
             ],
             next_cursor=_encode(*after) if after else None,
+        ))
+
+    #: The dashboard bounds its list the same way (app.DECISION_LIMIT).
+    LIST_LIMIT = 400
+
+    @api.get("/decisions/grouped", response_model=dto.Envelope[dto.DecisionListOut])
+    def decisions_grouped(
+        db: Db,
+        view: Annotated[str, Query(pattern=VIEW_PATTERN)] = "Notable",
+        pin: Annotated[str | None, Query(pattern=DIGEST)] = None,
+    ) -> dict[str, Any]:
+        """The sidebar list: grouped, filtered and pinned exactly as the page does it."""
+        recent, _ = decision.listing(db, limit=LIST_LIMIT)
+        oldest_first = list(reversed(recent))
+        pinned = next(
+            (d for d in oldest_first if d.decision_hash == f"sha256:{pin}"), None
+        ) if pin else None
+        built = listing.build(oldest_first, view, pin=pinned)  # type: ignore[arg-type]
+        # A pin outside the bounded page is reported missing, not silently dropped.
+        pin_missing = built.pin_missing or (pin is not None and pinned is None)
+
+        def hex_id(d: Any) -> str:
+            return d.decision_hash.removeprefix("sha256:")
+
+        return envelope(db, dto.DecisionListOut(
+            view=view,  # type: ignore[arg-type]
+            entries=[
+                dto.ListEntryOut(
+                    decision_id=hex_id(e.decision), snapshot_id=e.decision.snapshot_id,
+                    action=e.decision.action, direction=e.decision.direction, label=e.label,
+                    count=e.count, member_ids=[hex_id(m) for m in e.members],
+                )
+                for e in built.entries
+            ],
+            shown=len(built.entries), total=decision.count(db),
+            grouped=built.grouped, pin_missing=pin_missing,
+        ))
+
+    @api.get("/copy", response_model=dto.Envelope[dto.CopyOut])
+    def authority_copy(db: Db) -> dict[str, Any]:
+        return envelope(db, dto.CopyOut(
+            what_this_is=public_copy.WHAT_THIS_IS,
+            disclosures=list(public_copy.DISCLOSURES),
+            write_guards=[
+                dto.RuleOut(name=r.name, effect=r.effect) for r in public_copy.WRITE_GUARDS
+            ],
+            write_guards_note=public_copy.WRITE_GUARDS_NOTE,
+            model_limits=[
+                dto.RuleOut(name=r.name, effect=r.effect) for r in public_copy.MODEL_LIMITS
+            ],
+            halt_states=[
+                dto.HaltStateOut(
+                    state=h.state, tone=h.tone, explanation=h.explanation  # type: ignore[arg-type]
+                )
+                for h in public_copy.HALT_STATES
+            ],
         ))
 
     @api.get("/decisions/{digest}/summary", response_model=dto.Envelope[dto.DecisionSummary])

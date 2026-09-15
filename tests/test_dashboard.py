@@ -134,7 +134,12 @@ class DashboardBoundaryTests(unittest.TestCase):
         self.assertGreaterEqual(orders or 0, 2, "need the open and close lifecycle")
 
     def test_every_required_disclosure_is_present(self) -> None:
-        text = APP.read_text(encoding="utf-8")
+        # Asserted on the rendered page rather than on app.py's source: the copy
+        # moved to presentation/copy.py (RUI-1), and a disclosure that exists in a
+        # file but is not rendered discloses nothing.
+        run = AppTest.from_file(str(APP), default_timeout=120).run()
+        self.assertFalse(run.exception)
+        text = " ".join(m.value for m in run.sidebar.markdown)
         for phrase in ("Paper", "indicative", "No alpha is claimed", "investment advice"):
             self.assertIn(phrase, text)
 

@@ -437,3 +437,47 @@ class SceneOut(Public):
     snapshot_id: str
     #: None when the scene's decision is absent from the current source.
     decision_id: str | None
+
+
+class ListEntryOut(Public):
+    decision_id: str
+    snapshot_id: str
+    action: str
+    direction: str
+    label: str
+    #: Consecutive identical outcomes this entry stands for.
+    count: int
+    member_ids: list[str]
+
+
+class DecisionListOut(Public):
+    view: Literal["Notable", "Positions", "Refusals", "Everything"]
+    entries: list[ListEntryOut]
+    shown: int
+    total: int
+    grouped: bool
+    #: A `pin` was requested and this source holds no such decision.
+    pin_missing: bool
+
+
+class RuleOut(Public):
+    name: str
+    effect: str
+
+
+class HaltStateOut(Public):
+    state: str
+    tone: Literal["ok", "warn", "bad"]
+    explanation: str
+
+
+class CopyOut(Public):
+    """Copy that makes a checkable claim about the system, served rather than
+    typed into each client (presentation/copy.py)."""
+
+    what_this_is: str
+    disclosures: list[str]
+    write_guards: list[RuleOut]
+    write_guards_note: str
+    model_limits: list[RuleOut]
+    halt_states: list[HaltStateOut]

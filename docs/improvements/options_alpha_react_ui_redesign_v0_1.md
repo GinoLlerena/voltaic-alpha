@@ -1269,3 +1269,100 @@ error code and a redacted message, and ships files in idempotent parts that are
 checksum-verified and swapped atomically, so a partial transfer cannot replace a
 working file. That design is why the interrupted transfer left the host
 untouched.
+
+## 23. `RUI-1` closing increment — 14 September 2026
+
+The last two `RUI-1` items were presentation logic and authority copy still
+living in `app.py`. Moving them exposed two defects in the page that had been
+there since before the redesign began.
+
+### `RUI-VAL-009` — the default view hid positions, and the tour narrated the wrong decision
+
+**The list.** Runs of identical outcomes were keyed on `(action, reason codes)`.
+A position carries no reason codes, so every position shared one key, and the
+default "Notable" view merged consecutive positions — contradicting its own
+comment, "every position, plus one representative of each run of identical
+refusals". On the committed evidence Notable listed **three entries for five
+decisions**: the bullish and bearish qualified cases collapsed into a single
+"bearish ×2", joining opposite directions and hiding the bullish case; and the
+lifecycle decision, the one carrying the real Paper round trip, was hidden behind
+"live ×2". This dates from 28 August, when grouping was introduced.
+
+**The tour.** A scene selected its decision only if the current view listed it,
+and otherwise fell back silently to the first entry. With the list defect, **five
+of six scenes rendered a different decision under their narration**: scenes 1–3
+narrated the bullish qualified case over the bearish one, and scenes 4–5
+narrated the Paper lifecycle over the bearish qualified case. Only the refusal
+scene was right. On the live database, where no scene's decision exists, every
+step narrated over whatever came first, with nothing saying so. The tour tests
+proved each scene's decision *exists*; none proved the page *shows* it. This
+dates from `CIIP-004` on 9 September.
+
+**Fixed in `presentation/listing.py`.** A position's run key is its own hash, so
+positions are never grouped; identical refusals still are. A tour scene's
+decision is pinned into the list in every view — replacing its run's
+representative in Notable, or listed despite a filter that excludes it. A scene
+whose decision the source does not hold renders an explicit notice instead of
+its narration. Entries are newest first in every view; the previous order was an
+accident of grouping ("Everything" listed bearish, qualified, refusal, live,
+lifecycle).
+
+Tests that would have caught each defect, each shown to fail against the
+reintroduced defect:
+
+- the old run key fails the listing tests and the Notable-lists-every-position
+  test;
+- removing the pin fails a new test that opens every position scene under the
+  "Refusals" filter. The default-view tour test alone could not catch that once
+  Notable listed every position, which is why the filter test exists;
+- every scene is checked for the decision it *renders*, and a source missing a
+  scene's case must show the notice and not the narration.
+
+That last test also caught a bug in the first version of the fix: a missing
+scene resolved to no decision, so nothing was pinned and the listing could not
+know a pin had been wanted. "Missing" is now derived from the scene.
+
+### Authority copy is server-owned
+
+`presentation/copy.py` holds, word for word, the copy that makes a checkable
+claim about the system: what this is, the disclosures, the seven write guards and
+their note, the five model limits, and the three halt states — which a test
+requires to cover every `ExecutionState`. The page renders from it; the API
+serves it at `GET /api/v1/copy`, and a test requires every served rule to appear
+on the rendered page. Interface microcopy stays with the client.
+
+The disclosure test previously grepped `app.py`'s source. It now asserts on the
+rendered sidebar, since a disclosure that exists in a file but is not rendered
+discloses nothing.
+
+### `RUI-VAL-010` — two disclosure texts disagree
+
+The page says a `NO_TRADE` refusal and a deterministic baseline beating the model
+are both valid results, and elsewhere calls the P&L sample one round trip. The
+proof manifest (`export.DISCLOSURES`) says "the sample is two trades". Neither is
+derived from records. Not unified here: the manifest's bytes are pinned by
+digests reviewers keep, so changing its wording needs a manifest version bump,
+and a sample size should be computed from positions rather than typed in either
+place.
+
+### A test-order dependency, removed
+
+`app.py` cached its resolver with `@st.cache_resource` and no key, so every
+`AppTest` run in a process received the first resolver built regardless of
+`DASHBOARD_DATABASE_URL`. The suite passed only because the API tests happened to
+run first. The cache is now keyed on the URL, and the affected suites pass in
+both orders.
+
+### Served
+
+`GET /api/v1/decisions/grouped?view=&pin=` returns the sidebar list exactly as
+the page builds it — entries, labels, counts, member ids, whether grouping hid
+anything, and whether a requested pin is absent. A test requires the served
+labels to equal the rendered radio options in all four views.
+
+### `RUI-1` exit
+
+"React could render the full existing dashboard without ORM knowledge" now
+holds for everything the page derives from records or states as a rule. What a
+React client still owns is layout, styling, interface microcopy and interaction
+— which is what a presentation client is for.

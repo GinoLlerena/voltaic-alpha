@@ -79,3 +79,91 @@ class TourTests(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class TourRendersItsOwnDecisionTests(unittest.TestCase):
+    """`RUI-VAL-009`. The tests above proved each scene's decision *exists*; none
+    proved the page *shows* it. Five of six scenes narrated one decision over
+    another, because a scene selected its case only if the default view listed
+    it and otherwise fell back to the first entry."""
+
+    APP = Path(__file__).resolve().parents[1] / "app.py"
+
+    def _run(self, number: int, live_url: str | None = None):  # type: ignore[no-untyped-def]
+        import os
+
+        from streamlit.testing.v1 import AppTest
+
+        saved = os.environ.get("DASHBOARD_DATABASE_URL")
+        if live_url:
+            os.environ["DASHBOARD_DATABASE_URL"] = live_url
+        else:
+            os.environ.pop("DASHBOARD_DATABASE_URL", None)
+        try:
+            run = AppTest.from_file(str(self.APP), default_timeout=120)
+            run.query_params["tour"] = str(number)
+            return run.run()
+        finally:
+            if saved is None:
+                os.environ.pop("DASHBOARD_DATABASE_URL", None)
+            else:
+                os.environ["DASHBOARD_DATABASE_URL"] = saved
+
+    def test_every_scene_selects_its_own_decision_in_the_default_view(self) -> None:
+        import sqlite3
+
+        ids = dict(sqlite3.connect(DB).execute("select id, snapshot_id from decisions"))
+        for item in SCENES:
+            with self.subTest(scene=item.number):
+                run = self._run(item.number)
+                self.assertFalse(run.exception)
+                self.assertEqual(ids[run.radio[1].value], item.snapshot_id)
+                self.assertTrue(
+                    any(item.narration[:40] in m.value for m in run.markdown),
+                    "the scene's narration must be shown with its own decision",
+                )
+
+    def test_a_filter_that_excludes_the_scenes_decision_still_shows_it(self) -> None:
+        """Where the pin is load-bearing: a position scene viewed under "Refusals".
+
+        With every position now listed in the default view, the default-view test
+        above passes with or without pinning. This one does not."""
+        import os
+        import sqlite3
+
+        from streamlit.testing.v1 import AppTest
+
+        ids = dict(sqlite3.connect(DB).execute("select id, snapshot_id from decisions"))
+        saved = os.environ.pop("DASHBOARD_DATABASE_URL", None)
+        try:
+            for item in SCENES:
+                if not item.snapshot_id.startswith(("spy-qualified", "spy-lifecycle")):
+                    continue
+                with self.subTest(scene=item.number):
+                    run = AppTest.from_file(str(self.APP), default_timeout=120)
+                    run.query_params["tour"] = str(item.number)
+                    run.run()
+                    run.radio[0].set_value("Refusals").run()
+                    self.assertFalse(run.exception)
+                    self.assertEqual(ids[run.radio[1].value], item.snapshot_id)
+        finally:
+            if saved is not None:
+                os.environ["DASHBOARD_DATABASE_URL"] = saved
+
+    def test_a_scene_whose_decision_is_absent_says_so(self) -> None:
+        """On a source without the scene's case, admit it; never narrate over another."""
+        import shutil
+        import sqlite3
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            live = Path(tmp) / "live.db"
+            shutil.copy(DB, live)
+            with sqlite3.connect(live) as conn:
+                conn.execute("delete from decisions where snapshot_id=?", (SCENES[0].snapshot_id,))
+            run = self._run(1, f"sqlite+pysqlite:///{live}")
+        self.assertFalse(run.exception)
+        rendered = " ".join(m.value for m in run.markdown)
+        self.assertIn("is not in", rendered)
+        self.assertIn("not the one this step describes", rendered)
+        self.assertNotIn(SCENES[0].narration[:40], rendered)

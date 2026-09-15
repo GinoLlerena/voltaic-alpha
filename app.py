@@ -29,7 +29,9 @@ from sqlalchemy.orm import Session
 
 from options_alpha_lab.architecture.contracts import ExecutionState
 from options_alpha_lab.presentation import book
+from options_alpha_lab.presentation import copy as public_copy
 from options_alpha_lab.presentation import decision as decision_read
+from options_alpha_lab.presentation import listing as decision_list
 from options_alpha_lab.presentation.activity import for_decision as decision_trail
 from options_alpha_lab.presentation.artifacts import (
     correlate_ablation,
@@ -92,7 +94,7 @@ def block(markup: str) -> None:
 
 
 @st.cache_resource
-def _resolver() -> Resolver:
+def _resolver(live_url: str) -> Resolver:
     """Engines are built once per process; which one to read is not.
 
     The rule lives in `presentation/source.py` so the presentation API cannot
@@ -102,10 +104,13 @@ def _resolver() -> Resolver:
     count is current and a page opened before the worker's first decision moves
     to live data once there is some.
     """
-    return Resolver(LIVE_DATABASE_URL, DB)
+    # Keyed on the URL: a process-wide cache with no key hands every later run
+    # the first resolver it built, whatever the environment now says. In tests
+    # that made results depend on order; the URL is what the cache is for.
+    return Resolver(live_url, DB)
 
 
-_SOURCE = _resolver().current()
+_SOURCE = _resolver(LIVE_DATABASE_URL).current()
 
 
 def engine():  # type: ignore[no-untyped-def]
@@ -223,7 +228,6 @@ def signals_panel(signals: list[Any], evidence_ids: set[str],
 #: would still leave a judge scrolling past sixty identical refusals to find the
 #: two decisions that matter.
 DECISION_LIMIT = 400
-RUN_THRESHOLD = 2
 
 
 def load_decisions(limit: int = DECISION_LIMIT) -> tuple[list[Any], int]:
@@ -233,29 +237,6 @@ def load_decisions(limit: int = DECISION_LIMIT) -> tuple[list[Any], int]:
     with Session(engine()) as session:
         recent, _ = decision_read.listing(session, limit=limit)
         return list(reversed(recent)), decision_read.count(session)
-
-
-def outcome_key(decision: Any) -> tuple[str, str]:
-    """What makes two decisions the same story: the action and why."""
-    return decision.action, ", ".join(decision.reason_codes or [])
-
-
-def collapse_runs(items: list[Any]) -> list[dict[str, Any]]:
-    """Run-length encode consecutive identical outcomes.
-
-    Sixty consecutive `NO_TRADE / no_qualified_setup` decisions are one fact, not
-    sixty. Collapsing them keeps the two decisions that differ visible instead of
-    burying them, and each run still exposes its most recent member so the full
-    trace remains one click away.
-    """
-    runs: list[dict[str, Any]] = []
-    for decision in items:
-        key = outcome_key(decision)
-        if runs and runs[-1]["key"] == key:
-            runs[-1]["members"].append(decision)
-        else:
-            runs.append({"key": key, "members": [decision]})
-    return runs
 
 
 decisions, total_decisions = load_decisions()
@@ -330,41 +311,9 @@ st.sidebar.markdown(
 )
 
 view = st.sidebar.radio(
-    "Show", ["Notable", "Positions", "Refusals", "Everything"],
+    "Show", list(decision_list.VIEWS),
     horizontal=False, label_visibility="collapsed", index=0,
 )
-
-if view == "Positions":
-    candidates = [d for d in decisions if d.action == "OPTIONS_POSITION"]
-elif view == "Refusals":
-    candidates = [d for d in decisions if d.action != "OPTIONS_POSITION"]
-else:
-    candidates = list(decisions)
-
-runs = collapse_runs(candidates)
-if view == "Notable":
-    # Every position, plus one representative of each run of identical refusals.
-    entries = [
-        {"decision": run["members"][-1], "count": len(run["members"]), "run": run}
-        for run in runs
-    ]
-else:
-    entries = [
-        {"decision": member, "count": 1, "run": run}
-        for run in runs
-        for member in reversed(run["members"])
-    ]
-
-labels: dict[str, str] = {}
-for entry in entries:
-    decision_row = entry["decision"]
-    name = decision_row.snapshot_id.replace("spy-", "SPY ").replace("-", " ")
-    if decision_row.action == "OPTIONS_POSITION":
-        summary = f"position · {decision_row.direction}"
-    else:
-        summary = ", ".join(decision_row.reason_codes or ["refused"])
-    repeat = f"  ×{entry['count']}" if entry["count"] > 1 else ""
-    labels[decision_row.id] = f"{name}\n{summary}{repeat}"
 
 # CIIP-004. The tour step lives in the URL, so a scene is a shareable link rather
 # than a sequence of instructions. A hand-edited step is clamped, not raised on.
@@ -374,12 +323,23 @@ try:
 except ValueError:
     tour_step = 0
 
-forced_id: str | None = None
 active_scene = tour_scene(tour_step) if tour_step else None
-if active_scene is not None:
-    forced_id = next(
-        (d.id for d in decisions if d.snapshot_id == active_scene.snapshot_id), None
-    )
+scene_decision = (
+    next((d for d in decisions if d.snapshot_id == active_scene.snapshot_id), None)
+    if active_scene is not None
+    else None
+)
+
+# RUI-VAL-009. The scene's decision is pinned into the list, so it is selectable
+# under every view; previously a scene whose decision the view had grouped away
+# silently fell back to the first entry and narrated the wrong decision.
+listing = decision_list.build(decisions, view, pin=scene_decision)
+# A scene whose case this source does not hold at all. Derived from the scene,
+# not from the listing: with no decision found there is nothing to pin, so the
+# listing alone cannot know a pin was wanted.
+scene_missing = active_scene is not None and scene_decision is None
+labels: dict[str, str] = {entry.decision.id: entry.label for entry in listing.entries}
+forced_id: str | None = scene_decision.id if scene_decision is not None else None
 
 options = list(labels)
 index = options.index(forced_id) if forced_id in options else 0
@@ -402,7 +362,7 @@ st.sidebar.markdown(
     f'margin-top:.5rem;line-height:1.5">{shown} of {total_decisions} recorded'
     + (
         '<br>identical consecutive outcomes are grouped'
-        if view == "Notable" and shown < len(candidates)
+        if listing.grouped
         else ""
     )
     + (
@@ -418,15 +378,9 @@ st.sidebar.markdown('<hr class="rule">', unsafe_allow_html=True)
 st.sidebar.markdown(
     f"**Source:** {source_label()}\n\n"
     "**What this is**\n\n"
-    "A read-only view of decisions this system already made. It has no controls: "
-    "it cannot start a run, approve an intent, or reach a broker.\n\n"
+    f"{public_copy.WHAT_THIS_IS}\n\n"
     "**Disclosures**\n\n"
-    "- Alpaca **Paper** only. No live endpoint exists in this build.\n"
-    "- Option quotes come from the **indicative** feed. The account has no OPRA "
-    "agreement, so quotes are not trading-quality.\n"
-    "- **No alpha is claimed.** A `NO_TRADE` refusal and a deterministic baseline "
-    "beating the model are both valid results.\n"
-    "- Nothing here is investment advice."
+    + "\n".join(f"- {line}" for line in public_copy.DISCLOSURES)
 )
 
 # CIIP-004. The guided path. Always paused, every step directly reachable, and
@@ -438,7 +392,16 @@ if active_scene is not None:
         f'<div class="hd">GUIDED PATH · STEP {active_scene.number} OF {len(SCENES)}'
         f" · {esc(source_label().upper())}</div>"
         f"<h3>{esc(active_scene.title)}</h3>"
-        f"<p>{esc(active_scene.narration)}</p></div>"
+        + (
+            # RUI-VAL-009. Say the case is absent rather than narrate over a
+            # decision this step does not describe.
+            f"<p><b>This step's decision ({esc(active_scene.snapshot_id)}) is not in "
+            f"{esc(source_label())}.</b> The decision shown below is not the one this "
+            "step describes. The guided path is written against the committed "
+            "evidence.</p></div>"
+            if scene_missing
+            else f"<p>{esc(active_scene.narration)}</p></div>"
+        )
     )
     nav = st.columns([1, 1, 1, 5])
     if active_scene.number > 1 and nav[0].button("← Back"):
@@ -584,17 +547,12 @@ with tabs[1]:
     heading("What the model cannot do", "enforced by absence, not by validation")
     block(
         '<ul class="seq">'
-        '<li><span class="g">Pick a direction</span>'
-        '<span class="b">may agree or abstain; a reversal is coerced to abstention</span></li>'
-        '<li><span class="g">Change an invalidation level</span>'
-        '<span class="b">never sent to the model; absent from its schema</span></li>'
-        '<li><span class="g">Size the position</span>'
-        '<span class="b">not in the prompt; computed after the memo</span></li>'
-        '<li><span class="g">Choose the contracts</span>'
-        '<span class="b">deterministic, from the observed chain</span></li>'
-        '<li><span class="g">Reach a broker</span>'
-        '<span class="b">no order tool exists on the model path</span></li>'
-        "</ul>"
+        + "".join(
+            f'<li><span class="g">{esc(rule.name)}</span>'
+            f'<span class="b">{esc(rule.effect)}</span></li>'
+            for rule in public_copy.MODEL_LIMITS
+        )
+        + "</ul>"
     )
 
 # ---------------------------------------------------------------- 3 lineage
@@ -840,26 +798,13 @@ with tabs[4]:
     heading("What blocks a write", "checked immediately before every order, in this order")
     block(
         '<ul class="seq">'
-        '<li><span class="g">Configuration permits writes</span>'
-        '<span class="b">blocks any mode but paper_execute</span></li>'
-        '<li><span class="g">Resolved endpoint is Paper</span>'
-        '<span class="b">blocks a client pointing anywhere else</span></li>'
-        '<li><span class="g">Execution state allows the write</span>'
-        '<span class="b">blocks NO_NEW_RISK and FREEZE_ALL_WRITES</span></li>'
-        '<li><span class="g">An operator has approved</span>'
-        '<span class="b">blocks an autonomous open when approval is required</span></li>'
-        '<li><span class="g">No strategy already open</span>'
-        '<span class="b">blocks a second concurrent position</span></li>'
-        '<li><span class="g">Intent has not expired</span>'
-        '<span class="b">blocks a stale approval past its 90 s TTL</span></li>'
-        '<li><span class="g">Request still matches the intent hash</span>'
-        '<span class="b">blocks bytes that drifted after approval</span></li>'
-        "</ul>"
-        '<div class="note" style="margin-top:.6rem">They run before every order rather '
-        "than at startup, because the interesting failures develop between the two. "
-        "Risk-reducing closes are exempt from guards 3, 4 and 5: those exist to stop "
-        "new risk, and applying them to an exit would trap exposure at the moment it "
-        "most needs reducing.</div>"
+        + "".join(
+            f'<li><span class="g">{esc(rule.name)}</span>'
+            f'<span class="b">{esc(rule.effect)}</span></li>'
+            for rule in public_copy.WRITE_GUARDS
+        )
+        + "</ul>"
+        f'<div class="note" style="margin-top:.6rem">{esc(public_copy.WRITE_GUARDS_NOTE)}</div>'
     )
 
     heading("Halt states", "POLICY SIMULATOR · NO STATE CHANGE")
@@ -867,19 +812,8 @@ with tabs[4]:
         "Durable execution state", [s.value for s in ExecutionState], index=0,
         label_visibility="collapsed",
     )
-    if state == ExecutionState.NORMAL.value:
-        st.success("New risk permitted. Closes and cancels also permitted.")
-    elif state == ExecutionState.NO_NEW_RISK.value:
-        st.warning(
-            "New or increased risk blocked. Cancels and risk-reducing closes stay "
-            "permitted, because blocking a close during a loss would trap exposure."
-        )
-    else:
-        st.error(
-            "All writes blocked, including closes. Reserved for adapter, credential or "
-            "endpoint integrity incidents, and it raises an incident precisely because "
-            "it can temporarily prevent risk reduction."
-        )
+    halt = next(h for h in public_copy.HALT_STATES if h.state == state)
+    {"ok": st.success, "warn": st.warning}.get(halt.tone, st.error)(halt.explanation)
 
     if incidents:
         heading("Open incidents", "durable, not a console line")
