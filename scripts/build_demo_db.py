@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from options_alpha_lab.config import load_settings  # noqa: E402
+from options_alpha_lab.hashing import payload_hash  # noqa: E402
 from options_alpha_lab.persistence.models import (  # noqa: E402
     BrokerOrder,
     Decision,
@@ -108,23 +109,47 @@ def main() -> int:
                 )
             )
             session.flush()
+            # RUI-VAL-008. The request body is rebuilt in the adapter's exact
+            # shape (execution/request.prepare_mleg_request) and must reproduce
+            # the hash the live run recorded. This previously stored the receipt's
+            # *filled* legs -- fill price and quantity, no ratio_qty -- under the
+            # real request hash, with intent_hash_match hardcoded True: bytes that
+            # were never approved, displayed as "the bytes that were approved",
+            # beside a match that was asserted rather than computed.
+            body = {
+                "order_class": leg_data["order_class"],
+                "qty": str(leg_data["qty"]),
+                "type": "limit",
+                "time_in_force": "day",
+                "limit_price": leg_data["limit_price"],
+                "client_order_id": leg_data["client_order_id"],
+                "legs": [
+                    {
+                        "symbol": leg["symbol"],
+                        "ratio_qty": "1",
+                        "side": leg["side"],
+                        "position_intent": leg["position_intent"],
+                    }
+                    for leg in leg_data["legs"]
+                ],
+            }
+            recomputed = payload_hash(body)
+            if recomputed != leg_data["request_hash"]:
+                print(
+                    f"{phase} request body does not reproduce the recorded hash: "
+                    f"{recomputed} != {leg_data['request_hash']}",
+                    file=sys.stderr,
+                )
+                return 1
             session.add(
                 PreparedOrderRequest(
                     id=uuid.uuid4().hex,
                     order_intent_id=intent_id,
                     adapter_version="alpaca-py-0.44-mleg",
                     request_schema_version="mleg_limit.v1",
-                    serialized_request={
-                        "order_class": leg_data["order_class"],
-                        "qty": str(leg_data["qty"]),
-                        "type": "limit",
-                        "time_in_force": "day",
-                        "limit_price": leg_data["limit_price"],
-                        "client_order_id": leg_data["client_order_id"],
-                        "legs": leg_data["legs"],
-                    },
-                    request_hash=leg_data["request_hash"],
-                    intent_hash_match=True,
+                    serialized_request=body,
+                    request_hash=recomputed,
+                    intent_hash_match=recomputed == leg_data["request_hash"],
                     dry_run_result="reviewed",
                     prepared_at=datetime.fromisoformat(receipt["recorded_at"]),
                     expires_at=datetime.fromisoformat(receipt["recorded_at"]),

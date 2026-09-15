@@ -25,19 +25,11 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from options_alpha_lab.architecture.contracts import ExecutionState
-from options_alpha_lab.persistence.models import (
-    Decision,
-    Incident,
-    MarketSnapshot,
-    ModelCall,
-    Position,
-    PreparedOrderRequest,
-    SpreadCandidateRecord,
-)
+from options_alpha_lab.presentation import book
+from options_alpha_lab.presentation import decision as decision_read
 from options_alpha_lab.presentation.activity import for_decision as decision_trail
 from options_alpha_lab.presentation.artifacts import (
     correlate_ablation,
@@ -48,7 +40,7 @@ from options_alpha_lab.presentation.explain import why_decision
 from options_alpha_lab.presentation.export import digest as proof_digest
 from options_alpha_lab.presentation.export import render as proof_bytes
 from options_alpha_lab.presentation.proof import proof_tiles
-from options_alpha_lab.presentation.source import resolve as resolve_source
+from options_alpha_lab.presentation.source import Resolver
 from options_alpha_lab.presentation.status import system_status
 from options_alpha_lab.presentation.tour import SCENES
 from options_alpha_lab.presentation.tour import scene as tour_scene
@@ -100,32 +92,28 @@ def block(markup: str) -> None:
 
 
 @st.cache_resource
-def _resolve_source():  # type: ignore[no-untyped-def]
-    """Prefer the live worker database, but never show a judge an empty page.
+def _resolver() -> Resolver:
+    """Engines are built once per process; which one to read is not.
 
     The rule lives in `presentation/source.py` so the presentation API cannot
-    disagree with this page about where its data came from.
+    disagree with this page about where its data came from. Only the engines
+    are cached (`RUI-VAL-006`): Streamlit re-runs this script on every
+    interaction, and `_SOURCE` below is re-answered each time, so the label's
+    count is current and a page opened before the worker's first decision moves
+    to live data once there is some.
     """
-    resolved = resolve_source(LIVE_DATABASE_URL, DB)
-    return resolved.engine, resolved.label
+    return Resolver(LIVE_DATABASE_URL, DB)
+
+
+_SOURCE = _resolver().current()
 
 
 def engine():  # type: ignore[no-untyped-def]
-    return _resolve_source()[0]
+    return _SOURCE.engine
 
 
 def source_label() -> str:
-    return _resolve_source()[1]
-
-
-def rows(stmt: Any) -> list[Any]:
-    with Session(engine()) as session:
-        return list(session.scalars(stmt).all())
-
-
-def scalar(stmt: Any) -> Any:
-    with Session(engine()) as session:
-        return session.scalar(stmt)
+    return _SOURCE.label
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -207,12 +195,14 @@ def signals_panel(signals: list[Any], evidence_ids: set[str],
     out = []
     for signal in sorted(signals, key=lambda s: -float(s.strength)):
         strength = float(signal.strength)
-        used = signal.signal_id in evidence_ids
-        counter = not used and signal.direction != setup_direction
+        role = decision_read.signal_role(
+            signal.signal_id, signal.direction, evidence_ids, setup_direction
+        )
         # Cited evidence is cool; genuine counter-evidence is amber, because it
         # argues against the setup; anything else is simply unused.
-        colour = "var(--cool)" if used else ("var(--warm)" if counter else "var(--dim)")
-        role = "cited" if used else ("counter-evidence" if counter else "observed, unused")
+        colour = {"cited": "var(--cool)", "counter-evidence": "var(--warm)"}.get(
+            role, "var(--dim)"
+        )
         out.append(
             '<div class="r">'
             f'<div class="nm">{esc(signal.summary[:110])}'
@@ -237,9 +227,12 @@ RUN_THRESHOLD = 2
 
 
 def load_decisions(limit: int = DECISION_LIMIT) -> tuple[list[Any], int]:
-    total = int(scalar(select(func.count()).select_from(Decision)) or 0)
-    recent = rows(select(Decision).order_by(Decision.recorded_at.desc()).limit(limit))
-    return list(reversed(recent)), total
+    # One ordering for both surfaces: `decision.listing`, newest first on
+    # (decided_at, decision_hash). The page used `recorded_at`, which agreed on
+    # every record checked but is not guaranteed to.
+    with Session(engine()) as session:
+        recent, _ = decision_read.listing(session, limit=limit)
+        return list(reversed(recent)), decision_read.count(session)
 
 
 def outcome_key(decision: Any) -> tuple[str, str]:
@@ -273,9 +266,8 @@ if not decisions:
 
 receipt = load_json(RECEIPT)
 ablation = load_json(ABLATION)
-positions = rows(select(Position))
-open_positions = [p for p in positions if p.lifecycle_status in {"OPEN", "CLOSING"}]
-incidents = rows(select(Incident).where(Incident.resolved_at.is_(None)))
+with Session(engine()) as _book_session:
+    incidents = book.incidents(_book_session, open_only=True)
 
 block(
     '<div class="oa-head"><h1>Options Alpha</h1>'
@@ -499,14 +491,13 @@ tabs = st.tabs([
     "Evidence & setup", "Model memo", "Approval lineage", "Outcome", "Guards & state",
 ])
 
-snapshot = rows(
-    select(MarketSnapshot).where(MarketSnapshot.id == decision.market_snapshot_id)
-)[0]
+snapshot = lineage.snapshot
+if snapshot is None:
+    st.error("This decision's market snapshot is missing from the evidence database.")
+    st.stop()
 packs = lineage.packs
 theses = lineage.theses
-spreads = rows(
-    select(SpreadCandidateRecord).where(SpreadCandidateRecord.decision_id == decision.id)
-)
+spreads = lineage.spreads
 risks = lineage.risks
 intents = lineage.intents
 
@@ -567,7 +558,8 @@ with tabs[1]:
         )
     else:
         thesis = theses[0]
-        calls = rows(select(ModelCall).where(ModelCall.id == thesis.model_call_id))
+        call_record = lineage.call_for(thesis)
+        calls = [call_record] if call_record is not None else []
         heading("Model memo", f"synthesizer {thesis.synthesizer_name}")
         block(
             f'<div class="memo">{esc(thesis.reasoning_summary)}</div>'
@@ -647,11 +639,7 @@ with tabs[2]:
     prepared_all: list[Any] = []
     for intent in intents:
         links.append((f"Intent · {intent.approval_reference}", intent.intent_hash, False))
-        prepared = rows(
-            select(PreparedOrderRequest).where(
-                PreparedOrderRequest.order_intent_id == intent.id
-            )
-        )
+        prepared = lineage.requests_for(intent)
         prepared_all.extend(prepared)
         for request in prepared:
             links.append(("Prepared request", request.request_hash, False))
@@ -896,10 +884,18 @@ with tabs[4]:
     if incidents:
         heading("Open incidents", "durable, not a console line")
         for incident in incidents:
+            # RUI-VAL-007. `detail` is built from exception text at several call
+            # sites (e.g. "could not read broker state: {exc}"), so it is free text
+            # a broker error chose. The public page shows what the system decided
+            # -- kind, severity, the execution state it imposed -- and says plainly
+            # that the detail is kept for operators.
             block(
                 f'<div class="card" style="margin-bottom:.4rem">'
                 f'{badge(incident.severity, "bad")} <code>{esc(incident.kind)}</code>'
-                f'<div class="note" style="margin-top:.4rem">{esc(incident.detail)}</div></div>'
+                f'<div class="note" style="margin-top:.4rem">execution state '
+                f"<code>{esc(incident.execution_state)}</code> · opened "
+                f"{esc(incident.opened_at)} · detail withheld from the public page"
+                "</div></div>"
             )
     else:
         heading("Open incidents", "none")

@@ -20,8 +20,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..persistence.models import (
@@ -31,6 +32,7 @@ from ..persistence.models import (
     ExitDecisionRecord,
     Fill,
     MarketSnapshot,
+    ModelCall,
     OrderIntent,
     Position,
     PreparedOrderRequest,
@@ -58,6 +60,7 @@ class DecisionView:
     fills: list[Fill] = field(default_factory=list)
     positions: list[Position] = field(default_factory=list)
     exits: list[ExitDecisionRecord] = field(default_factory=list)
+    model_calls: list[ModelCall] = field(default_factory=list)
 
     # -- questions the tabs ask, answered here rather than re-derived ----------
 
@@ -75,6 +78,12 @@ class DecisionView:
 
     def fills_for(self, order_id: str) -> list[Fill]:
         return [f for f in self.fills if f.broker_order_id == order_id]
+
+    def call_for(self, thesis: ThesisRecord) -> ModelCall | None:
+        return next((c for c in self.model_calls if c.id == thesis.model_call_id), None)
+
+    def requests_for(self, intent: OrderIntent) -> list[PreparedOrderRequest]:
+        return [r for r in self.requests if r.order_intent_id == intent.id]
 
 
 def load(session: Session, decision: Decision) -> DecisionView:
@@ -136,6 +145,16 @@ def load(session: Session, decision: Decision) -> DecisionView:
         else []
     )
 
+    theses = list(
+        session.scalars(select(ThesisRecord).where(ThesisRecord.decision_id == decision.id)).all()
+    )
+    call_ids = [t.model_call_id for t in theses if t.model_call_id]
+    model_calls = (
+        list(session.scalars(select(ModelCall).where(ModelCall.id.in_(call_ids))).all())
+        if call_ids
+        else []
+    )
+
     snapshot_id = decision.market_snapshot_id
     return DecisionView(
         decision=decision,
@@ -154,11 +173,7 @@ def load(session: Session, decision: Decision) -> DecisionView:
                 )
             ).all()
         ),
-        theses=list(
-            session.scalars(
-                select(ThesisRecord).where(ThesisRecord.decision_id == decision.id)
-            ).all()
-        ),
+        theses=theses,
         spreads=list(
             session.scalars(
                 select(SpreadCandidateRecord).where(
@@ -177,7 +192,28 @@ def load(session: Session, decision: Decision) -> DecisionView:
         fills=fills,
         positions=positions,
         exits=exits,
+        model_calls=model_calls,
     )
+
+
+SignalRole = Literal["cited", "counter-evidence", "observed, unused"]
+
+
+def signal_role(
+    signal_id: str, direction: str, cited: set[str], setup_direction: str
+) -> SignalRole:
+    """How one observed signal relates to the qualifying setup.
+
+    `RUI-1`. This lived in the dashboard's render function, which made it an
+    interpretation only one surface could perform. Cited evidence supports the
+    setup; an uncited signal pointing the other way argues against it; anything
+    else was observed and not used.
+    """
+    if signal_id in cited:
+        return "cited"
+    if direction != setup_direction:
+        return "counter-evidence"
+    return "observed, unused"
 
 
 #: A position in the decision list: `(decided_at, decision_hash)`.
@@ -194,6 +230,10 @@ def by_hash(session: Session, decision_hash: str) -> Decision | None:
     return session.scalars(
         select(Decision).where(Decision.decision_hash == decision_hash)
     ).one_or_none()
+
+
+def count(session: Session) -> int:
+    return int(session.scalar(select(func.count()).select_from(Decision)) or 0)
 
 
 def listing(

@@ -1156,20 +1156,116 @@ not a 500. The committed evidence is such a source — see below.
 
 ### Remaining for `RUI-1`'s exit
 
-"React could render the full existing dashboard without ORM knowledge" is not yet
-true:
+~~Superseded the same day by §22.~~
 
-- `/decisions/{hash}/market`, `/structure`, `/risk`, `/lifecycle` and
-  `/incidents` are not built; money in those payloads is where the decimal-string
-  rule will do most of its work.
-- `app.py` still runs its own list queries; it delegates source resolution only.
-- `RUI-VAL-006`'s per-request label.
-- A deployment unit, if the API is to run on the host before `RUI-6`.
+## 22. `RUI-1` second increment — 14 September 2026
 
-### Blocking a decision, not code
+### What is now served
 
-`demo/h0_demo.db` is at migration `0003`, one behind head, and lacks
-`worker_events`. The API handles that honestly, but the committed evidence cannot
-demonstrate worker activity until it is rebuilt — and rebuilding changes the
-demo database's digest in `artifacts/release_freeze.json`, a release artifact.
-Left for the owner to decide rather than changed in passing.
+Seven decision workspaces, one per area of the dashboard, plus incidents and the
+tour:
+
+| Route | Dashboard area |
+|---|---|
+| `…/{hash}/market` | Evidence & setup: observation, signals with their **role**, qualification |
+| `…/{hash}/memo` | Model memo and provider call — kept apart from structure so the model's advisory output and deterministic structure never share a payload |
+| `…/{hash}/structure` | Selected spread and candidates, with allowlisted leg quotes |
+| `…/{hash}/risk` | Risk decisions, checks, and accounting (equity lifted out of the payload, which stays behind) |
+| `…/{hash}/lifecycle` | Intents, allowlisted requests, orders and fills, positions, exits, the audit trail with its gap check, and receipt/ablation correlation |
+| `GET /api/v1/incidents?state=open\|all` | Guards & state: open incidents |
+| `GET /api/v1/tour` | Guided scenes, each resolved to a decision hash or `null` |
+
+### `app.py` no longer queries
+
+Every ad hoc query left the page: the decision list and count, positions and
+incidents (`presentation/book.py`), and four re-queries of rows the decision
+view had already loaded — snapshot, spreads, model call and prepared requests.
+The signal role (cited / counter-evidence / observed, unused) moved out of the
+render function into `presentation.decision.signal_role`, so the dashboard and
+the API classify evidence with one rule.
+
+Rendered parity was checked, not assumed: every view × decision combination
+rendered before and after the refactor — 13 combinations, 643 rendered elements
+— with **zero** differences and no exceptions. The committed evidence holds no
+incident, so the incident change below was verified separately.
+
+### Deployed, loopback only
+
+`options-alpha-api.service` runs on the host on `127.0.0.1:8600` with the
+dashboard's `SELECT`-only credential. Against live PostgreSQL: `LIVE` mode, 72
+decisions, 29 routes probed with no non-200, **no float and no naive timestamp
+anywhere**, `POST` refused, the read-only gate passing, and port 8600 not
+answering from outside the host. The public dashboard was reloaded on the
+refactored code and checked by reading the rendered page: five tabs, no
+exception, and the same 72-decision label the API reports.
+
+### Findings closed
+
+**`RUI-VAL-006` — resolved.** `presentation/source.Resolver` holds the engines
+and answers "which source?" on every call. Both surfaces use it. Tested by
+deleting a live decision between two requests (label 5 → 4) and by a live source
+that gains its first decision moving from `FROZEN_REPLAY` to `LIVE` without a
+restart.
+
+**`RUI-VAL-007` — incident detail was published verbatim.** Several incident
+call sites build `detail` from exception text (`"reconciliation could not read
+broker state: {exc}"`), and the public dashboard printed it. The live database
+holds no incident, so nothing leaked; the exposure was latent. The dashboard now
+shows kind, severity, the execution state imposed and "detail withheld from the
+public page"; the API names `detail` in `withheld`. Both tested with an incident
+carrying a credential-shaped canary.
+
+**`RUI-VAL-008` — the committed evidence displayed bytes that were never
+approved.** The most serious finding of the day, because hash lineage is the
+product's central claim. `build_demo_db.py` built each prepared request from the
+receipt's *filled* legs (fill price and quantity, no `ratio_qty`), stored it
+under the real request hash, and hardcoded `intent_hash_match=True`. The
+dashboard rendered those bodies as "the bytes that were approved" beside a green
+"Request hash matches the approved intent" that nothing computed. Neither stored
+body hashed to its recorded hash.
+
+The genuine bodies turned out to be recoverable: rebuilt in the adapter's exact
+shape (`execution/request.prepare_mleg_request`), both reproduce the recorded
+hashes. The builder now does that, **refuses to write a body that does not
+reproduce its hash**, and computes the match. `export.py`'s comment that the
+body "includes headers" was also wrong — the adapter writes seven order fields
+and four per leg — and the API's request allowlist is exactly that shape, so a
+key a future adapter adds is named and withheld.
+
+This reversed a decision recorded in §21. The demo database was left for the
+owner because rebuilding changes its freeze digest; a fixture showing unapproved
+bytes under an approval label outweighs that, and a rebuild is the only fix. It
+was rebuilt locally and on the host:
+
+- schema `0003_reasoning_effort` → `0004_worker_events`;
+- decision rows identical, every table's row count identical;
+- both request bodies reproduce their hashes;
+- `tests/test_demo_db_provenance.py` now requires head schema and hash-reproducing
+  request bodies — all three new assertions fail against the pre-rebuild file and
+  pass against the rebuilt one. The `expectedFailure` marker is gone.
+
+### What still stands between `RUI-1` and its exit
+
+The records are fully served. What is not served is **copy and presentation
+logic that is not a record**, and a React client would otherwise re-create it:
+
+- the decision list's run-length grouping (`collapse_runs`) and its four filter
+  views (Notable, Positions, Refusals, Everything);
+- static explanatory copy: the write-guard sequence, "what the model cannot do",
+  the halt-state explanations, and the disclosures.
+
+The doc's rule is that reason-code public copy is server-owned, so both belong
+behind the API. They are the last `RUI-1` items.
+
+### Operational note
+
+A Cloud Assistant call failed on a network reset during the demo-database
+transfer, and the Alibaba CLI printed the failed request's full URL — including
+the account's **AccessKey ID** — into the working session. The AccessKey secret
+was not printed, and the request signature is single-use and time-bound, but the
+key ID is now outside the account. **Rotate the Alibaba AccessKey pair.** The
+local helper that makes these calls now captures CLI stderr and emits only an
+error code and a redacted message, and ships files in idempotent parts that are
+checksum-verified and swapped atomically, so a partial transfer cannot replace a
+working file. That design is why the interrupted transfer left the host
+untouched.

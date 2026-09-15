@@ -30,10 +30,9 @@ from fastapi import Path as PathParam
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from ..presentation import activity, decision, explain, export, proof, status
-from ..presentation.source import Source
-from ..presentation.source import resolve as resolve_source
-from . import dto
+from ..presentation import activity, book, decision, explain, export, proof, status, tour
+from ..presentation.source import Resolver, Source
+from . import dto, views
 
 ROOT = Path(__file__).resolve().parents[3]
 COMMITTED = ROOT / "demo" / "h0_demo.db"
@@ -58,7 +57,7 @@ def _decode(cursor: str | None) -> tuple[datetime, str] | None:
 
 
 def create_app(
-    source: Source,
+    source: Source | Resolver,
     *,
     root: Path = ROOT,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -73,16 +72,29 @@ def create_app(
     )
     api = APIRouter(prefix="/api/v1")
 
+    def current() -> Source:
+        # A fixed `Source` is for tests; a `Resolver` answers per request, so
+        # the label and the mode are never older than the response (RUI-VAL-006).
+        return source.current() if isinstance(source, Resolver) else source
+
+    # One answer per request, carried on the session itself: the rows a response
+    # contains and the source its envelope names must be the same source, even if
+    # the answer changes between two requests.
     def session() -> Iterator[Session]:
-        with Session(source.engine) as db:
+        chosen = current()
+        with Session(chosen.engine) as db:
+            db.info["source"] = chosen
             yield db
 
     Db = Annotated[Session, Depends(session)]
 
-    def envelope(data: Any, correlation_id: str | None = None) -> dict[str, Any]:
+    def envelope(
+        db: Session, data: Any, correlation_id: str | None = None
+    ) -> dict[str, Any]:
+        chosen: Source = db.info["source"]
         return {
-            "source_mode": source.mode,
-            "source_label": source.label,
+            "source_mode": chosen.mode,
+            "source_label": chosen.label,
             "observed_at": dto.utc(clock()),
             "correlation_id": correlation_id,
             "data": data,
@@ -97,7 +109,7 @@ def create_app(
     @api.get("/system/status", response_model=dto.Envelope[list[dto.StatusItemOut]])
     def system_status(db: Db) -> dict[str, Any]:
         items = status.system_status(db, now=clock())
-        return envelope([
+        return envelope(db, [
             dto.StatusItemOut(
                 label=i.label, value=i.value, tone=i.tone, known=i.known,
                 source=i.source, observed_at=dto.utc(i.observed_at), reason=i.reason,
@@ -107,7 +119,7 @@ def create_app(
 
     @api.get("/system/proof", response_model=dto.Envelope[list[dto.ProofTileOut]])
     def system_proof(db: Db) -> dict[str, Any]:
-        return envelope([
+        return envelope(db, [
             dto.ProofTileOut(
                 value=t.value, label=t.label, mode=t.mode, available=t.available,
                 source=t.source, detail=t.detail,
@@ -123,7 +135,7 @@ def create_app(
         cursor: str | None = None,
     ) -> dict[str, Any]:
         rows, after = decision.listing(db, action=action, limit=limit, before=_decode(cursor))
-        return envelope(dto.DecisionPage(
+        return envelope(db, dto.DecisionPage(
             items=[
                 dto.DecisionListItem(
                     decision_id=r.decision_hash.removeprefix("sha256:"),
@@ -141,7 +153,7 @@ def create_app(
         row = found(db, digest)
         view = decision.load(db, row)
         snap = view.snapshot
-        return envelope(
+        return envelope(db,
             dto.DecisionSummary(
                 decision_id=digest, snapshot_id=row.snapshot_id, action=row.action,
                 direction=row.direction, reason_codes=sorted(row.reason_codes or []),
@@ -166,11 +178,59 @@ def create_app(
             correlation_id=row.decision_hash,
         )
 
+    def scoped(db: Session, digest: str) -> tuple[Any, decision.DecisionView]:
+        row = found(db, digest)
+        return row, decision.load(db, row)
+
+    @api.get("/decisions/{digest}/market", response_model=dto.Envelope[dto.MarketOut])
+    def decision_market(db: Db, digest: Digest) -> dict[str, Any]:
+        row, view = scoped(db, digest)
+        return envelope(db, views.market(view), correlation_id=row.decision_hash)
+
+    @api.get("/decisions/{digest}/memo", response_model=dto.Envelope[dto.MemoOut])
+    def decision_memo(db: Db, digest: Digest) -> dict[str, Any]:
+        row, view = scoped(db, digest)
+        return envelope(db, views.memo(view), correlation_id=row.decision_hash)
+
+    @api.get("/decisions/{digest}/structure", response_model=dto.Envelope[dto.StructureOut])
+    def decision_structure(db: Db, digest: Digest) -> dict[str, Any]:
+        row, view = scoped(db, digest)
+        return envelope(db, views.structure(view), correlation_id=row.decision_hash)
+
+    @api.get("/decisions/{digest}/risk", response_model=dto.Envelope[dto.RiskOut])
+    def decision_risk(db: Db, digest: Digest) -> dict[str, Any]:
+        row, view = scoped(db, digest)
+        return envelope(db, views.risk(view), correlation_id=row.decision_hash)
+
+    @api.get("/decisions/{digest}/lifecycle", response_model=dto.Envelope[dto.LifecycleOut])
+    def decision_lifecycle(db: Db, digest: Digest) -> dict[str, Any]:
+        row, view = scoped(db, digest)
+        return envelope(db, views.lifecycle(db, view, root=root), correlation_id=row.decision_hash)
+
+    @api.get("/incidents", response_model=dto.Envelope[list[dto.IncidentOut]])
+    def incidents(
+        db: Db, state: Annotated[str, Query(pattern="^(open|all)$")] = "open"
+    ) -> dict[str, Any]:
+        rows = book.incidents(db, open_only=state == "open")
+        return envelope(db, [views.incident(i) for i in rows])
+
+    @api.get("/tour", response_model=dto.Envelope[list[dto.SceneOut]])
+    def guided_tour(db: Db) -> dict[str, Any]:
+        out = []
+        for item in tour.SCENES:
+            row = tour.resolve(db, item)
+            out.append(dto.SceneOut(
+                number=item.number, title=item.title, narration=item.narration, tab=item.tab,
+                snapshot_id=item.snapshot_id,
+                decision_id=row.decision_hash.removeprefix("sha256:") if row else None,
+            ))
+        return envelope(db, out)
+
     @api.get("/decisions/{digest}/proof", response_model=dto.Envelope[dto.ProofOut])
     def decision_proof(db: Db, digest: Digest) -> dict[str, Any]:
         row = found(db, digest)
         view = decision.load(db, row)
-        return envelope(
+        return envelope(db,
             dto.ProofOut(manifest_digest=export.digest(view), manifest=export.manifest(view)),
             correlation_id=row.decision_hash,
         )
@@ -203,7 +263,7 @@ def create_app(
         cursor: str | None = None,
     ) -> dict[str, Any]:
         events, after = activity.page(db, limit=limit, before=_decode(cursor))
-        return envelope(dto.ActivityPage(
+        return envelope(db, dto.ActivityPage(
             items=[
                 dto.ActivityEventOut(
                     correlation_id=e.correlation_id, sequence=e.sequence, stage=e.stage,
@@ -223,7 +283,7 @@ def create_app(
         faults_only: bool = False,
     ) -> dict[str, Any]:
         if not activity.worker_events_recorded(db):
-            return envelope(dto.WorkerEventsOut(
+            return envelope(db, dto.WorkerEventsOut(
                 available=False,
                 reason="this source predates worker event recording (migration 0004)",
                 items=[],
@@ -237,7 +297,7 @@ def create_app(
                 detail=detail,
                 withheld=sorted(k for k in e.detail if k not in dto.WORKER_DETAIL_ALLOWLIST),
             ))
-        return envelope(dto.WorkerEventsOut(available=True, reason=None, items=out))
+        return envelope(db, dto.WorkerEventsOut(available=True, reason=None, items=out))
 
     app.include_router(api)
     return app
@@ -250,4 +310,4 @@ def build_app() -> FastAPI:
     the dashboard uses, and never `DATABASE_URL`, which is the worker's.
     """
     live_url = os.environ.get("DASHBOARD_DATABASE_URL", "").strip()
-    return create_app(resolve_source(live_url, COMMITTED))
+    return create_app(Resolver(live_url, COMMITTED))

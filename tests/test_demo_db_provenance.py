@@ -83,21 +83,14 @@ class BuilderIsDeterministicTests(unittest.TestCase):
 
 
 class CommittedSchemaIsCurrentTests(unittest.TestCase):
-    """The decision rows are current; the file's schema is not. Known, and pinned.
+    """The committed database must be at the migration head.
 
-    Found by `RUI-1`: the committed database is at `0003_reasoning_effort` and has
-    no `worker_events` table. The determinism tests above compare decisions only,
-    which is exactly why they did not catch it.
-
-    Marked `expectedFailure` rather than skipped or left out. Rebuilding the file
-    changes its digest in `artifacts/release_freeze.json`, a release artifact, so
-    that is the owner's decision -- but the gap should be recorded in code, not
-    only in prose. When the database is rebuilt this becomes an unexpected
-    success, which unittest reports as a failure: the marker has to be removed
-    by whoever closes the gap, rather than outliving it.
+    Found by `RUI-1`: the file had been left at `0003_reasoning_effort`, without
+    `worker_events`, while its decision rows were current -- the determinism
+    tests compare decisions only, which is why they never noticed. Rebuilt on
+    14 September; this keeps it from drifting behind again.
     """
 
-    @unittest.expectedFailure
     def test_the_committed_database_is_at_the_migration_head(self) -> None:
         # Derived rather than named, as in test_learning_capture.py.
         versions = ROOT / "migrations" / "versions"
@@ -105,6 +98,39 @@ class CommittedSchemaIsCurrentTests(unittest.TestCase):
         with sqlite3.connect(DB) as conn:
             stamped = conn.execute("select version_num from alembic_version").fetchone()[0]
         self.assertTrue(stamped.startswith(head), f"committed evidence at {stamped}, head {head}")
+
+
+class CommittedRequestsAreTheApprovedBytesTests(unittest.TestCase):
+    """`RUI-VAL-008`. A stored request body must hash to its recorded hash.
+
+    The builder used to store the receipt's filled legs -- fill price and
+    quantity, no `ratio_qty` -- under the real request hash, with
+    `intent_hash_match` hardcoded True. The dashboard rendered those bytes as
+    "the bytes that were approved" beside a green match that nothing computed.
+    Hash lineage is this product's central claim; a fixture that contradicts its
+    own hash undermines it more than any missing feature would.
+    """
+
+    def test_every_request_body_reproduces_its_recorded_hash(self) -> None:
+        from options_alpha_lab.hashing import payload_hash
+
+        with sqlite3.connect(DB) as conn:
+            rows = conn.execute(
+                "select request_hash, serialized_request from prepared_order_requests"
+            ).fetchall()
+        self.assertTrue(rows, "the committed lifecycle must include its prepared requests")
+        for recorded, body in rows:
+            self.assertEqual(payload_hash(json.loads(body)), recorded)
+
+    def test_request_bodies_have_the_adapters_shape(self) -> None:
+        """Fill fields belong to fills. A request that carries them was never sent."""
+        with sqlite3.connect(DB) as conn:
+            bodies = [json.loads(b) for (b,) in conn.execute(
+                "select serialized_request from prepared_order_requests"
+            )]
+        for body in bodies:
+            for leg in body["legs"]:
+                self.assertEqual(sorted(leg), ["position_intent", "ratio_qty", "side", "symbol"])
 
 
 class ReceiptCorrelatesToNoCommittedDecisionTests(unittest.TestCase):

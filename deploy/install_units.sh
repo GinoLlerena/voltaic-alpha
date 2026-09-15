@@ -20,10 +20,11 @@ DEST=/etc/systemd/system
 declare -A REQUIRES=(
   [options-alpha-worker.service]=/etc/options-alpha.env
   [options-alpha.service]=/etc/options-alpha-dashboard.env
+  [options-alpha-api.service]=/etc/options-alpha-dashboard.env
 )
 
 changed=0
-for unit in options-alpha-worker.service options-alpha.service; do
+for unit in options-alpha-worker.service options-alpha.service options-alpha-api.service; do
   src="$UNITS/$unit"
   [ -f "$src" ] || { echo "  missing in repo: $src" >&2; exit 1; }
   if [ -f "$DEST/$unit" ] && cmp -s "$src" "$DEST/$unit"; then
@@ -37,7 +38,7 @@ done
 
 [ "$changed" = 1 ] && systemctl daemon-reload
 
-for unit in options-alpha-worker.service options-alpha.service; do
+for unit in options-alpha-worker.service options-alpha.service options-alpha-api.service; do
   env_file="${REQUIRES[$unit]}"
   if [ ! -f "$env_file" ]; then
     echo "  $unit: NOT enabled -- $env_file does not exist yet"

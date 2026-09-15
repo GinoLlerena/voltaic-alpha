@@ -235,9 +235,23 @@ class SelectorScaleTests(unittest.TestCase):
     def test_the_query_is_bounded(self) -> None:
         # Without a limit the page loads the whole decisions table on every
         # interaction, which is a different failure from the list being long.
+        # The query moved into `presentation/decision.listing` (RUI-1), so this
+        # asserts the bound where it now lives, by behaviour, and that the page
+        # still passes its limit rather than asking for everything.
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from options_alpha_lab.presentation.decision import listing
+
         source = APP.read_text(encoding="utf-8")
         self.assertIn("DECISION_LIMIT", source)
-        self.assertIn(".limit(", source)
+        self.assertIn("listing(session, limit=limit)", source)
+        demo = APP.parent / "demo" / "h0_demo.db"
+        engine = create_engine(f"sqlite+pysqlite:///{demo}", future=True)
+        with Session(engine) as session:
+            rows, after = listing(session, limit=2)
+        self.assertEqual(len(rows), 2)
+        self.assertIsNotNone(after, "a bounded page must say there is more")
 
     def test_every_filter_renders(self) -> None:
         import os

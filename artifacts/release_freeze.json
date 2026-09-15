@@ -1,10 +1,10 @@
 {
   "categories": {
     "code": {
-      "app.py": "sha256:0b4cb2ce198667e43230a5627189bcab716ca91b830199055be40ea5f140e89a",
+      "app.py": "sha256:e0032918ed58ce254aec61144bce527cb4c91d861ac75afce8a303dff9d85a89",
       "scripts/arm_worker.sh": "sha256:3468a56ea685b63a623b61d500fb38215ba3af384f6bdcce76b78cde3c7de013",
       "scripts/backup_database.sh": "sha256:c93f79a43b6c753eebb85d7a3e930b1ec9e9b0e204e480d63d6341b17798b0c0",
-      "scripts/build_demo_db.py": "sha256:3ce62c83bb66c315e5ae017e41c0f426f33c9b3b812269abc336b9504af48b5b",
+      "scripts/build_demo_db.py": "sha256:842d073a6cd2a00c6c2ac5868b91a0637ae53751a6bd94a8e146ad9ca04bb0f1",
       "scripts/check_no_write_path.py": "sha256:68b793642499883e7014a50f089a46dfa777988164ebef63fe8c92fe28aa968b",
       "scripts/configure_secrets.py": "sha256:6c70749aa83394d9d2260226948629cd6e1ed450771c275e37a035dd287af4e5",
       "scripts/dependency_licenses.py": "sha256:a3a036bb0c1152c7f961a4c8e3867ae140887ff33d088b7c37a4a2b37241eb00",
@@ -20,8 +20,9 @@
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
       "src/options_alpha_lab/api/__init__.py": "sha256:4430b1f87ec17e889ded8dac44683c16c6906d0862b33cc14a02bfa9008f3e0c",
       "src/options_alpha_lab/api/__main__.py": "sha256:20571ffdb01f5602a76937e71794f135c38ab8cd9fcf0a995ebf0a41d4b6152f",
-      "src/options_alpha_lab/api/dto.py": "sha256:8ee7b8ff3a75a7710223080cdcfb62f32af737920ede3946b58d1d8156498dc9",
-      "src/options_alpha_lab/api/server.py": "sha256:4aeb25b3552db509ea8eb609de70419277eb066b35bf702060ac3e6180493ef7",
+      "src/options_alpha_lab/api/dto.py": "sha256:d0662ffef37b837951c8ada863f199d065ad88d2a36a7be1e79ae0a738dd43f5",
+      "src/options_alpha_lab/api/server.py": "sha256:d21895ed1d86f284f70a8990036b522b7eac7354dc471e6b3c17d4b6231f53e0",
+      "src/options_alpha_lab/api/views.py": "sha256:fd02b6b638b51d3fd6d7fd8f91c8c68125f74cb2f535b752f0bd8185fc6af5af",
       "src/options_alpha_lab/architecture/__init__.py": "sha256:b9ec27fa878d4c68c402434339bad7a35db69868d14fad68ecb67b086b540d1a",
       "src/options_alpha_lab/architecture/contracts.py": "sha256:ae85b7100b48ee9dd4d5baa2e4745f352296109dbb3ad22d0818dc17c82e4be7",
       "src/options_alpha_lab/architecture/ports.py": "sha256:979fe77c8f82bb7df30af834f35e3277e70ea83577d0f66a4129efeeed624097",
@@ -50,12 +51,13 @@
       "src/options_alpha_lab/presentation/__init__.py": "sha256:9908c273a22d19b3ae0d636345e1da581279061b96e8e35d6a3a9e623e318ba5",
       "src/options_alpha_lab/presentation/activity.py": "sha256:261425fb0065b7b891fdcb48d1434ded7da2270ec10e40393f6908b2cd64a90d",
       "src/options_alpha_lab/presentation/artifacts.py": "sha256:33e4bc4b3545f95bb4d7854cd3163c0ef3b9dabb0e088e70a37db5ae6e81e582",
-      "src/options_alpha_lab/presentation/decision.py": "sha256:0ab0eac1e38200d4403993e179a08dbe7b94a5fb4a91e770118e27dca5379d3c",
+      "src/options_alpha_lab/presentation/book.py": "sha256:52cea07a02eabc254d65fba3d85f7dd9ab4534dacd9568e4f313b5d65f507778",
+      "src/options_alpha_lab/presentation/decision.py": "sha256:20b6205151f9ce25737eda07cd96238d2b023619826fa8c10935c45cc5a5ffde",
       "src/options_alpha_lab/presentation/explain.py": "sha256:b70fbacbad28ebca773f54d13843c82df3bb8067c78976868c082aa62b5a4a1e",
       "src/options_alpha_lab/presentation/export.py": "sha256:407e4ccef987546f6f03880c48ea9dd5a9a04fb93b81041e4cec675a7d4b8f8d",
       "src/options_alpha_lab/presentation/proof.py": "sha256:0c1ebb480a1507be9a5856fc4e18f1166bc0f70372a61783e2109cbed6eb9574",
-      "src/options_alpha_lab/presentation/source.py": "sha256:576e36cd51777eccd88be86940110e618aa1ed3a0f848c97e1ccf17a20e0a279",
-      "src/options_alpha_lab/presentation/status.py": "sha256:8773030c11b8ed73d67652bed1fdb9e074cf9d0363016690070509a7765389ef",
+      "src/options_alpha_lab/presentation/source.py": "sha256:e5f3276f7fccf89641fd042f18f873930d26d3454ffb0d934587abd8b67e1f58",
+      "src/options_alpha_lab/presentation/status.py": "sha256:ae381b9ba8012d884ea11763b43f2f0a99f4179345aacb979913125843d639e7",
       "src/options_alpha_lab/presentation/tour.py": "sha256:eaa73eef805bcbc7e20d35ffb3b88ce97ff45193c4485f10412bbeab086e7a2f",
       "src/options_alpha_lab/providers/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/providers/alpaca_readonly.py": "sha256:3bab4b14b3c40ced53e85b3a993228a4fbb558286739ba8c3a3d2c51b59eefd7",
@@ -83,7 +85,7 @@
     },
     "demo_data": {
       "artifacts/h0_paper_lifecycle.json": "sha256:a09aea77c418e7d53d12ba2db1b6e77274cdfd58d01654245f73c8336713bf4c",
-      "demo/h0_demo.db": "sha256:aa68d80c1cdedf1eac13941378f4c49e91a0946ed017ec6bad3c890388c5b1cc",
+      "demo/h0_demo.db": "sha256:79590eda92eff90761a6e3523949b52dc8482b17bd6c5acf4a300126e2a2dfaf",
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.manifest.json": "sha256:2710b9e3104a605b6ce6a9e13176500f123940d08564d4d61f37580eae6227c7",
       "fixtures/h0/frozen/spy-lifecycle-20260828T154747Z.snapshot.json": "sha256:ef9595f0454f73dde9099e537530492ff484f4e5509fd135e34298094e729206",
       "fixtures/h0/frozen/spy-live-20260828T153310Z.manifest.json": "sha256:ce436fa73460f9e96a9993a58ef644b8a80b1205eed1f463796e29f699a32cdd",
@@ -106,8 +108,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:8f1bb7b8167634858a334c2eb2bfa09a3bbd18eb",
-  "freeze_digest": "sha256:11b932d780c6856dba5d3d309489a9e65936f67731c13c0b37f03664e5c13e10",
-  "frozen_at": "2026-09-14T20:32:38.607021+00:00",
+  "commit": "git:a61795efbcd1f1ba7771b5de579d26fec5fca1c1",
+  "freeze_digest": "sha256:337fb6705dfb750d9cd97b863e6173630f64129b4319f8368a2a5a7fbbdfa083",
+  "frozen_at": "2026-09-15T02:42:43.538076+00:00",
   "manifest_version": "release_freeze.v1"
 }

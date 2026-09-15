@@ -1,0 +1,26 @@
+[Unit]
+Description=Options Alpha presentation API (read-only, loopback)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/options-alpha
+# The dashboard's credential: the SELECT-only options_alpha_ro role (CIIP-I-017).
+# Never /etc/options-alpha.env, which carries the worker's read-write role and
+# the broker and model keys this process must not hold.
+EnvironmentFile=/etc/options-alpha-dashboard.env
+# Loopback on purpose. Exposing the API is a separate, deliberate change (RUI-6),
+# not a side effect of installing it.
+Environment=PRESENTATION_API_HOST=127.0.0.1
+Environment=PRESENTATION_API_PORT=8600
+ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.api
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

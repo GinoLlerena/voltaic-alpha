@@ -34,7 +34,8 @@ Tone = Literal["ok", "warn", "bad", "off", "unknown"]
 UNKNOWN = "UNKNOWN"
 
 #: States that still owe management, mirroring `lifecycle.active_positions`.
-_OPEN_STATES = ("PENDING", "OPEN", "CLOSING", "INCIDENT")
+OPEN_STATES = ("PENDING", "OPEN", "CLOSING", "INCIDENT")
+_OPEN_STATES = OPEN_STATES
 
 
 @dataclass(frozen=True)
