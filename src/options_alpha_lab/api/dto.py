@@ -18,7 +18,7 @@ from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-SCHEMA_VERSION = "public.v1"
+SCHEMA_VERSION: Literal["public.v1"] = "public.v1"
 
 T = TypeVar("T")
 

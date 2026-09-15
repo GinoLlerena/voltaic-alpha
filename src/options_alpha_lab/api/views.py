@@ -10,7 +10,7 @@ it withheld.
 import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
@@ -23,9 +23,11 @@ from . import dto
 
 def _json(path: Path) -> dict[str, Any]:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001 - a missing artifact is reported as UNKNOWN, not raised
         return {}
+    # A committed artifact that is valid JSON but not an object is treated as absent.
+    return data if isinstance(data, dict) else {}
 
 
 def market(view: DecisionView) -> dto.MarketOut:
@@ -33,6 +35,7 @@ def market(view: DecisionView) -> dto.MarketOut:
     pack = view.packs[0] if view.packs else None
     cited = set(pack.evidence_ids) if pack else set()
     setup_direction = pack.direction if pack else ""
+    kind: Literal["fixture", "provider", "unavailable"]
     if snap is None:
         kind = "unavailable"
     else:

@@ -20,9 +20,9 @@
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
       "src/options_alpha_lab/api/__init__.py": "sha256:4430b1f87ec17e889ded8dac44683c16c6906d0862b33cc14a02bfa9008f3e0c",
       "src/options_alpha_lab/api/__main__.py": "sha256:20571ffdb01f5602a76937e71794f135c38ab8cd9fcf0a995ebf0a41d4b6152f",
-      "src/options_alpha_lab/api/dto.py": "sha256:53d99ec52c7e68cb8afce62d1fa383e2f3f3056affd2090558953778d2b30ccb",
-      "src/options_alpha_lab/api/server.py": "sha256:25616341ad45b47ff3e0d13fb1a63db3e7254d04de8fe2f2b9d47d05796a47ae",
-      "src/options_alpha_lab/api/views.py": "sha256:fd02b6b638b51d3fd6d7fd8f91c8c68125f74cb2f535b752f0bd8185fc6af5af",
+      "src/options_alpha_lab/api/dto.py": "sha256:faa13d39da2383a92aecba328e3598d67d9b810e736113e31a03e4ae76039bef",
+      "src/options_alpha_lab/api/server.py": "sha256:83e391c36d2b32764e5861afa70e59218ccb5f55691920fa098de27cdc688edd",
+      "src/options_alpha_lab/api/views.py": "sha256:84647fe36716a0e207da6c8db4c645c2d37fab6b60def8f713174da8162f32b5",
       "src/options_alpha_lab/architecture/__init__.py": "sha256:b9ec27fa878d4c68c402434339bad7a35db69868d14fad68ecb67b086b540d1a",
       "src/options_alpha_lab/architecture/contracts.py": "sha256:ae85b7100b48ee9dd4d5baa2e4745f352296109dbb3ad22d0818dc17c82e4be7",
       "src/options_alpha_lab/architecture/ports.py": "sha256:979fe77c8f82bb7df30af834f35e3277e70ea83577d0f66a4129efeeed624097",
@@ -110,8 +110,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:de4bb7e7662dd0e710b187670c6f6fbbd38a757e",
-  "freeze_digest": "sha256:49dcbd7bc3f7f6a6ce68339589ea3ba1d4910a10e2a211d4b9aa0e9c6751ec79",
-  "frozen_at": "2026-09-15T02:58:03.024199+00:00",
+  "commit": "git:b69545374720d1d5537cfd713be8bbfbab596155",
+  "freeze_digest": "sha256:d642552cd72bd85e1af538c4fa4374b0faebe460331b5069ab4627e072b8dbba",
+  "frozen_at": "2026-09-15T03:12:26.961233+00:00",
   "manifest_version": "release_freeze.v1"
 }
