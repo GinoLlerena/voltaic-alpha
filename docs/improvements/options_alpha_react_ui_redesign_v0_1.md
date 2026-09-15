@@ -1356,7 +1356,15 @@ a different version rather than an unexplained digest.
 Guarded three ways, each shown to fail against the reintroduced claim: the
 derived count must agree with the tile it backs; no manifest disclosure may
 assert a sample size (`sample is one|two|three|<n>`); and the rendered page must
-name the same number the records yield.
+name the numbers the records yield.
+
+**Corrected on deployment.** Deriving the count from the *current source* made
+the live page read "0 completed round trips" beside a realized −7.10 taken from
+the committed receipt — two numbers counting different things, which together
+read as a contradiction. The note now names both and says which is which: the
+committed receipt the P&L came from, and this source's reconciled round trips.
+The test renders both shapes, including the live-like source with no closed
+position, which is where the first fix went wrong.
 
 ### A test-order dependency, removed
 

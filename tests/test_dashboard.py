@@ -134,22 +134,48 @@ class DashboardBoundaryTests(unittest.TestCase):
         self.assertGreaterEqual(orders or 0, 2, "need the open and close lifecycle")
 
     def test_the_sample_size_note_is_derived(self) -> None:
-        """`RUI-VAL-010`. The note asserted "one round trip" in prose; it now
-        reports the same count the proof tile derives from the records."""
+        """`RUI-VAL-010`. The note asserted "one round trip" in prose. It now
+        reports two derived counts, each labelled with what it counts: the
+        committed receipt the P&L comes from, and this source's reconciled round
+        trips. One number for both read as a contradiction on a live worker,
+        which shows a committed receipt beside zero closed positions."""
+        import os
+        import shutil
+        import sqlite3
+        import tempfile
+
         from sqlalchemy import create_engine
         from sqlalchemy.orm import Session
 
         from options_alpha_lab.presentation.proof import completed_round_trips
 
-        demo = APP.parent / "demo" / "h0_demo.db"
-        with Session(create_engine(f"sqlite+pysqlite:///{demo}", future=True)) as session:
-            expected = completed_round_trips(session)
+        for strip_positions, expected in ((False, 1), (True, 0)):
+            with self.subTest(closed_round_trips=expected), tempfile.TemporaryDirectory() as tmp:
+                live = Path(tmp) / "live.db"
+                shutil.copy(APP.parent / "demo" / "h0_demo.db", live)
+                if strip_positions:
+                    with sqlite3.connect(live) as conn:
+                        conn.execute("delete from positions")
+                with Session(create_engine(f"sqlite+pysqlite:///{live}", future=True)) as session:
+                    self.assertEqual(completed_round_trips(session), expected)
 
-        run = AppTest.from_file(str(APP), default_timeout=120).run()
-        self.assertFalse(run.exception)
-        rendered = " ".join(m.value for m in run.markdown)
-        plural = "s" if expected != 1 else ""
-        self.assertIn(f"{expected} completed round trip{plural}", rendered)
+                saved = os.environ.get("DASHBOARD_DATABASE_URL")
+                os.environ["DASHBOARD_DATABASE_URL"] = f"sqlite+pysqlite:///{live}"
+                try:
+                    run = AppTest.from_file(str(APP), default_timeout=120).run()
+                finally:
+                    if saved is None:
+                        os.environ.pop("DASHBOARD_DATABASE_URL", None)
+                    else:
+                        os.environ["DASHBOARD_DATABASE_URL"] = saved
+
+                self.assertFalse(run.exception)
+                rendered = " ".join(m.value for m in run.markdown).replace("&amp;", "&")
+                self.assertIn("The P&L above is 1 committed Paper receipt", rendered)
+                plural = "s" if expected != 1 else ""
+                self.assertIn(
+                    f"this source records {expected} reconciled round trip{plural}", rendered
+                )
 
     def test_every_required_disclosure_is_present(self) -> None:
         # Asserted on the rendered page rather than on app.py's source: the copy

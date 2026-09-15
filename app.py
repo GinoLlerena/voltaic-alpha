@@ -247,6 +247,9 @@ if not decisions:
 
 receipt = load_json(RECEIPT)
 ablation = load_json(ABLATION)
+#: A receipt records one round trip when it holds both halves. Derived, so a
+#: second committed lifecycle changes the sentence rather than contradicting it.
+RECEIPT_TRIPS = 1 if (receipt.get("open") and receipt.get("close")) else 0
 with Session(engine()) as _book_session:
     incidents = book.incidents(_book_session, open_only=True)
 
@@ -755,9 +758,14 @@ with tabs[3]:
             )
         block(
             '<div class="note" style="margin-top:.6rem">'
-            "P&amp;L is reported here with its sample size, which is "
-            f"{ROUND_TRIPS} completed round trip{'s' if ROUND_TRIPS != 1 else ''}. "
-            "That is far too small to say anything about the strategy, and the "
+            # RUI-VAL-010. Two counts, each labelled with what it counts. The
+            # P&L above is the committed receipt's; the reconciled count is this
+            # source's, and on a live worker with no closed position it is zero.
+            # Reporting one number for both read as a contradiction.
+            f"The P&amp;L above is {RECEIPT_TRIPS} committed Paper "
+            f"receipt{'s' if RECEIPT_TRIPS != 1 else ''}; this source records "
+            f"{ROUND_TRIPS} reconciled round trip{'s' if ROUND_TRIPS != 1 else ''}. "
+            "Either way the sample is far too small to say anything about the strategy, and the "
             "published judging criteria do not include P&amp;L. What the number does "
             "show is the friction any real edge would have to clear first. "
             "An ablation that cannot return &ldquo;no difference&rdquo; is not "
