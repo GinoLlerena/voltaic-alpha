@@ -119,6 +119,21 @@ class ContentTests(unittest.TestCase):
         self.assertTrue(manifest["broker_orders"][0]["fills"])
         self.assertTrue(manifest["positions"])
 
+    def test_the_manifest_asserts_no_sample_size(self) -> None:
+        """`RUI-VAL-010`. It claimed "two trades"; nothing counted them, and the
+        page's own derived count is one."""
+        import re
+
+        with _committed() as session:
+            manifest = export.manifest(_view(session, LIFECYCLE))
+        self.assertEqual(manifest["manifest_version"], "proof-manifest-2")
+        for line in manifest["disclosures"]:
+            self.assertNotIn("two trades", line)
+            self.assertIsNone(
+                re.search(r"sample is (one|two|three|\d+)", line),
+                f"a counted claim belongs in a derived tile, not in copy: {line}",
+            )
+
     def test_disclosures_travel_with_the_proof(self) -> None:
         with _committed() as session:
             manifest = export.manifest(_view(session, LIFECYCLE))

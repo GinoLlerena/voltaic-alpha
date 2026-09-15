@@ -32,15 +32,18 @@ from typing import Any
 from .decision import DecisionView
 
 #: Bumped when the shape changes, so an old manifest stays interpretable.
-MANIFEST_VERSION = "proof-manifest-1"
+#: Bumped for `RUI-VAL-010`: the disclosures no longer assert a sample size that
+#: nothing counted, which changes the bytes and therefore every digest.
+MANIFEST_VERSION = "proof-manifest-2"
 
 #: Reproduced verbatim from README.md. See `HK-018`.
 DISCLOSURES = (
     "Alpaca Paper only. No live endpoint exists in this build.",
     "Option quotes come from the indicative feed; the account has no OPRA "
     "agreement, so quotes are not trading-quality.",
-    "No alpha is claimed. The null hypothesis is not rejected and the sample is "
-    "two trades.",
+    "No alpha is claimed. The null hypothesis is not rejected, and the sample is "
+    "far too small to test it. The completed round trips are counted on the "
+    "dashboard's proof tiles rather than asserted here.",
     "Nothing here is investment advice.",
 )
 

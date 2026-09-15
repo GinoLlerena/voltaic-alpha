@@ -25,6 +25,7 @@ from options_alpha_lab.persistence.models import (
     Position,
 )
 from options_alpha_lab.presentation.proof import (
+    completed_round_trips,
     model_effect,
     paper_lifecycles,
     write_boundary,
@@ -128,6 +129,32 @@ class PaperLifecycleTileTests(unittest.TestCase):
         _lifecycle(self.session, decision_id="d1", closed=False)
         _lifecycle(self.session, decision_id="d2", closed=False)
         self.assertEqual(paper_lifecycles(self.session).mode, "UNAVAILABLE")
+
+
+class CompletedRoundTripsTests(unittest.TestCase):
+    """`RUI-VAL-010`. A sample-size claim must be counted, not typed."""
+
+    def setUp(self) -> None:
+        self.session = _session()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def test_no_records_is_zero(self) -> None:
+        self.assertEqual(completed_round_trips(self.session), 0)
+
+    def test_it_counts_only_reconciled_round_trips(self) -> None:
+        _lifecycle(self.session, decision_id="d1", closed=True)
+        _lifecycle(self.session, decision_id="d2", closed=False)
+        self.assertEqual(completed_round_trips(self.session), 1)
+
+    def test_it_agrees_with_the_tile_it_backs(self) -> None:
+        """Two numbers on one page that disagree is the defect being fixed."""
+        for n in range(1, 4):
+            _lifecycle(self.session, decision_id=f"d{n}", closed=True)
+            self.assertEqual(
+                str(completed_round_trips(self.session)), paper_lifecycles(self.session).value
+            )
 
 
 class ArtifactTileTests(unittest.TestCase):
