@@ -1335,15 +1335,28 @@ The disclosure test previously grepped `app.py`'s source. It now asserts on the
 rendered sidebar, since a disclosure that exists in a file but is not rendered
 discloses nothing.
 
-### `RUI-VAL-010` — two disclosure texts disagree
+### `RUI-VAL-010` — two disclosure texts disagree — **resolved 15 September 2026**
 
-The page says a `NO_TRADE` refusal and a deterministic baseline beating the model
-are both valid results, and elsewhere calls the P&L sample one round trip. The
-proof manifest (`export.DISCLOSURES`) says "the sample is two trades". Neither is
-derived from records. Not unified here: the manifest's bytes are pinned by
-digests reviewers keep, so changing its wording needs a manifest version bump,
-and a sample size should be computed from positions rather than typed in either
-place.
+The page called the P&L sample "one round trip"; the proof manifest
+(`export.DISCLOSURES`) said "the sample is two trades". Neither was derived, and
+they could not both be right.
+
+Counted, they are not: `proof.completed_round_trips` — extracted from the tile
+that already did this correctly, joining positions through decisions to broker
+orders and requiring both a reconciled entry and close — returns **1** on the
+committed evidence. The page's number was right; the manifest's was wrong.
+
+Fixed by deriving rather than by picking a winner. The page reports the counted
+number and pluralises from it. The manifest stops asserting a sample size at all
+and points at the tile that counts it, because a per-decision manifest has no
+corpus to count. `MANIFEST_VERSION` is bumped to `proof-manifest-2`: the bytes
+change, so every digest does, and a reviewer holding an older manifest should see
+a different version rather than an unexplained digest.
+
+Guarded three ways, each shown to fail against the reintroduced claim: the
+derived count must agree with the tile it backs; no manifest disclosure may
+assert a sample size (`sample is one|two|three|<n>`); and the rendered page must
+name the same number the records yield.
 
 ### A test-order dependency, removed
 

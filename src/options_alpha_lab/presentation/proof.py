@@ -49,6 +49,29 @@ class ProofTile:
         return self.mode != "UNAVAILABLE"
 
 
+def completed_round_trips(session: Session) -> int:
+    """How many Paper round trips actually completed, by lineage.
+
+    `RUI-VAL-010`. The number exists so that a claim about sample size can be
+    derived rather than typed: the page said "one round trip" and the proof
+    manifest said "two trades", neither computed from anything.
+    """
+    complete = 0
+    for position in session.scalars(
+        select(Position).where(Position.lifecycle_status == "CLOSED")
+    ).all():
+        roles = set(
+            session.scalars(
+                select(BrokerOrder.role)
+                .join(OrderIntent, OrderIntent.id == BrokerOrder.order_intent_id)
+                .where(OrderIntent.decision_id == position.decision_id)
+            ).all()
+        )
+        if {"entry", "close"} <= roles:
+            complete += 1
+    return complete
+
+
 def paper_lifecycles(session: Session) -> ProofTile:
     """Completed Paper round trips, counted by correlation rather than by hand.
 
@@ -63,20 +86,7 @@ def paper_lifecycles(session: Session) -> ProofTile:
     `CLOSED` positions alone would also count one abandoned into that state,
     which is a different claim.
     """
-    closed = session.scalars(
-        select(Position).where(Position.lifecycle_status == "CLOSED")
-    ).all()
-    complete = 0
-    for position in closed:
-        roles = set(
-            session.scalars(
-                select(BrokerOrder.role)
-                .join(OrderIntent, OrderIntent.id == BrokerOrder.order_intent_id)
-                .where(OrderIntent.decision_id == position.decision_id)
-            ).all()
-        )
-        if {"entry", "close"} <= roles:
-            complete += 1
+    complete = completed_round_trips(session)
 
     if not complete:
         return ProofTile(

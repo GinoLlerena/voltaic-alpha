@@ -41,7 +41,7 @@ from options_alpha_lab.presentation.decision import load as decision_view
 from options_alpha_lab.presentation.explain import why_decision
 from options_alpha_lab.presentation.export import digest as proof_digest
 from options_alpha_lab.presentation.export import render as proof_bytes
-from options_alpha_lab.presentation.proof import proof_tiles
+from options_alpha_lab.presentation.proof import completed_round_trips, proof_tiles
 from options_alpha_lab.presentation.source import Resolver
 from options_alpha_lab.presentation.status import system_status
 from options_alpha_lab.presentation.tour import SCENES
@@ -271,6 +271,9 @@ block(
 
 with Session(engine()) as _proof_session:
     _tiles = proof_tiles(_proof_session, root=ROOT)
+    # RUI-VAL-010. Derived, not typed: the note below used to assert "one round
+    # trip" while the proof manifest asserted "two trades", and neither counted.
+    ROUND_TRIPS = completed_round_trips(_proof_session)
 block(
     '<div class="proof">'
     + "".join(
@@ -752,7 +755,8 @@ with tabs[3]:
             )
         block(
             '<div class="note" style="margin-top:.6rem">'
-            "P&amp;L is reported here with its sample size, which is one round trip. "
+            "P&amp;L is reported here with its sample size, which is "
+            f"{ROUND_TRIPS} completed round trip{'s' if ROUND_TRIPS != 1 else ''}. "
             "That is far too small to say anything about the strategy, and the "
             "published judging criteria do not include P&amp;L. What the number does "
             "show is the friction any real edge would have to clear first. "

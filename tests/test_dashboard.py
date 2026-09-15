@@ -133,6 +133,24 @@ class DashboardBoundaryTests(unittest.TestCase):
         self.assertGreaterEqual(decisions or 0, 2, "need a qualified and a refused case")
         self.assertGreaterEqual(orders or 0, 2, "need the open and close lifecycle")
 
+    def test_the_sample_size_note_is_derived(self) -> None:
+        """`RUI-VAL-010`. The note asserted "one round trip" in prose; it now
+        reports the same count the proof tile derives from the records."""
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from options_alpha_lab.presentation.proof import completed_round_trips
+
+        demo = APP.parent / "demo" / "h0_demo.db"
+        with Session(create_engine(f"sqlite+pysqlite:///{demo}", future=True)) as session:
+            expected = completed_round_trips(session)
+
+        run = AppTest.from_file(str(APP), default_timeout=120).run()
+        self.assertFalse(run.exception)
+        rendered = " ".join(m.value for m in run.markdown)
+        plural = "s" if expected != 1 else ""
+        self.assertIn(f"{expected} completed round trip{plural}", rendered)
+
     def test_every_required_disclosure_is_present(self) -> None:
         # Asserted on the rendered page rather than on app.py's source: the copy
         # moved to presentation/copy.py (RUI-1), and a disclosure that exists in a
