@@ -12,6 +12,7 @@ import unittest
 import uuid
 from datetime import UTC, datetime, time
 from decimal import Decimal
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import create_engine, select
@@ -327,6 +328,53 @@ class RealizedTests(OutcomeCase):
         ).one()
         self.assertEqual(row.outcome_kind, outcomes.NO_TRADE)
         self.assertIsNone(row.realized)
+
+
+class RecordedDecisionsCarryTheirJobsTests(unittest.TestCase):
+    """`CIIP-008`. A decision cannot exist without the questions asked of it:
+    the jobs are written in the decision's own transaction."""
+
+    def _recorder(self):  # type: ignore[no-untyped-def]
+        import tempfile
+        from pathlib import Path
+
+        from options_alpha_lab.config import load_settings
+        from options_alpha_lab.persistence.repository import (
+            DecisionRecorder,
+            build_engine,
+            create_schema,
+        )
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        settings = load_settings({
+            "BOT_MODE": "observe",
+            "ALPACA_PAPER_TRADE": "true",
+            "ALPACA_TRADING_ENABLED": "false",
+            "DATABASE_URL": f"sqlite+pysqlite:///{Path(tmp.name) / 'w.db'}",
+        })
+        engine = build_engine(settings)
+        create_schema(engine)
+        return DecisionRecorder(engine, settings), engine
+
+    def test_recording_a_decision_creates_its_review_jobs(self) -> None:
+        from options_alpha_lab.replay import replay_paths
+
+        recorder, engine = self._recorder()
+        settings = recorder._settings  # noqa: SLF001 - test introspection
+        results = replay_paths([Path("fixtures/h0/spy_qualified.snapshot.json")], settings)
+        self.assertTrue(results)
+        with Session(engine) as session:
+            decisions = session.scalars(select(Decision)).all()
+            self.assertTrue(decisions)
+            for decision in decisions:
+                horizons = sorted(
+                    j.horizon
+                    for j in session.scalars(
+                        select(ReviewJob).where(ReviewJob.decision_id == decision.id)
+                    ).all()
+                )
+                self.assertEqual(horizons, [h.label for h in outcomes.HORIZONS])
 
 
 if __name__ == "__main__":  # pragma: no cover

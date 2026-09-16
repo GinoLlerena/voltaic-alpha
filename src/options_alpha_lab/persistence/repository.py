@@ -22,8 +22,10 @@ from sqlalchemy import Engine, create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..architecture.contracts import DecisionOutcome, DecisionSnapshot
+from ..calendar import TradingCalendar
 from ..config import Settings
 from ..hashing import payload_hash
+from ..outcomes import ReviewSummary, ensure_jobs, review
 from ..snapshot_io import outcome_to_dict, snapshot_to_dict
 from .models import (
     AuditEvent,
@@ -153,6 +155,17 @@ class DecisionRecorder:
             run.ended_at = datetime.now(UTC)
             run.health_result = health_result
 
+    def review_outcomes(
+        self, calendar: TradingCalendar, *, now: datetime | None = None
+    ) -> ReviewSummary:
+        """Resolve every review job whose horizon has produced a completed close.
+
+        `CIIP-008`. Session handling belongs here rather than in the worker, which
+        holds no session of its own.
+        """
+        with self._session() as session:
+            return review(session, calendar, now=now)
+
     def record_worker_event(
         self,
         run_id: str,
@@ -235,6 +248,10 @@ class DecisionRecorder:
                 select(Decision).where(Decision.decision_hash == decision_hash)
             )
             if existing is not None:
+                # Idempotent, and the repair path: a decision recorded before
+                # `CIIP-008`, or by an attempt that died between the two writes,
+                # gets its jobs the next time the same inputs are decided.
+                ensure_jobs(session, existing)
                 return RecordedDecision(
                     decision_id=existing.id,
                     input_hash=existing.input_hash,
@@ -295,8 +312,7 @@ class DecisionRecorder:
                     )
                 )
 
-            session.add(
-                Decision(
+            decision_row = Decision(
                     id=decision_id,
                     run_id=run_id,
                     market_snapshot_id=market_snapshot_id,
@@ -309,11 +325,16 @@ class DecisionRecorder:
                     decision_hash=decision_hash,
                     policy_version=self._settings.policy_version,
                     decided_at=now,
-                )
             )
+            session.add(decision_row)
             # Same reason as above: the thesis, spread, and risk rows reference
             # this decision, and the ordering is not inferable from the columns.
             session.flush()
+
+            # `CIIP-008`. The review jobs are written in the decision's own
+            # transaction, so a decision cannot exist without the questions that
+            # will be asked of it. Idempotent, so a re-decision adds none.
+            ensure_jobs(session, decision_row)
 
             model_call_id: str | None = None
             if model_call is not None:
