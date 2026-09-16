@@ -308,3 +308,58 @@ class OrderClockWiringTests(unittest.TestCase):
         )
 
         self.assertGreater(DEFAULT_POSITION_CLOCK_SECONDS, DEFAULT_ORDER_CLOCK_SECONDS)
+
+
+class ReviewClockWiringTests(unittest.TestCase):
+    """`CIIP-008`. The reviewer has to be driven, and must never be fatal."""
+
+    def wait_loop(self) -> str:
+        import inspect
+
+        from options_alpha_lab import worker
+
+        return inspect.getsource(worker.main).split("while waited < args.interval")[1]
+
+    def source(self) -> str:
+        import inspect
+
+        from options_alpha_lab import worker
+
+        return inspect.getsource(worker.main)
+
+    def test_the_wait_loop_runs_the_reviewer(self) -> None:
+        self.assertIn("run_review()", self.wait_loop())
+
+    def test_no_clock_can_skip_the_reviewer(self) -> None:
+        """The defect the two trading clocks already had, applied to a third."""
+        loop = self.wait_loop()
+        between = loop[loop.index("agent.position_clock"):loop.index("run_review()")]
+        self.assertNotIn("continue", between)
+
+    def test_a_failed_review_is_contained_and_recorded(self) -> None:
+        """A reviewer that raised must not stop the single writer, and must not
+        be indistinguishable from one that found nothing."""
+        body = self.source().split("def run_review()")[1].split("def run_clock")[0]
+        self.assertIn("except Exception", body)
+        self.assertIn('journal("review_failed", kind="fault"', body)
+        self.assertNotIn("raise", body)
+
+    def test_a_quiet_review_says_nothing(self) -> None:
+        """`CIIP-I-007`: most passes resolve nothing, and a line each would be a
+        metronome."""
+        body = self.source().split("def run_review()")[1].split("def run_clock")[0]
+        self.assertIn("if summary.completed:", body)
+
+    def test_the_review_clock_is_slower_than_the_trading_clocks(self) -> None:
+        from options_alpha_lab.agent import (
+            DEFAULT_ORDER_CLOCK_SECONDS,
+            DEFAULT_POSITION_CLOCK_SECONDS,
+        )
+        from options_alpha_lab.worker import DEFAULT_REVIEW_CLOCK_SECONDS
+
+        self.assertGreater(DEFAULT_REVIEW_CLOCK_SECONDS, DEFAULT_POSITION_CLOCK_SECONDS)
+        self.assertGreater(DEFAULT_REVIEW_CLOCK_SECONDS, DEFAULT_ORDER_CLOCK_SECONDS)
+
+    def test_the_review_clock_can_be_disabled(self) -> None:
+        loop = self.wait_loop()
+        self.assertIn("args.review_interval > 0", loop)

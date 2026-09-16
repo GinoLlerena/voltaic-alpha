@@ -39,6 +39,12 @@ LEASE_TTL = timedelta(seconds=90)
 #: over - while the first is still alive and mid-tick.
 HEARTBEAT_INTERVAL_SECONDS = 20
 
+#: `CIIP-008`. Outcomes resolve on completed trading sessions, so this clock is
+#: slow by nature: a horizon that has not elapsed cannot be hurried by asking
+#: more often. It belongs to the worker rather than the agent -- reviewing is
+#: not a trading behaviour and reaches no broker.
+DEFAULT_REVIEW_CLOCK_SECONDS = 900
+
 
 class LeaseUnavailable(RuntimeError):
     """Another worker holds a live lease. Starting anyway would be the bug."""
@@ -271,6 +277,10 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
         "--position-clock-interval", type=int, default=DEFAULT_POSITION_CLOCK_SECONDS,
         help="seconds between valuations of an open position; 0 disables it",
     )
+    parser.add_argument(
+        "--review-interval", type=int, default=DEFAULT_REVIEW_CLOCK_SECONDS,
+        help="seconds between outcome reviews; 0 disables it",
+    )
     parser.add_argument("--approve", default=None, metavar="TOKEN")
     parser.add_argument("--health-file", default="/var/run/options-alpha/health.json")
     parser.add_argument("--lease", default=DEFAULT_LEASE)
@@ -378,6 +388,27 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
               flush=True)
         stopping["now"] = True
 
+    def run_review() -> None:
+        """`CIIP-008`. Resolve any review job whose horizon has now elapsed.
+
+        Appends only: it writes outcome rows and marks jobs resolved, and touches
+        no decision, position or order. A failure must never stop the single
+        writer, so it is contained exactly as a clock failure is.
+
+        Silent when nothing resolved, which is most passes -- a horizon is
+        measured in completed sessions, and a line per quiet pass is the
+        metronome `CIIP-I-007` removed.
+        """
+        try:
+            summary = recorder.review_outcomes(calendar)
+        except Exception as exc:  # noqa: BLE001 - as for a tick, never fatal
+            health.last_error = f"review_clock: {type(exc).__name__}: {exc}"
+            journal("review_failed", kind="fault", error=health.last_error)
+            return
+        if summary.completed:
+            journal("outcomes_reviewed", resolved=summary.completed,
+                    still_pending=summary.still_pending)
+
     def run_clock(name: str, call: Callable[[], TickResult | None]) -> None:
         """Run one between-tick clock. A failure is recorded, never fatal.
 
@@ -420,7 +451,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
             feed=client.option_feed, sessions_loaded=len(calendar),
             interval_seconds=args.interval,
             order_clock_seconds=args.order_clock_interval,
-            position_clock_seconds=args.position_clock_interval)
+            position_clock_seconds=args.position_clock_interval,
+            review_clock_seconds=args.review_interval)
 
     # Reconcile before the agent is permitted to consider any new risk.
     startup = agent.startup()
@@ -482,6 +514,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                     waited % args.position_clock_interval == 0
                 ):
                     run_clock("position_clock", agent.position_clock)
+                if args.review_interval > 0 and (waited % args.review_interval == 0):
+                    run_review()
     finally:
         recorder.end_run(agent.run_id, "ok" if not health.last_error else "degraded")
         lease.release()
