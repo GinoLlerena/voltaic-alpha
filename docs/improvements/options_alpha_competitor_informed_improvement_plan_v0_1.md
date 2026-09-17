@@ -1233,3 +1233,60 @@ the same reading.
 
 From the next live tick onward, "waiting for a rare setup" and "effectively
 switched off" are distinguishable from the records.
+
+### `CIIP-009` — the strategy catalog — 17 September 2026
+
+The competitors' strategy-lifecycle vocabulary, made into records rather than
+adopted as language. Migration `0007` adds three tables and
+`src/options_alpha_lab/catalog.py` holds the lifecycle.
+
+**`strategy_candidates`** carries what a candidate must have before it can be
+argued with: a hypothesis, its setup family, the instruments it is permitted, the
+hash of its parameter set, who proposed it, and a state.
+
+**`policy_versions`** finally says what `policy_version` has meant on every
+decision since the beginning — the thresholds in force, when they took effect,
+what preceded them, and whether an owner approved them. Immutable by
+construction: a change is a new row pointing back, because a decision recorded
+under `h0-provisional-1` must stay re-readable after the policy moves on.
+
+**`promotion_decisions`** is why a candidate moved, cited both ways. It is the
+reason a state change is a decision rather than an assignment, and why a rejected
+candidate is exactly as inspectable as an eligible one: both are made of the same
+records.
+
+### The two properties that are enforced rather than described
+
+**The ladder holds.** `promote` refuses any transition the lifecycle does not
+allow, refuses one with no rationale or no decider, and returns the justification
+for the ones it accepts. `PROPOSED` cannot reach `ELIGIBLE`, `PAPER_SHADOW` or
+`PAPER_ACTIVE`; `PAPER_ACTIVE` cannot quietly reverse to `TESTING`; `RETIRED` and
+`REJECTED` are terminal, so a retired candidate is re-proposed as a new one and
+its record keeps saying what was decided. Rejection stays reachable from every
+state before paper trading, because a candidate that cannot be rejected late is
+one nobody can argue against once it has momentum. Adding a `PROPOSED →
+PAPER_ACTIVE` edge fails the tests.
+
+**State grants nothing.** `CIIP-3`'s acceptance says a candidate must not reach
+the gateway by changing its state alone, and that is asserted against the real
+import graph: importing `execution.gateway` in a clean interpreter loads no
+`catalog` module, no execution module mentions a candidate state, and the catalog
+itself contains no path to an intent, a request or a broker. That last check
+reads the module with docstrings stripped, for the reason
+`check_no_write_path.py` gives — this module's docstring explains that it never
+reaches the gateway, and a guard that cannot tell that from reaching one punishes
+the explanation.
+
+### Empty, and honestly so
+
+No candidate has been proposed. The tables exist so the first one is recorded
+rather than described, and the migration says as much.
+
+### Not in this increment
+
+`evaluation_runs` — frozen dataset manifest, folds, costs, stress, parameter
+perturbations, regime slices, uncertainty. It is the heaviest entity in `CIIP-3`
+and needs a research harness rather than a table; recording a run before anything
+can produce one would be scaffolding pretending to be evidence. The existing
+`sensitivity.py` and the ablation artifact are the nearest things to it and are
+the place to start.

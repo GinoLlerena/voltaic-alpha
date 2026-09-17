@@ -561,6 +561,102 @@ class ExitDecisionRecord(Base):
     schema_version: Mapped[str] = _schema_version()
 
 
+class PolicyVersionRecord(Base):
+    """A named set of thresholds, immutable once recorded.
+
+    `CIIP-009`. `policy_version` has been a string on every decision since the
+    beginning, and nothing said what it meant. This is the table that says: the
+    thresholds in force, when they took effect, what preceded them, and whether
+    an owner approved them.
+
+    Immutable by construction, not by convention: thresholds live in a JSON blob
+    written once, and a change is a new row with `predecessor` pointing back. A
+    decision recorded under `h0-provisional-1` must still be re-readable after the
+    policy moves on, which editing a row in place would destroy.
+    """
+
+    __tablename__ = "policy_versions"
+
+    id: Mapped[str] = _pk()
+    version: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    scope: Mapped[str] = mapped_column(String(32), nullable=False)
+    thresholds: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    #: `DRAFT` until an owner approves it; approval is a person's decision.
+    approval_state: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    effective_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    predecessor: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
+class StrategyCandidate(Base):
+    """A strategy someone proposed, and what was decided about it.
+
+    `CIIP-009`. A candidate that exists only as a name in a document cannot be
+    argued with. This one carries its hypothesis, the setup family and
+    instruments it is permitted, the hash of its parameter set, who proposed it,
+    and a state that only moves through a recorded promotion decision.
+
+    `state` grants nothing. Reaching `PAPER_ACTIVE` creates no execution
+    authority: the gateway consults approved intents and its own guards, and has
+    never heard of this table.
+    """
+
+    __tablename__ = "strategy_candidates"
+
+    id: Mapped[str] = _pk()
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
+    setup_family: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    permitted_instruments: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    #: Identifies the exact parameters, so two candidates cannot claim to be the
+    #: same strategy while differing, or differ while claiming to be the same.
+    parameter_set_hash: Mapped[str] = mapped_column(String(80), nullable=False)
+    parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    proposed_by: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
+class PromotionDecision(Base):
+    """Why a candidate moved, recorded as its own row.
+
+    `CIIP-009`. Append-only, and the reason a state change is a decision rather
+    than an assignment: the history of a candidate is the sequence of these, and
+    a rejected candidate is exactly as inspectable as an eligible one because
+    both are made of the same records.
+    """
+
+    __tablename__ = "promotion_decisions"
+
+    id: Mapped[str] = _pk()
+    candidate_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("strategy_candidates.id"), nullable=False, index=True
+    )
+    from_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    to_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Evidence cited for and against, as identifiers rather than prose: an
+    #: argument that cannot be followed back to records is not evidence.
+    evidence_for: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    evidence_against: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    decided_by: Mapped[str] = mapped_column(String(64), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: Where to return to if this proves wrong.
+    rollback_target: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
 class StructureReadingRecord(Base):
     """What the structure gate computed for one decision, signal or not.
 
