@@ -1070,6 +1070,7 @@ export interface components {
             qualification: components["schemas"]["QualificationOut"] | null;
             /** Signals */
             signals: components["schemas"]["SignalOut"][];
+            structure?: components["schemas"]["StructureReadingOut"] | null;
         };
         /**
          * MemoOut
@@ -1395,6 +1396,35 @@ export interface components {
             /** Candidates */
             candidates: components["schemas"]["SpreadCandidateOut"][];
             selected: components["schemas"]["SpreadCandidateOut"] | null;
+        };
+        /**
+         * StructureReadingOut
+         * @description What the structure gate computed, whether or not it produced a signal.
+         *
+         *     `CIIP-VAL-012`. Without it a refusal is a reason code with no arithmetic
+         *     behind it, and 201 of them cannot be told apart.
+         */
+        StructureReadingOut: {
+            /** Bars Considered */
+            bars_considered: number;
+            /** Bars Required */
+            bars_required: number;
+            /** Close Side */
+            close_side: string | null;
+            /** Fast Ema */
+            fast_ema: string | null;
+            /** Gate */
+            gate: string;
+            /** Last Close */
+            last_close: string | null;
+            /** Retest Touched */
+            retest_touched: boolean | null;
+            /** Separation */
+            separation: string | null;
+            /** Separation Shortfall */
+            separation_shortfall: string | null;
+            /** Slow Ema */
+            slow_ema: string | null;
         };
         /** ThesisOut */
         ThesisOut: {

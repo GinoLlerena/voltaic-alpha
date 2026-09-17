@@ -38,6 +38,7 @@ from .models import (
     Run,
     SignalRecord,
     SpreadCandidateRecord,
+    StructureReadingRecord,
     ThesisRecord,
     WorkerEvent,
 )
@@ -225,6 +226,7 @@ class DecisionRecorder:
         classifier_name: str = "unknown",
         synthesizer_name: str = "unknown",
         model_call: Any = None,
+        structure: Any = None,
     ) -> RecordedDecision:
         snapshot_payload = snapshot_to_dict(snapshot)
         input_hash = payload_hash(snapshot_payload)
@@ -335,6 +337,30 @@ class DecisionRecorder:
             # transaction, so a decision cannot exist without the questions that
             # will be asked of it. Idempotent, so a re-decision adds none.
             ensure_jobs(session, decision_row)
+
+            # `CIIP-VAL-012`. Likewise the structure reading: a decision cannot
+            # exist without the measurement that explains it. Absent for a caller
+            # that has no bars to read -- a replayed fixture carries signals
+            # rather than the series they came from.
+            if structure is not None:
+                session.add(
+                    StructureReadingRecord(
+                        id=_new_id(),
+                        decision_id=decision_id,
+                        market_snapshot_id=market_snapshot_id,
+                        gate=structure.gate,
+                        bars_considered=structure.bars_considered,
+                        bars_required=structure.bars_required,
+                        fast_ema=structure.fast_ema,
+                        slow_ema=structure.slow_ema,
+                        separation=structure.separation,
+                        last_close=structure.last_close,
+                        close_side=structure.close_side,
+                        retest_touched=structure.retest_touched,
+                        separation_shortfall=structure.separation_shortfall,
+                        policy_version=self._settings.policy_version,
+                    )
+                )
 
             model_call_id: str | None = None
             if model_call is not None:

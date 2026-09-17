@@ -2072,6 +2072,16 @@
             },
             "title": "Signals",
             "type": "array"
+          },
+          "structure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StructureReadingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3277,6 +3287,115 @@
           "candidates"
         ],
         "title": "StructureOut",
+        "type": "object"
+      },
+      "StructureReadingOut": {
+        "additionalProperties": false,
+        "description": "What the structure gate computed, whether or not it produced a signal.\n\n`CIIP-VAL-012`. Without it a refusal is a reason code with no arithmetic\nbehind it, and 201 of them cannot be told apart.",
+        "properties": {
+          "bars_considered": {
+            "title": "Bars Considered",
+            "type": "integer"
+          },
+          "bars_required": {
+            "title": "Bars Required",
+            "type": "integer"
+          },
+          "close_side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Side"
+          },
+          "fast_ema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fast Ema"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "retest_touched": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retest Touched"
+          },
+          "separation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separation"
+          },
+          "separation_shortfall": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Separation Shortfall"
+          },
+          "slow_ema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slow Ema"
+          }
+        },
+        "required": [
+          "gate",
+          "bars_considered",
+          "bars_required",
+          "fast_ema",
+          "slow_ema",
+          "separation",
+          "last_close",
+          "close_side",
+          "retest_touched",
+          "separation_shortfall"
+        ],
+        "title": "StructureReadingOut",
         "type": "object"
       },
       "ThesisOut": {

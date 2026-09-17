@@ -57,6 +57,18 @@ def market(view: DecisionView) -> dto.MarketOut:
             # Strongest first, the order the dashboard renders in.
             for s in sorted(view.signals, key=lambda s: -Decimal(str(s.strength)))
         ],
+        structure=None if view.structure is None else dto.StructureReadingOut(
+            gate=view.structure.gate,
+            bars_considered=view.structure.bars_considered,
+            bars_required=view.structure.bars_required,
+            fast_ema=dto.decimal(view.structure.fast_ema),
+            slow_ema=dto.decimal(view.structure.slow_ema),
+            separation=dto.decimal(view.structure.separation),
+            last_close=dto.decimal(view.structure.last_close),
+            close_side=view.structure.close_side,
+            retest_touched=view.structure.retest_touched,
+            separation_shortfall=dto.decimal(view.structure.separation_shortfall),
+        ),
         qualification=None if pack is None else dto.QualificationOut(
             setup_id=pack.setup_id, setup_family=pack.setup_family, direction=pack.direction,
             classifier_name=pack.classifier_name, evidence_ids=list(pack.evidence_ids),

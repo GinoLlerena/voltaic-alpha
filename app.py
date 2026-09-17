@@ -508,12 +508,38 @@ with tabs[0]:
             + "</div></div>"
         )
     else:
+        # CIIP-VAL-012. Say how nearly it qualified, when the reading exists.
+        # Without it a refusal is a reason code with no arithmetic behind it.
+        reading = lineage.structure
+        detail = ""
+        if reading is not None:
+            if reading.gate == "insufficient_bars":
+                detail = (
+                    f"Only {reading.bars_considered} of the {reading.bars_required} "
+                    "daily bars the structure rule needs were available."
+                )
+            elif reading.gate == "separation_or_side":
+                detail = (
+                    f"EMA20 sat {money(reading.separation)} from EMA50 with the close "
+                    f"{esc(reading.close_side or 'unknown')} EMA20 — "
+                    f"{money(abs(reading.separation_shortfall or 0))} short of the "
+                    "separation the rule requires."
+                )
+            elif reading.gate == "no_retest":
+                detail = (
+                    "The trend qualified, but price did not retest EMA20 within the "
+                    "recent sessions the rule looks back over."
+                )
+            elif reading.gate == "ema_unavailable":
+                detail = "The moving averages could not be computed from the bars available."
         block(
             f'<div class="card">{badge("no setup qualified", "bad")}'
             '<div class="note" style="margin-top:.6rem">The deterministic classifier '
             "declined before any model was consulted. Contradictory evidence is not "
             "something the model is asked to resolve, because it has no authority "
-            "to resolve it.</div></div>"
+            "to resolve it."
+            + (f"<br><b>{detail}</b>" if detail else "")
+            + "</div></div>"
         )
 
 # ------------------------------------------------------------------- 2 memo

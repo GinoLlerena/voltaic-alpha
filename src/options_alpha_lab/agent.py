@@ -39,7 +39,13 @@ from .components import (
     DeterministicSpreadSelector,
 )
 from .config import Settings
-from .evidence import PARTICIPATION_SYMBOL, build_snapshot, parse_bars, parse_occ_symbol
+from .evidence import (
+    PARTICIPATION_SYMBOL,
+    build_snapshot,
+    parse_bars,
+    parse_occ_symbol,
+    structure_reading,
+)
 from .execution.deadline import DeadlineEnforcer, DeadlineOutcome, deadline_for
 from .execution.gateway import AmbiguousSubmission, ExecutionGateway, ExecutionRefused
 from .execution.intent import IntentLeg, OrderIntent, build_close_intent, build_open_intent
@@ -298,10 +304,12 @@ class TradingAgent:
         is_open = bool(
             isinstance(clock_read.payload, dict) and clock_read.payload.get("is_open")
         )
-        self._sessions = [
-            bar.session
-            for bar in parse_bars(bars, as_of=self._clock(), market_open=is_open)
-        ]
+        parsed_bars = parse_bars(bars, as_of=self._clock(), market_open=is_open)
+        self._sessions = [bar.session for bar in parsed_bars]
+        # CIIP-VAL-012. The same bars the structure gate will read, measured now
+        # so a refusal records how nearly it accepted. Read-only: nothing
+        # downstream consumes it.
+        self.last_structure_reading = structure_reading(parsed_bars, self._clock())
         stamp = self._clock().strftime("%Y%m%dT%H%M%SZ")
         snapshot = build_snapshot(
             snapshot_id=f"{self.symbol.lower()}-agent-{stamp}",
@@ -1136,6 +1144,7 @@ class TradingAgent:
                 synthesizer_name=getattr(self.synthesizer, "name", None)
                 or DeterministicBaselineThesis.name,
                 model_call=getattr(self.synthesizer, "last_call", None),
+                structure=getattr(self, "last_structure_reading", None),
             )
             recorded_hash = recorded.decision_hash
             self.decision_row_id = recorded.decision_id

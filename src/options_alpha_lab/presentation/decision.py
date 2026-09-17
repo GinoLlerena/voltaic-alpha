@@ -39,6 +39,7 @@ from ..persistence.models import (
     RiskDecisionRecord,
     SignalRecord,
     SpreadCandidateRecord,
+    StructureReadingRecord,
     ThesisRecord,
 )
 
@@ -61,6 +62,9 @@ class DecisionView:
     positions: list[Position] = field(default_factory=list)
     exits: list[ExitDecisionRecord] = field(default_factory=list)
     model_calls: list[ModelCall] = field(default_factory=list)
+    #: `CIIP-VAL-012`. Absent for a decision recorded before the reading
+    #: existed, or replayed from a fixture that carries no bars.
+    structure: StructureReadingRecord | None = None
 
     # -- questions the tabs ask, answered here rather than re-derived ----------
 
@@ -155,6 +159,12 @@ def load(session: Session, decision: Decision) -> DecisionView:
         else []
     )
 
+    structure = session.scalars(
+        select(StructureReadingRecord).where(
+            StructureReadingRecord.decision_id == decision.id
+        )
+    ).one_or_none()
+
     snapshot_id = decision.market_snapshot_id
     return DecisionView(
         decision=decision,
@@ -193,6 +203,7 @@ def load(session: Session, decision: Decision) -> DecisionView:
         positions=positions,
         exits=exits,
         model_calls=model_calls,
+        structure=structure,
     )
 
 

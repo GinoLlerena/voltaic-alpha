@@ -210,6 +210,94 @@ def participation_signal(
     )
 
 
+@dataclass(frozen=True)
+class StructureReading:
+    """What the structure gate computed, whether or not it produced a signal.
+
+    `CIIP-VAL-012`. `build_signals` returns `[]` the moment a gate declines, so a
+    refusal reached the records carrying nothing: 201 live decisions had zero
+    signal rows, and nothing said whether the trend was a hair short or absent.
+    This is the same arithmetic, kept.
+
+    It is a reading, not a decision. Nothing consumes it, no gate depends on it,
+    and `build_signals` is untouched -- a diagnostic that could change an outcome
+    would be a second classifier.
+    """
+
+    #: The first gate that declined, or `passed`.
+    gate: str
+    bars_considered: int
+    bars_required: int
+    fast_ema: Decimal | None = None
+    slow_ema: Decimal | None = None
+    separation: Decimal | None = None
+    last_close: Decimal | None = None
+    #: `above`, `below`, or `None` when no EMA was available to compare against.
+    close_side: str | None = None
+    retest_touched: bool | None = None
+    #: How far the separation was from qualifying, signed so that a negative
+    #: number is a shortfall. `None` when the gate was never reached.
+    separation_shortfall: Decimal | None = None
+
+
+def structure_reading(bars: list[Bar], as_of: datetime) -> StructureReading:
+    """Recompute the structure gate and report where it stopped.
+
+    Mirrors `build_signals` gate for gate. The duplication is deliberate and
+    narrow: making `build_signals` return a diagnostic would change the signature
+    every caller and every fixture depends on, and a decision path that also
+    reports on itself is harder to keep honest than two short functions that a
+    test holds to the same answer.
+    """
+    required = MIN_BARS_REQUIRED
+    if len(bars) < required:
+        return StructureReading(
+            gate="insufficient_bars", bars_considered=len(bars), bars_required=required
+        )
+
+    closes = [bar.close for bar in bars]
+    fast = ema(closes, FAST_EMA)
+    slow = ema(closes, SLOW_EMA)
+    if fast is None or slow is None or slow == 0:
+        return StructureReading(
+            gate="ema_unavailable", bars_considered=len(bars), bars_required=required
+        )
+
+    last = bars[-1]
+    separation = (fast - slow) / slow
+    side = "above" if last.close > fast else "below"
+    qualifies = (separation >= MIN_EMA_SEPARATION and last.close > fast) or (
+        separation <= -MIN_EMA_SEPARATION and last.close < fast
+    )
+    shortfall = abs(separation) - MIN_EMA_SEPARATION
+
+    def reading(gate: str, retest: bool | None = None) -> StructureReading:
+        return StructureReading(
+            gate=gate,
+            bars_considered=len(bars),
+            bars_required=required,
+            fast_ema=fast,
+            slow_ema=slow,
+            separation=separation,
+            last_close=last.close,
+            close_side=side,
+            retest_touched=retest,
+            separation_shortfall=shortfall,
+        )
+
+    if not qualifies:
+        return reading("separation_or_side")
+
+    recent = bars[-RETEST_LOOKBACK_SESSIONS:]
+    tolerance = fast * RETEST_TOLERANCE
+    touched = (
+        any(bar.low <= fast + tolerance for bar in recent)
+        if separation > 0
+        else any(bar.high >= fast - tolerance for bar in recent)
+    )
+    return reading("passed" if touched else "no_retest", retest=touched)
+
+
 def build_signals(
     bars: list[Bar],
     atm_iv: Decimal | None,
