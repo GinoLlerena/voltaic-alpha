@@ -183,11 +183,12 @@ rather than only to the journal.
 4. Install the units that live in version control:
    `bash deploy/install_units.sh` (worker + dashboard). The base worker unit is
    **disarmed** — it hard-codes `--mode observe` and no drop-in is installed here.
-5. Install the units written inline by the restore path:
-   `bash scripts/restore_hosted_demo.sh` (port 80 forward, backup timer,
-   watchdog timer). **Do not skip this step.** Omitting it on 10 September is
-   why the rebuilt host had no watchdog and no backups until 11 September; the
-   artifacts existed, the sequence simply never named them. See `CIIP-I-016`.
+5. Run `bash scripts/restore_hosted_demo.sh` for the host-level setup it still
+   owns (port 80 rule, directories, PostgreSQL). It no longer writes units: it
+   calls `deploy/install_units.sh`, which installs all seven from
+   `deploy/systemd/` and starts the timers. **Do not skip this step.** Omitting
+   it on 10 September is why the rebuilt host had no watchdog and no backups
+   until 11 September.
 6. Create the dashboard's read-only database role and point the dashboard at
    it: `bash deploy/create_readonly_role.sh`, then
    `systemctl restart options-alpha`, then `bash deploy/verify_readonly_role.sh`

@@ -6,18 +6,38 @@ did exactly that.
 
 ## What lives where
 
-| Unit | Defined in | Why |
-|---|---|---|
-| `options-alpha-worker.service` | **this directory** | the base unit `arm_worker.sh` overrides |
-| `options-alpha.service` | **this directory** | the dashboard, previously in no file at all |
-| `options-alpha-port80.service` | `scripts/restore_hosted_demo.sh` | written inline during host restore |
-| `options-alpha-backup.{service,timer}` | `scripts/restore_hosted_demo.sh` | ditto |
-| `options-alpha-watchdog.{service,timer}` | `scripts/restore_hosted_demo.sh` | ditto |
+Every unit lives here, and only here. `scripts/restore_hosted_demo.sh` calls
+`deploy/install_units.sh` rather than writing any unit of its own.
 
-The five inline units are deliberately **not** copied here. Two definitions of
-one unit drift, and the drifted copy is discovered at the worst moment. Merging
-them into this directory is worth doing, but it is a change to a restore path
-that currently works, so it belongs in its own commit with its own verification.
+| Unit | Purpose |
+|---|---|
+| `options-alpha-worker.service` | the base unit `arm_worker.sh` overrides |
+| `options-alpha.service` | the Streamlit dashboard |
+| `options-alpha-api.service` | the read-only presentation API, loopback only |
+| `options-alpha-port80.service` | redirects 80 to 8501 |
+| `options-alpha-backup.{service,timer}` | hourly verified dump |
+| `options-alpha-watchdog.{service,timer}` | five-minute liveness check |
+
+### What the consolidation found
+
+Five units had lived as heredocs in the restore script while the host ran
+different text, and **all five differed**. Two differences were functional:
+
+- the deployed watchdog had lost `--record`, so it detected and printed while the
+  durable incident record — the one every other integrity failure lands in —
+  never heard about it;
+- the restore script's port 80 unit interpolated nothing. Its heredoc is quoted,
+  so it wrote a literal `$PUBLIC_PORT` into the unit, and systemd does not expand
+  shell variables in `ExecStart`. A host rebuilt from that script would have got
+  a redirect unit that could not work. The host's working copy had literal ports,
+  so it was written by something else — which is the drift itself.
+
+The remaining three differed in description text, `AccuracySec`, `After=`, and
+the `BACKUP_KEEP=12` retention that existed only on the host. The committed units
+take the host's working text plus the watchdog's `--record`.
+
+Timers are enabled **and started** by the installer: enabling alone leaves a
+rebuilt host with no backups and no watchdog until something reboots it.
 
 Install what is here with `deploy/install_units.sh`, on the host.
 

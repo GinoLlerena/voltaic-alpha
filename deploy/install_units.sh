@@ -21,10 +21,29 @@ declare -A REQUIRES=(
   [options-alpha-worker.service]=/etc/options-alpha.env
   [options-alpha.service]=/etc/options-alpha-dashboard.env
   [options-alpha-api.service]=/etc/options-alpha-dashboard.env
+  [options-alpha-watchdog.service]=/etc/options-alpha.env
+  [options-alpha-backup.service]=/etc/options-alpha.env
+)
+
+#: Units with no environment of their own.
+UNCONDITIONAL=(options-alpha-port80.service)
+
+#: Timers are enabled, not started: `--now` on a timer for a job that has just
+#: run would run it again for no reason.
+TIMERS=(options-alpha-backup.timer options-alpha-watchdog.timer)
+
+ALL=(
+  options-alpha-worker.service
+  options-alpha.service
+  options-alpha-api.service
+  options-alpha-watchdog.service
+  options-alpha-backup.service
+  "${UNCONDITIONAL[@]}"
+  "${TIMERS[@]}"
 )
 
 changed=0
-for unit in options-alpha-worker.service options-alpha.service options-alpha-api.service; do
+for unit in "${ALL[@]}"; do
   src="$UNITS/$unit"
   [ -f "$src" ] || { echo "  missing in repo: $src" >&2; exit 1; }
   if [ -f "$DEST/$unit" ] && cmp -s "$src" "$DEST/$unit"; then
@@ -38,13 +57,19 @@ done
 
 [ "$changed" = 1 ] && systemctl daemon-reload
 
-for unit in options-alpha-worker.service options-alpha.service options-alpha-api.service; do
-  env_file="${REQUIRES[$unit]}"
-  if [ ! -f "$env_file" ]; then
+for unit in "${ALL[@]}"; do
+  env_file="${REQUIRES[$unit]:-}"
+  if [ -n "$env_file" ] && [ ! -f "$env_file" ]; then
     echo "  $unit: NOT enabled -- $env_file does not exist yet"
     continue
   fi
-  systemctl enable "$unit" >/dev/null 2>&1 || true
+  # A timer is enabled *and started*: enabling alone leaves a rebuilt host
+  # with no backups and no watchdog until something reboots it. Services
+  # are only enabled -- starting the worker is a deliberate act.
+  case " ${TIMERS[*]} " in
+    *" $unit "*) systemctl enable --now "$unit" >/dev/null 2>&1 || true ;;
+    *) systemctl enable "$unit" >/dev/null 2>&1 || true ;;
+  esac
   echo "  $unit: enabled ($(systemctl is-active "$unit"))"
 done
 

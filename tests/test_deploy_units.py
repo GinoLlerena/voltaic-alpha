@@ -100,6 +100,15 @@ class InstallerCoversWhatIsCommittedTests(unittest.TestCase):
         installer = INSTALLER.read_text()
         for unit in sorted(p.name for p in UNITS.glob("*.service")):
             self.assertIn(unit, installer, f"{unit} is never installed")
+        for timer in sorted(p.name for p in UNITS.glob("*.timer")):
+            self.assertIn(timer, installer, f"{timer} is never installed")
+
+    def test_timers_are_started_not_merely_enabled(self) -> None:
+        """`enable` alone leaves a rebuilt host with no backups and no watchdog
+        until something reboots it."""
+        installer = INSTALLER.read_text()
+        self.assertIn("enable --now", installer)
+        self.assertIn("TIMERS", installer)
 
     def test_the_installer_refuses_to_enable_without_an_env_file(self) -> None:
         self.assertIn("NOT enabled", INSTALLER.read_text())
@@ -112,6 +121,64 @@ class UnitsParseTests(unittest.TestCase):
             self.assertIn("Unit", parsed)
             self.assertIn("Service", parsed)
             self.assertEqual(parsed["Install"]["WantedBy"], "multi-user.target")
+
+
+class ConsolidatedUnitTests(unittest.TestCase):
+    """`CIIP-I-016`, finished: one definition per unit, and the drift it found.
+
+    Five units lived as heredocs inside `restore_hosted_demo.sh` while the host
+    ran different text. Every one of the five differed, and two differences were
+    functional rather than cosmetic.
+    """
+
+    def unit(self, name: str) -> str:
+        return (UNITS / name).read_text()
+
+    def test_the_watchdog_records_what_it_finds(self) -> None:
+        """The deployed unit had lost `--record`, so it detected and printed and
+        the durable incident record never heard about it."""
+        exec_start = _exec_start(UNITS / "options-alpha-watchdog.service")
+        self.assertIn("options_alpha_lab.watchdog", exec_start)
+        self.assertIn("--record", exec_start)
+
+    def test_the_watchdog_can_reach_the_database_it_records_into(self) -> None:
+        service = _parse(UNITS / "options-alpha-watchdog.service")["Service"]
+        self.assertEqual(service["EnvironmentFile"], "/etc/options-alpha.env")
+
+    def test_no_unit_carries_an_unexpanded_shell_variable(self) -> None:
+        """The port 80 unit was written by a quoted heredoc, so systemd would have
+        received a literal `$PUBLIC_PORT`. systemd does not expand shell
+        variables in ExecStart, so a rebuilt host got a unit that could not work."""
+        for path in sorted(UNITS.glob("options-alpha*")):
+            for line in path.read_text().splitlines():
+                if line.lstrip().startswith("#"):
+                    continue
+                self.assertNotRegex(
+                    line, r"\$[A-Z_]{3,}", f"{path.name} has an unexpanded variable: {line}"
+                )
+
+    def test_the_backup_unit_keeps_its_retention_and_says_why(self) -> None:
+        text = self.unit("options-alpha-backup.service")
+        self.assertIn("BACKUP_KEEP=12", text)
+        self.assertIn("NOT a backup", text)
+
+    def test_the_restore_script_no_longer_writes_units(self) -> None:
+        """One definition per unit. Two drift, and these had."""
+        script = (UNITS.parents[1] / "scripts" / "restore_hosted_demo.sh").read_text()
+        self.assertNotIn("cat > /etc/systemd/system/", script)
+        self.assertNotIn("cat >/etc/systemd/system/", script)
+        self.assertIn("deploy/install_units.sh", script)
+
+    def test_every_unit_the_restore_path_needs_is_committed(self) -> None:
+        committed = {p.name for p in UNITS.glob("options-alpha*")}
+        for name in (
+            "options-alpha-port80.service",
+            "options-alpha-backup.service",
+            "options-alpha-backup.timer",
+            "options-alpha-watchdog.service",
+            "options-alpha-watchdog.timer",
+        ):
+            self.assertIn(name, committed)
 
 
 class ReadOnlyRoleScriptTests(unittest.TestCase):

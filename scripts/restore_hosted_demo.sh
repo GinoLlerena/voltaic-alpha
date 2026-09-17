@@ -320,59 +320,16 @@ install -d -m 755 /var/run/options-alpha
 install -d -m 755 /var/lib/options-alpha
 chmod +x /opt/options-alpha/scripts/backup_database.sh
 
-cat > /etc/systemd/system/options-alpha-backup.service <<"UNIT"
-[Unit]
-Description=Options Alpha database backup, verified by restoring it
-After=postgresql.service
-Requires=postgresql.service
 
-[Service]
-Type=oneshot
-ExecStart=/opt/options-alpha/scripts/backup_database.sh
-# The dump is a full copy of the decision record, so it stays on the host and
-# readable only by root. Shipping it anywhere is a separate decision.
-UMask=0077
-UNIT
 
-cat > /etc/systemd/system/options-alpha-backup.timer <<"UNIT"
-[Unit]
-Description=Hourly verified backup of the Options Alpha database
 
-[Timer]
-OnCalendar=hourly
-# Run a missed backup after a reboot rather than waiting for the next hour.
-Persistent=true
-RandomizedDelaySec=120
 
-[Install]
-WantedBy=timers.target
-UNIT
-
-cat > /etc/systemd/system/options-alpha-watchdog.service <<"UNIT"
-[Unit]
-Description=Check that the Options Alpha worker is still working
-
-[Service]
-Type=oneshot
-EnvironmentFile=/etc/options-alpha.env
-WorkingDirectory=/opt/options-alpha
-ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.watchdog --record
-UNIT
-
-cat > /etc/systemd/system/options-alpha-watchdog.timer <<"UNIT"
-[Unit]
-Description=Run the Options Alpha watchdog every five minutes
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=5min
-
-[Install]
-WantedBy=timers.target
-UNIT
-
-systemctl daemon-reload
-systemctl enable --now options-alpha-backup.timer options-alpha-watchdog.timer
+# CIIP-I-016. The units are installed from deploy/systemd/ rather than written
+# here. Two definitions of one unit drift, and these had: the deployed watchdog
+# had lost --record, the backup retention lived only on the host, and the port 80
+# unit written here interpolated nothing -- its heredoc is quoted, so systemd
+# would have received a literal $PUBLIC_PORT and failed on a rebuilt host.
+bash /opt/options-alpha/deploy/install_units.sh
 systemctl list-timers --no-pager options-alpha-\* | head -5'
 fi
 
@@ -393,23 +350,6 @@ if wants port80; then
 # rule - adding one by hand as well leaves a duplicate and a unit that reports
 # inactive while the redirect works, which is the kind of disagreement that
 # gets discovered during a demo.
-cat >/etc/systemd/system/options-alpha-port80.service <<'UNIT'
-[Unit]
-Description=Redirect 80 to the Streamlit dashboard on 8501
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT
-ExecStop=/usr/sbin/iptables -t nat -D PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-systemctl daemon-reload
-systemctl enable options-alpha-port80
 # Idempotent: drop every copy of the rule first, so re-running does not stack
 # duplicates, then let the unit add exactly one.
 while iptables -t nat -C PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT 2>/dev/null; do
