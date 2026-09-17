@@ -43,3 +43,39 @@ dt { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-tra
   color: var(--dim); }
 dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
 .failed { color: var(--alarm); } .empty { color: var(--dim); }
+
+/* ---- RUI-3: spine, ticket, tour ---- */
+header a { color: inherit; text-decoration: none; }
+.spine { list-style: none; display: flex; gap: 1px; padding: 0; margin: .8rem 0;
+  background: var(--edge); border: 1px solid var(--edge); flex-wrap: wrap; }
+.spine li { background: var(--panel2, #1b222c); padding: .45rem .6rem; flex: 1; min-width: 92px; }
+.spine li.off { opacity: .45; }
+.spine li.model { background: #1f1808; }
+.spine li.model .l { color: var(--warm); }
+.spine li.on .l { color: var(--cool); }
+.spine .n { font-family: var(--mono); font-size: .58rem; color: var(--dim); display: block; }
+.spine .l { font-weight: 600; font-size: .9rem; }
+.spine .fence { flex-basis: 100%; background: var(--panel); color: var(--warm);
+  font-family: var(--mono); font-size: .58rem; text-align: center; }
+.ticket { display: grid; grid-template-columns: 180px 1fr; gap: .3rem .9rem; margin: .6rem 0 1rem; }
+.ticket dt { font-family: var(--mono); font-size: .64rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim); }
+.ticket dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
+.why { list-style: none; padding: 0; display: grid; gap: .5rem; }
+.why .s { font-family: var(--mono); font-size: .6rem; letter-spacing: .13em; color: var(--cool); }
+.why .t { display: block; font-size: .86rem; } .why .t.na { color: var(--dim); }
+.why .src { font-family: var(--mono); font-size: .58rem; color: var(--dim); }
+.chk { list-style: none; padding: 0; display: grid; gap: 1px; background: var(--edge);
+  border: 1px solid var(--edge); }
+.chk li { background: var(--panel); padding: .45rem .7rem; display: flex;
+  justify-content: space-between; gap: 1rem; font-size: .84rem; }
+.chk .m { font-family: var(--mono); font-size: .75rem; color: var(--muted); }
+.tour { border: 1px solid var(--warm); background: rgba(232,163,61,.06); padding: .7rem .85rem;
+  margin: .6rem 0; }
+.tour .hd { font-family: var(--mono); font-size: .6rem; letter-spacing: .14em; color: var(--warm); margin: 0; }
+.tour h3 { margin: .2rem 0 .3rem; }
+.caveat { color: var(--muted); font-size: .86rem; }
+.gate { font-family: var(--mono); font-size: .8rem; }
+.decisions a { display: flex; gap: .6rem; align-items: baseline; padding: .55rem .7rem;
+  background: var(--panel); color: inherit; text-decoration: none; }
+.decisions a:hover { background: #101923; }
