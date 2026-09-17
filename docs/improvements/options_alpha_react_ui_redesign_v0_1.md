@@ -1447,3 +1447,48 @@ Storybook, the axe accessibility pass, visual-regression and responsive QA — a
 part of `RUI-2`'s stated exit. Routing is not here either: with one screen there
 is nothing to route between, and `@tanstack/react-router` arrives with `RUI-3`'s
 second screen rather than as scaffolding for it.
+
+
+## 25. `RUI-3` first vertical slice — 17 September 2026
+
+Routing, an overview, and a decision that is a link rather than a selection.
+
+### Two screens, both addressable
+
+`/` carries the ten-second read: source banner, status strip, the three derived
+proof tiles, the review caveat, and the grouped decision list.
+`/decisions/$digest` carries the Decision Ticket — the authority spine, the
+identity and hashes, the structure reading, the `why` lines in authority order,
+and the review horizons including the ones still waiting.
+
+Every decision in the list is an `<a href>`, and opening a decision's URL
+directly renders it without going through the list. That is the point of routing
+here: `CIIP-004` made a tour step shareable and found that a step which cannot
+address its own decision silently shows another. A link cannot do that.
+
+### The guided path, carried over with its lesson
+
+`/?tour=N` renders the scene and links to its own decision. A step whose case the
+source does not hold renders the absence — the same notice the dashboard gained
+after `RUI-VAL-009`, rather than narrating over whichever decision came first. A
+hand-edited step clamps instead of raising.
+
+Verified in a browser against the real API: step 4 links to the lifecycle
+decision, which is exactly the step the dashboard used to narrate over the wrong
+one.
+
+### What the client still refuses to derive
+
+Tone, `known`, the grouping, labels, run counts, the caveat, the proof tiles'
+availability and the `why` ordering all arrive decided. The spine lights from the
+decision's own `model_was_called` and `reached_the_broker`. Checked in a browser:
+the lifecycle decision lights the memo stage and the broker stage; a refusal
+lights neither.
+
+### Exit criteria not yet met
+
+`RUI-3`'s exit is the ten-second and 90-second evaluator journeys passing with no
+missing source. The screens exist and every value on them carries its source, but
+the journeys have not been walked as journeys, and `RUI-2`'s accessibility,
+visual-regression and responsive gates are still outstanding. Those remain the
+honest blockers before either increment is called done.

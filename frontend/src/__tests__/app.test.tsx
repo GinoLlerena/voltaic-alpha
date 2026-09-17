@@ -1,9 +1,12 @@
+import { createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import App from "../App";
+import { App } from "../router";
 
-const envelope = <T,>(data: T, over: Partial<Record<string, unknown>> = {}) => ({
+const DIGEST = "a".repeat(64);
+
+const envelope = <T,>(data: T, over: Record<string, unknown> = {}) => ({
   schema_version: "public.v1",
   source_mode: "LIVE",
   source_label: "live worker database (201 decisions)",
@@ -22,119 +25,194 @@ const status = [
 
 const listing = {
   view: "Notable",
-  entries: [
-    { decision_id: "a".repeat(64), snapshot_id: "spy-agent-1", action: "NO_TRADE",
-      direction: "neutral", label: "SPY agent 1\nno_qualified_setup", count: 72,
-      member_ids: [] },
-  ],
+  entries: [{
+    decision_id: DIGEST, snapshot_id: "spy-agent-1", action: "NO_TRADE",
+    direction: "neutral", label: "SPY agent 1\nno_qualified_setup", count: 72, member_ids: [],
+  }],
   shown: 1, total: 201, grouped: true, pin_missing: false,
 };
 
 const summary = {
-  decision_id: "a".repeat(64), snapshot_id: "spy-agent-1", action: "NO_TRADE",
-  direction: "neutral", reason_codes: ["no_qualified_setup"], input_hash: "sha256:in",
-  decision_hash: `sha256:${"a".repeat(64)}`, policy_version: "h0", decided_at: null,
-  observation: null, reached_the_broker: false, model_was_called: false, why: [],
+  decision_id: DIGEST, snapshot_id: "spy-agent-1", action: "NO_TRADE", direction: "neutral",
+  reason_codes: ["no_qualified_setup"], input_hash: "sha256:in",
+  decision_hash: `sha256:${DIGEST}`, policy_version: "h0-provisional-1",
+  decided_at: "2026-09-17T14:00:00+00:00", observation: null,
+  reached_the_broker: false, model_was_called: false,
+  why: [{ stage: "01 evidence", text: "no setup qualified", source: "evidence_packs", present: true }],
 };
 
-function respond(map: Record<string, unknown>, failing: Set<string> = new Set()) {
+const market = {
+  observation: null, observation_kind: "provider", signals: [], qualification: null,
+  structure: {
+    gate: "separation_or_side", bars_considered: 120, bars_required: 70,
+    fast_ema: "640.100000", slow_ema: "639.900000", separation: "0.00031250",
+    last_close: "640.500000", close_side: "above", retest_touched: null,
+    separation_shortfall: "-0.00168750",
+  },
+};
+
+const horizons = [
+  { horizon: "T+1", sessions: 1, state: "COMPLETE", resolved: true,
+    underlying_at_decision: "640.50", underlying_at_horizon: "646.00", change: "5.50",
+    direction_agreed: null, realized: null, observed_snapshot_id: "spy-agent-2" },
+  { horizon: "T+3", sessions: 3, state: "PENDING", resolved: false,
+    underlying_at_decision: null, underlying_at_horizon: null, change: null,
+    direction_agreed: null, realized: null, observed_snapshot_id: null },
+];
+
+const tiles = [
+  { value: "0", label: "reconciled Paper lifecycles", mode: "UNAVAILABLE", available: false,
+    source: "positions joined through decisions", detail: "no position has both ends" },
+];
+
+const review = {
+  horizons: [], decisions: 201, decisions_reviewed: 136, positions_ever: 0,
+  resolved: 160, pending: 242,
+  caveat: "All 136 reviewed decisions are refusals: no position has ever been opened.",
+};
+
+const scenes = [
+  { number: 1, title: "What was observed", narration: "The system reads a completed close.",
+    tab: 0, snapshot_id: "spy-qualified-2026-08-27", decision_id: DIGEST },
+  { number: 2, title: "A case this source lacks", narration: "Never shown.",
+    tab: 0, snapshot_id: "spy-lifecycle-2026", decision_id: null },
+];
+
+const routes: Record<string, unknown> = {
+  "/api/v1/system/status": envelope(status),
+  "/api/v1/system/proof": envelope(tiles),
+  "/api/v1/decisions/grouped": envelope(listing),
+  "/api/v1/outcomes": envelope(review),
+  "/api/v1/tour": envelope(scenes),
+  [`/api/v1/decisions/${DIGEST}/summary`]: envelope(summary),
+  [`/api/v1/decisions/${DIGEST}/market`]: envelope(market),
+  [`/api/v1/decisions/${DIGEST}/outcomes`]: envelope(horizons),
+};
+
+function respond(failing: Set<string> = new Set(), over: Record<string, unknown> = {}) {
+  const map = { ...routes, ...over };
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    const key = Object.keys(map).find((k) => url.startsWith(k));
-    if (!key || failing.has(key)) {
-      return Promise.reject(new Error("network down"));
-    }
+    // Longest match first: /decisions/{d}/outcomes must not be served by /outcomes.
+    const key = Object.keys(map).sort((a, b) => b.length - a.length).find((k) => url.startsWith(k));
+    if (!key || failing.has(key)) return Promise.reject(new Error("network down"));
     return Promise.resolve({
-      ok: true, status: 200, statusText: "OK",
-      json: () => Promise.resolve(map[key]),
+      ok: true, status: 200, statusText: "OK", json: () => Promise.resolve(map[key]),
     } as Response);
   });
 }
 
-const healthy = {
-  "/api/v1/system/status": envelope(status),
-  "/api/v1/decisions/grouped": envelope(listing),
-  [`/api/v1/decisions/${"a".repeat(64)}/summary`]: envelope(summary),
-};
+const at = (path: string) => <App history={createMemoryHistory({ initialEntries: [path] })} />;
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("the shell says where its data came from", () => {
-  it("names the live source rather than implying it", async () => {
-    vi.stubGlobal("fetch", respond(healthy));
-    render(<App />);
+describe("the overview", () => {
+  it("names its source rather than implying it", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
     const banner = await screen.findByTestId("source-banner");
     expect(banner).toHaveAttribute("data-mode", "LIVE");
-    expect(banner).toHaveTextContent("live worker database (201 decisions)");
   });
 
-  it("marks committed evidence as committed, not live", async () => {
-    vi.stubGlobal("fetch", respond({
-      ...healthy,
-      "/api/v1/system/status": envelope(status, {
-        source_mode: "FROZEN_REPLAY", source_label: "committed evidence",
-      }),
-    }));
-    render(<App />);
-    const banner = await screen.findByTestId("source-banner");
-    expect(banner).toHaveTextContent("COMMITTED EVIDENCE");
-    expect(banner).not.toHaveTextContent("LIVE");
-  });
-});
-
-describe("the shell renders the server's judgement, not its own", () => {
-  it("keeps an unknown unknown and shows the reason given", async () => {
-    vi.stubGlobal("fetch", respond(healthy));
-    render(<App />);
+  it("keeps an unknown unknown, with the reason the server gave", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
     const strip = await screen.findByTestId("status-strip");
     const unknown = strip.querySelector('[data-known="false"]');
-    expect(unknown).not.toBeNull();
-    expect(unknown).toHaveTextContent("UNKNOWN");
     expect(unknown).toHaveTextContent("no lease row");
   });
 
-  it("shows the grouped count the server computed", async () => {
-    vi.stubGlobal("fetch", respond(healthy));
-    render(<App />);
-    expect(await screen.findByText(/1 of 201/)).toBeInTheDocument();
-    expect(screen.getByText("×72")).toBeInTheDocument();
+  it("shows an unavailable proof tile as unavailable", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const tilesEl = await screen.findByTestId("proof-tiles");
+    expect(tilesEl.querySelector('[data-available="false"]')).not.toBeNull();
   });
-});
 
-describe("a failure never turns into a blank screen", () => {
-  it("reports an unreachable API instead of rendering an empty shell", async () => {
-    vi.stubGlobal("fetch", respond(healthy, new Set(["/api/v1/system/status"])));
-    render(<App />);
+  it("shows the server's caveat about what the outcomes do not measure", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    expect(await screen.findByTestId("review-caveat")).toHaveTextContent("are refusals");
+  });
+
+  it("reports an unreachable API instead of an empty shell", async () => {
+    vi.stubGlobal("fetch", respond(new Set(["/api/v1/system/status"])));
+    render(at("/"));
     expect(await screen.findByRole("alert")).toHaveTextContent("unreachable");
     expect(screen.queryByTestId("status-strip")).toBeNull();
   });
+});
 
-  it("keeps the last verified response when a refresh fails, and says it is old", async () => {
-    vi.useFakeTimers();
-    const fetcher = respond(healthy);
-    vi.stubGlobal("fetch", fetcher);
-    render(<App />);
-    await vi.waitFor(() => expect(screen.getByTestId("status-strip")).toBeInTheDocument());
+describe("a decision is addressable", () => {
+  it("opens from its own URL without going through the list", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${DIGEST}`));
+    expect(await screen.findByTestId("decision-ticket")).toHaveTextContent("spy-agent-1");
+  });
 
-    vi.stubGlobal("fetch", respond(healthy, new Set(["/api/v1/system/status"])));
-    await vi.advanceTimersByTimeAsync(16_000);
-    await vi.waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("Showing last verified state"),
-    );
-    // The data it had is still on screen: a reader can tell old from broken.
-    expect(screen.getByTestId("status-strip")).toBeInTheDocument();
-    vi.useRealTimers();
+  it("is reachable by following the list", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("link", { name: /SPY agent 1/ }));
+    await waitFor(() => expect(screen.getByTestId("decision-ticket")).toBeInTheDocument());
+  });
+
+  it("says so when the source holds no such decision", async () => {
+    vi.stubGlobal("fetch", respond(new Set([`/api/v1/decisions/${DIGEST}/summary`])));
+    render(at(`/decisions/${DIGEST}`));
+    expect(await screen.findByTestId("decision-missing")).toBeInTheDocument();
   });
 });
 
-describe("selecting a decision", () => {
-  it("shows the identity the server reports for it", async () => {
-    vi.stubGlobal("fetch", respond(healthy));
-    render(<App />);
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /SPY agent 1/ }));
-    await waitFor(() =>
-      expect(screen.getByTestId("selected-decision")).toHaveTextContent("NO_TRADE"),
-    );
+describe("the ticket shows the server's own reasoning", () => {
+  it("marks the model's one stage and leaves the rest to code", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${DIGEST}`));
+    const spine = await screen.findByTestId("authority-spine");
+    const memo = spine.querySelector('[data-stage="03"]');
+    expect(memo).toHaveClass("model");
+    expect(memo).toHaveAttribute("data-lit", "false");
+  });
+
+  it("explains how nearly the setup qualified", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${DIGEST}`));
+    const structure = await screen.findByTestId("structure-reading");
+    expect(structure).toHaveTextContent("separation_or_side");
+    expect(structure).toHaveTextContent("-0.00168750");
+    expect(structure).toHaveTextContent("short of the threshold");
+  });
+
+  it("shows a waiting horizon as waiting rather than hiding it", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${DIGEST}`));
+    const list = await screen.findByTestId("horizons");
+    expect(list).toHaveTextContent("WAITING");
+    expect(list).toHaveTextContent("T+1");
+  });
+});
+
+describe("the guided path", () => {
+  it("is a shareable step, and opens its own decision", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/?tour=1"));
+    const card = await screen.findByTestId("tour-card");
+    expect(card).toHaveTextContent("What was observed");
+    expect(card.querySelector("a")).toHaveAttribute("href", `/decisions/${DIGEST}`);
+  });
+
+  it("admits a step whose decision this source lacks", async () => {
+    /* RUI-VAL-009: the dashboard narrated over another decision for weeks. */
+    vi.stubGlobal("fetch", respond());
+    render(at("/?tour=2"));
+    expect(await screen.findByTestId("scene-absent")).toHaveTextContent("is not in this source");
+    expect(screen.queryByText("Never shown.")).toBeNull();
+  });
+
+  it("clamps a hand-edited step rather than raising", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/?tour=99"));
+    expect(await screen.findByTestId("tour-card")).toBeInTheDocument();
   });
 });

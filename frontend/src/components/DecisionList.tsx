@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { Schemas } from "../api/client";
 
 type Entry = Schemas["ListEntryOut"];
@@ -9,15 +10,7 @@ type Entry = Schemas["ListEntryOut"];
  * from arithmetic here: `RUI-VAL-009` was a grouping rule that hid positions,
  * and a second implementation in the browser could hide different ones.
  */
-export function DecisionList({
-  entries,
-  selected,
-  onSelect,
-}: {
-  entries: Entry[];
-  selected: string | null;
-  onSelect: (id: string) => void;
-}) {
+export function DecisionList({ entries }: { entries: Entry[] }) {
   if (entries.length === 0) {
     return <p className="empty">This source holds no decisions.</p>;
   }
@@ -27,11 +20,9 @@ export function DecisionList({
         const [name, summary] = entry.label.split("\n");
         return (
           <li key={entry.decision_id}>
-            <button
-              type="button"
-              aria-current={entry.decision_id === selected}
-              onClick={() => onSelect(entry.decision_id)}
-            >
+            {/* A link, not a button: a decision a reader can send to someone
+                else is the point of `CIIP-004`'s shareable steps. */}
+            <Link to="/decisions/$digest" params={{ digest: entry.decision_id }}>
               <span className="name">{name}</span>
               <span className="summary">{summary}</span>
               {entry.count > 1 ? (
@@ -39,7 +30,7 @@ export function DecisionList({
                   ×{entry.count}
                 </span>
               ) : null}
-            </button>
+            </Link>
           </li>
         );
       })}

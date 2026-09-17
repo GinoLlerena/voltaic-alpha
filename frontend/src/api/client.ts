@@ -46,6 +46,13 @@ export const api = {
     `${published("/api/v1/decisions/grouped")}?view=${encodeURIComponent(view)}` as ApiUrl,
   summary: (digest: string) =>
     published("/api/v1/decisions/{digest}/summary").replace("{digest}", digest) as ApiUrl,
+  market: (digest: string) =>
+    published("/api/v1/decisions/{digest}/market").replace("{digest}", digest) as ApiUrl,
+  outcomes: (digest: string) =>
+    published("/api/v1/decisions/{digest}/outcomes").replace("{digest}", digest) as ApiUrl,
+  proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
+  reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
+  tour: () => published("/api/v1/tour") as ApiUrl,
 };
 
 /**
