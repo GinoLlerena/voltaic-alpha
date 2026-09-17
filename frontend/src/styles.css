@@ -44,6 +44,30 @@ dt { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-tra
 dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
 .failed { color: var(--alarm); } .empty { color: var(--dim); }
 
+/* ---- RUI-VAL-012: the proof tiles, which shipped with no styles at all ----
+   The first viewport's three claims rendered as a bulleted list in which the
+   value, the label, the mode and the provenance were the same size and colour.
+   Authority rule 6 requires observed, read, replayed and derived values to stay
+   visibly different, so the mode is a chip coloured by what it actually is. */
+.proof { list-style: none; margin: .8rem 0; padding: 0; display: grid; gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  background: var(--edge); border: 1px solid var(--edge); }
+.proof li { background: var(--panel); padding: .7rem .8rem; display: grid; gap: .25rem;
+  align-content: start; }
+.proof .n { font-size: 1.6rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.proof .l { font-size: .84rem; color: var(--text); }
+.proof .mode { justify-self: start; font-family: var(--mono); font-size: .56rem;
+  letter-spacing: .14em; padding: .1rem .35rem; border: 1px solid currentColor;
+  color: var(--dim); }
+.proof li[data-mode="OBSERVED PAPER"] .mode { color: var(--affirm); }
+.proof li[data-mode="LIVE READ"] .mode { color: var(--cool); }
+.proof li[data-mode="FROZEN REPLAY"] .mode { color: var(--muted); }
+.proof li[data-mode="UNAVAILABLE"] .mode { color: var(--alarm); }
+.proof .src { font-family: var(--mono); font-size: .58rem; color: var(--dim); }
+/* An unavailable tile stays visibly unavailable — by rule, not by fading it. */
+.proof li.na { box-shadow: inset 2px 0 0 var(--alarm); }
+.proof li.na .n { color: var(--dim); }
+
 /* ---- RUI-3: spine, ticket, tour ---- */
 header a { color: inherit; text-decoration: none; }
 .spine { list-style: none; display: flex; gap: 1px; padding: 0; margin: .8rem 0;
@@ -54,8 +78,15 @@ header a { color: inherit; text-decoration: none; }
    and said nothing to a screen reader; the state is carried by colour, an inset
    rule, and the visually-hidden note in AuthoritySpine. */
 .spine li.model { background: #1f1808; }
+/* Order matters here, and got this backwards once. `.on .l` followed
+   `.model .l` at equal specificity, so the memo stage was painted cool when the
+   model had written it and warm when it never ran — the product's one claim,
+   inverted. The model's stage keeps its own colour only when it actually ran,
+   and recedes with every other unreached stage when it did not. */
 .spine li.model .l { color: var(--warm); }
 .spine li.on .l { color: var(--cool); }
+.spine li.model.on .l { color: var(--warm); }
+.spine li.off .l { color: var(--dim); }
 .spine .n { font-family: var(--mono); font-size: .58rem; color: var(--dim); display: block; }
 .spine .l { font-weight: 600; font-size: .9rem; }
 .spine .fence { flex-basis: 100%; background: var(--panel); color: var(--warm);
@@ -79,6 +110,8 @@ header a { color: inherit; text-decoration: none; }
 .tour h3 { margin: .2rem 0 .3rem; }
 .caveat { color: var(--muted); font-size: .86rem; }
 .gate { font-family: var(--mono); font-size: .8rem; }
+.gate .t.na { display: block; font-family: system-ui, sans-serif; font-size: .86rem; }
+.gate .src { display: block; font-size: .58rem; color: var(--dim); margin-top: .15rem; }
 .decisions a { display: flex; gap: .6rem; align-items: baseline; padding: .55rem .7rem;
   background: var(--panel); color: inherit; text-decoration: none; }
 .decisions a:hover { background: #101923; }

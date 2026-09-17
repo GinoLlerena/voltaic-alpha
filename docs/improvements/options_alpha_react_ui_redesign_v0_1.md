@@ -1517,12 +1517,63 @@ it can be drawn on, plus a rule that the spine may not express state through
 opacity. Reintroducing each defect fails it — five cases for the token, one each
 for the fade and the missing words.
 
+### `RUI-VAL-012` — walking the evaluator journeys found three defects no test could see — **17 September 2026**
+
+`RUI-3`'s exit is the ten-second and 90-second evaluator journeys passing with
+no missing source. Walked as journeys, against the real API, they did not pass.
+All three failures were invisible to the unit tests, because jsdom applies no
+stylesheet: the markup was right in every case and the rendering was wrong.
+
+**The proof tiles had no styles at all.** The first viewport's three claims —
+the reconciled lifecycle, the model's measured influence, the single authorized
+write path — rendered as a disc-bulleted list in which the value, the label, the
+mode and the provenance were all 15px in the same colour. `.proof` matched
+nothing in the stylesheet. Authority rule 6 requires observed, read, replayed
+and derived values to stay visibly different; four of the five modes were not
+distinguishable from each other or from the prose around them. The tiles now use
+the status strip's grid, and the mode is a chip coloured by what it actually is,
+carried on `data-mode` rather than inferred.
+
+**The spine painted the product's one claim backwards.** `.spine li.on .l`
+followed `.spine li.model .l` at equal specificity and therefore won. The
+consequence: on a refusal, where the model was never called, the memo stage was
+painted in the model's warm; on a decision where the model had written the memo,
+it was painted the same cool as the deterministic code stages. Measured in the
+browser — refusal `rgb(232,163,61)`, live decision `rgb(90,179,240)`. The one
+distinction the product exists to make, inverted, on the page that makes it. The
+model's stage now keeps its colour only when it ran and recedes with every other
+unreached stage when it did not.
+
+**A missing structure reading rendered as nothing.** `CIIP-VAL-012` added the
+reading so a refusal could say how nearly it qualified. Every one of the five
+committed-evidence decisions has `structure: null` — recorded before that work,
+or replayed from a fixture carrying no bars — so the section silently vanished,
+taking the refusal's central question off the page with no account of why. This
+is `RUI-VAL-009`'s omission again. The client now states that the record is
+absent and names `structure_readings` as where it would come from. It does not
+guess at a reason, because it cannot derive one.
+
+### What the journeys now show
+
+| | |
+|---|---|
+| Ten-second read | source banner, six status cells each naming its source, `WORKER UNKNOWN` kept unknown with the reason, three proof tiles with mode and provenance, the review caveat, five decisions |
+| 90-second read | qualified, refusal and lifecycle each open by URL; 3–6 `why` lines each, **none** missing prose or a source; horizons render the waiting ones as waiting |
+| The memorable distinction | the fence — "the model may only write the memo" — on every decision, and the spine now lights it truthfully |
+| axe | 8 routes × 2 viewports, **0 violations** |
+| Responsive | no horizontal overflow at 400px or 768px |
+
 ### Exit criteria not yet met
 
-`RUI-3`'s exit is the ten-second and 90-second evaluator journeys passing with no
-missing source. The screens exist and every value on them carries its source, but
-the journeys have not been walked as journeys. `RUI-2`'s accessibility gate is
-now partly met — the contrast and state findings above are fixed and guarded by a
-unit test — but axe itself runs only by hand; a browser-based gate in CI, visual
-regression and a deliberate responsive pass are still outstanding. Those remain
-the honest blockers before either increment is called done.
+`RUI-3`'s exit is now met on the committed evidence: both journeys were walked,
+the three defects they exposed are fixed, and no value on either screen lacks a
+source. It is met on five decisions and one refusal, which is the whole corpus
+that exists — a live refusal carrying a real structure reading has not yet been
+walked, and should be once the worker records one.
+
+`RUI-2` is not done. Keyboard, axe and responsive checks now pass, but they pass
+*by hand*. The regression tests assert the stylesheet's arithmetic and cascade
+order, not the rendered page, because jsdom applies no CSS — which is precisely
+how all three of the defects above survived a green suite. A browser-based axe
+and visual-regression gate in CI is the remaining blocker, and this increment is
+the argument for it.

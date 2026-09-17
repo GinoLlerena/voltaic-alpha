@@ -186,6 +186,23 @@ describe("the ticket shows the server's own reasoning", () => {
     expect(structure).toHaveTextContent("short of the threshold");
   });
 
+  it("says so when no structure reading was recorded, rather than dropping the section", async () => {
+    // Every committed-evidence decision has `structure: null`, so this is the
+    // case the demo actually shows. Silently omitting it put a refusal's
+    // central question off the page with no account of why.
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [`/api/v1/decisions/${DIGEST}/market`]: envelope({ ...market, structure: null }),
+      }),
+    );
+    render(at(`/decisions/${DIGEST}`));
+    const structure = await screen.findByTestId("structure-reading");
+    expect(structure).toHaveAttribute("data-present", "false");
+    expect(structure).toHaveTextContent("No structure reading was recorded");
+    expect(structure).toHaveTextContent("structure_readings");
+  });
+
   it("shows a waiting horizon as waiting rather than hiding it", async () => {
     vi.stubGlobal("fetch", respond());
     render(at(`/decisions/${DIGEST}`));

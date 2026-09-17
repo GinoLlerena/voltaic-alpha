@@ -13,7 +13,12 @@ export function ProofTiles({ tiles }: { tiles: Tile[] }) {
   return (
     <ul className="proof" data-testid="proof-tiles">
       {tiles.map((tile) => (
-        <li key={tile.label} className={tile.available ? "p" : "p na"} data-available={String(tile.available)}>
+        <li
+          key={tile.label}
+          className={tile.available ? "p" : "p na"}
+          data-available={String(tile.available)}
+          data-mode={tile.mode}
+        >
           <span className="n">{tile.value}</span>
           <span className="l">{tile.label}</span>
           <span className="mode">{tile.mode}</span>

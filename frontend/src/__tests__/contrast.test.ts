@@ -67,6 +67,23 @@ describe("every token pair clears WCAG AA", () => {
   }
 });
 
+describe("the spine says whose stage actually ran", () => {
+  // jsdom applies no stylesheet, so the cascade is asserted on the source. The
+  // bug this guards was invisible to every DOM test: the classes were right and
+  // the colours were wrong, because `.on` followed `.model` at equal
+  // specificity and silently won.
+  const at = (selector: string) => css.indexOf(selector);
+
+  it("keeps the model's colour on the model's stage when it ran", () => {
+    expect(at(".spine li.model.on .l")).toBeGreaterThan(-1);
+    expect(at(".spine li.model.on .l")).toBeGreaterThan(at(".spine li.on .l"));
+  });
+
+  it("recedes the model's stage when the model was never called", () => {
+    expect(at(".spine li.off .l")).toBeGreaterThan(at(".spine li.model .l"));
+  });
+});
+
 describe("state is never carried by opacity alone", () => {
   it("does not fade the stages a decision never reached", () => {
     // `opacity` scales foreground and background together, so it cannot be
