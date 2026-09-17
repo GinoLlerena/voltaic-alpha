@@ -55,5 +55,31 @@ for (const digest of digests) {
   }
 }
 
+// RUI-5. The audit feed is captured in small pages on purpose: the whole
+// committed corpus fits one default page, so a fixture taken at the default
+// limit would exercise none of the cursor loop — the exact path `RUI-VAL-004`
+// showed a sequence cursor would get wrong. Each page is stored under the URL
+// the client will actually ask for, so the walk replays step by step.
+const PAGE = 7;
+let cursor = null;
+let pages = 0;
+for (;;) {
+  const query = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+  const page = await envelope(`/api/v1/activity?limit=${PAGE}${query}`);
+  captured[cursor === null ? "/api/v1/activity" : `/api/v1/activity?cursor=${encodeURIComponent(cursor)}`] =
+    page;
+  pages += 1;
+  cursor = page.data.next_cursor;
+  if (cursor === null || pages > 50) break;
+}
+
+for (const state of ["open", "all"]) {
+  captured[`/api/v1/incidents?state=${state}`] = await envelope(`/api/v1/incidents?state=${state}`);
+}
+captured["/api/v1/worker/events"] = await envelope("/api/v1/worker/events");
+
 writeFileSync("fixtures/api.json", JSON.stringify(captured, null, 1) + "\n");
-console.log(`captured ${Object.keys(captured).length} responses for ${digests.length} decisions`);
+console.log(
+  `captured ${Object.keys(captured).length} responses for ${digests.length} decisions, ` +
+    `activity in ${pages} page(s) of ${PAGE}`,
+);

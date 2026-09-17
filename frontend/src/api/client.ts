@@ -63,6 +63,21 @@ export const api = {
   /** The committed manifest as a file. The server sets the attachment name. */
   proofExport: (digest: string) =>
     published("/api/v1/proof/{digest}.json").replace("{digest}", digest) as ApiUrl,
+  /**
+   * The audit feed, paged by the server's own opaque cursor.
+   *
+   * `RUI-VAL-004`: `audit_events.sequence` restarts at zero for every decision,
+   * so it cannot order a feed that spans them — the committed evidence holds 26
+   * events sharing six values. The cursor is over `(occurred_at, id)` and is
+   * opaque on purpose. It is passed back exactly as received and never built.
+   */
+  activity: (cursor?: string | null) =>
+    (cursor
+      ? `${published("/api/v1/activity")}?cursor=${encodeURIComponent(cursor)}`
+      : published("/api/v1/activity")) as ApiUrl,
+  incidents: (state: "open" | "all") =>
+    `${published("/api/v1/incidents")}?state=${state}` as ApiUrl,
+  workerEvents: () => published("/api/v1/worker/events") as ApiUrl,
   proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
   reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
   tour: () => published("/api/v1/tour") as ApiUrl,

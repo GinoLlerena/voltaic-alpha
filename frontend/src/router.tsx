@@ -9,6 +9,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
+import { Activity } from "./routes/Activity";
 import { Decision } from "./routes/Decision";
 import { Overview } from "./routes/Overview";
 
@@ -28,6 +29,10 @@ const rootRoute = createRootRoute({
           <h1>Options Alpha</h1>
         </Link>
         <p className="sub">auditable execution firewall</p>
+        <nav>
+          <Link to="/">Decisions</Link>
+          <Link to="/activity">Activity</Link>
+        </nav>
       </header>
       <Outlet />
     </main>
@@ -61,7 +66,13 @@ const decisionRoute = createRoute({
   },
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, decisionRoute]);
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: Activity,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute, decisionRoute, activityRoute]);
 
 export function buildRouter(history?: RouterHistory) {
   return createRouter({ routeTree, ...(history ? { history } : {}) });

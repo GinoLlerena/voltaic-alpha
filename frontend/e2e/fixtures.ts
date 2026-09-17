@@ -39,7 +39,25 @@ export async function replayApi(page: Page): Promise<string[]> {
   return missed;
 }
 
-/** Routes the gate walks: the overview, two tour steps, and every decision. */
-export const routes = ["/", "/?tour=1", "/?tour=4", ...digests.map((d) => `/decisions/${d}`)];
+/** Routes the gate walks: the overview, two tour steps, activity, and every decision. */
+export const routes = [
+  "/",
+  "/?tour=1",
+  "/?tour=4",
+  "/activity",
+  ...digests.map((d) => `/decisions/${d}`),
+];
 
-export const names = ["overview", "tour-1", "tour-4", ...digests.map((d) => `decision-${d.slice(0, 12)}`)];
+export const names = [
+  "overview",
+  "tour-1",
+  "tour-4",
+  "activity",
+  ...digests.map((d) => `decision-${d.slice(0, 12)}`),
+];
+
+/** Every cursor the fixtures hand out, so a client-invented one is detectable. */
+export const servedCursors: string[] = Object.entries(captured)
+  .filter(([path]) => path.startsWith("/api/v1/activity"))
+  .map(([, body]) => (body as { data?: { next_cursor?: string | null } }).data?.next_cursor)
+  .filter((cursor): cursor is string => typeof cursor === "string");

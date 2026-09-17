@@ -3024,5 +3024,343 @@
     "observed_snapshot_id": null
    }
   ]
+ },
+ "/api/v1/activity": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "correlation_id": "spy-live-20260828T153310Z",
+     "sequence": 1,
+     "stage": "QUALIFIED",
+     "outcome": "qualified",
+     "component": "deterministic_trend_retest_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-live-20260828T153310Z",
+     "sequence": 4,
+     "stage": "RISK_REVIEWED",
+     "outcome": "approved",
+     "component": "deterministic_risk_governor_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-live-20260828T153310Z",
+     "sequence": 3,
+     "stage": "STRUCTURE_READY",
+     "outcome": "selected",
+     "component": "deterministic_vertical_selector_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-live-20260828T153310Z",
+     "sequence": 0,
+     "stage": "OBSERVED",
+     "outcome": "accepted",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-live-20260828T153310Z",
+     "sequence": 5,
+     "stage": "DECIDED",
+     "outcome": "OPTIONS_POSITION",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-live-20260828T153310Z",
+     "sequence": 2,
+     "stage": "THESIS_READY",
+     "outcome": "synthesized",
+     "component": "deterministic_baseline_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-lifecycle-20260828T154747Z",
+     "sequence": 1,
+     "stage": "QUALIFIED",
+     "outcome": "qualified",
+     "component": "deterministic_trend_retest_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+     "refused": false
+    }
+   ],
+   "next_cursor": "WyIyMDI2LTA5LTE3VDExOjQ3OjIxLjE5MzIxNSIsICJmOTVlNjIzNWQ3MDE0M2FjYjA5MGIxM2Y1NmQzZjhiMSJd"
+  }
+ },
+ "/api/v1/activity?cursor=WyIyMDI2LTA5LTE3VDExOjQ3OjIxLjE5MzIxNSIsICJmOTVlNjIzNWQ3MDE0M2FjYjA5MGIxM2Y1NmQzZjhiMSJd": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "correlation_id": "spy-lifecycle-20260828T154747Z",
+     "sequence": 0,
+     "stage": "OBSERVED",
+     "outcome": "accepted",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-lifecycle-20260828T154747Z",
+     "sequence": 4,
+     "stage": "RISK_REVIEWED",
+     "outcome": "approved",
+     "component": "deterministic_risk_governor_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-lifecycle-20260828T154747Z",
+     "sequence": 3,
+     "stage": "STRUCTURE_READY",
+     "outcome": "selected",
+     "component": "deterministic_vertical_selector_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-lifecycle-20260828T154747Z",
+     "sequence": 2,
+     "stage": "THESIS_READY",
+     "outcome": "synthesized",
+     "component": "deterministic_baseline_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-lifecycle-20260828T154747Z",
+     "sequence": 5,
+     "stage": "DECIDED",
+     "outcome": "OPTIONS_POSITION",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-refusal-2026-08-27",
+     "sequence": 1,
+     "stage": "DECIDED",
+     "outcome": "NO_TRADE",
+     "component": "decision_workflow",
+     "reason_codes": [
+      "no_qualified_setup"
+     ],
+     "occurred_at": "2026-09-17T11:47:21.119512+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-refusal-2026-08-27",
+     "sequence": 0,
+     "stage": "OBSERVED",
+     "outcome": "accepted",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.119512+00:00",
+     "refused": false
+    }
+   ],
+   "next_cursor": "WyIyMDI2LTA5LTE3VDExOjQ3OjIxLjExOTUxMiIsICIwYTg0NDU3M2EyY2M0ZDVhYjY1MTZmOTE1NmJkNmQ4NSJd"
+  }
+ },
+ "/api/v1/activity?cursor=WyIyMDI2LTA5LTE3VDExOjQ3OjIxLjExOTUxMiIsICIwYTg0NDU3M2EyY2M0ZDVhYjY1MTZmOTE1NmJkNmQ4NSJd": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "correlation_id": "spy-bearish-qualified-2026-08-27",
+     "sequence": 4,
+     "stage": "RISK_REVIEWED",
+     "outcome": "approved",
+     "component": "deterministic_risk_governor_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-bearish-qualified-2026-08-27",
+     "sequence": 3,
+     "stage": "STRUCTURE_READY",
+     "outcome": "selected",
+     "component": "deterministic_vertical_selector_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-bearish-qualified-2026-08-27",
+     "sequence": 2,
+     "stage": "THESIS_READY",
+     "outcome": "synthesized",
+     "component": "deterministic_baseline_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-bearish-qualified-2026-08-27",
+     "sequence": 1,
+     "stage": "QUALIFIED",
+     "outcome": "qualified",
+     "component": "deterministic_trend_retest_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-bearish-qualified-2026-08-27",
+     "sequence": 0,
+     "stage": "OBSERVED",
+     "outcome": "accepted",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-bearish-qualified-2026-08-27",
+     "sequence": 5,
+     "stage": "DECIDED",
+     "outcome": "OPTIONS_POSITION",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-qualified-2026-08-27",
+     "sequence": 5,
+     "stage": "DECIDED",
+     "outcome": "OPTIONS_POSITION",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+     "refused": false
+    }
+   ],
+   "next_cursor": "WyIyMDI2LTA5LTE3VDExOjQ3OjIxLjA2MzU4NyIsICJmZjE1MzE1ODA0Nzg0M2UwOGJmM2MwYWVhMzdjOTczZCJd"
+  }
+ },
+ "/api/v1/activity?cursor=WyIyMDI2LTA5LTE3VDExOjQ3OjIxLjA2MzU4NyIsICJmZjE1MzE1ODA0Nzg0M2UwOGJmM2MwYWVhMzdjOTczZCJd": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "correlation_id": "spy-qualified-2026-08-27",
+     "sequence": 3,
+     "stage": "STRUCTURE_READY",
+     "outcome": "selected",
+     "component": "deterministic_vertical_selector_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-qualified-2026-08-27",
+     "sequence": 0,
+     "stage": "OBSERVED",
+     "outcome": "accepted",
+     "component": "decision_workflow",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-qualified-2026-08-27",
+     "sequence": 4,
+     "stage": "RISK_REVIEWED",
+     "outcome": "approved",
+     "component": "deterministic_risk_governor_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-qualified-2026-08-27",
+     "sequence": 1,
+     "stage": "QUALIFIED",
+     "outcome": "qualified",
+     "component": "deterministic_trend_retest_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+     "refused": false
+    },
+    {
+     "correlation_id": "spy-qualified-2026-08-27",
+     "sequence": 2,
+     "stage": "THESIS_READY",
+     "outcome": "synthesized",
+     "component": "deterministic_baseline_v0",
+     "reason_codes": [],
+     "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+     "refused": false
+    }
+   ],
+   "next_cursor": null
+  }
+ },
+ "/api/v1/incidents?state=open": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": []
+ },
+ "/api/v1/incidents?state=all": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": []
+ },
+ "/api/v1/worker/events": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "available": true,
+   "reason": null,
+   "items": []
+  }
  }
 }

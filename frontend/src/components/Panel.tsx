@@ -13,6 +13,7 @@ export function Panel({
   source,
   present,
   absence,
+  controls,
   children,
   testId,
 }: {
@@ -22,12 +23,17 @@ export function Panel({
   present: boolean;
   /** What is missing, in the server's terms — never a guess at why. */
   absence: string;
+  /** Controls belonging to this panel, shown under its heading whether or not
+   *  it has rows: a filter that disappears when a list is empty cannot be used
+   *  to find out why it is empty. */
+  controls?: ReactNode;
   children?: ReactNode;
   testId: string;
 }) {
   return (
     <section id={testId} data-testid={testId} data-present={String(present)}>
       <h3>{title}</h3>
+      {controls}
       {present ? (
         children
       ) : (

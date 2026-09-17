@@ -176,6 +176,40 @@ const proof = {
   },
 };
 
+// RUI-5. Two pages, and the FIRST one is deliberately shorter than the second:
+// the end of the feed is `next_cursor === null` and nothing else. A client that
+// inferred "short page, therefore finished" would stop here with a third of the
+// events and no sign that it had.
+const activityPage1 = {
+  items: [
+    { correlation_id: "spy-agent-1", sequence: 2, stage: "DECIDED", outcome: "NO_TRADE",
+      component: "decision_workflow", reason_codes: ["no_qualified_setup"],
+      occurred_at: "2026-09-17T14:00:01+00:00", refused: true },
+  ],
+  next_cursor: "opaque-page-2",
+};
+
+const activityPage2 = {
+  items: [
+    { correlation_id: "spy-agent-1", sequence: 1, stage: "OBSERVED", outcome: "accepted",
+      component: "decision_workflow", reason_codes: [], occurred_at: "2026-09-17T14:00:00+00:00",
+      refused: false },
+    { correlation_id: "spy-agent-2", sequence: 1, stage: "OBSERVED", outcome: "accepted",
+      component: "decision_workflow", reason_codes: [], occurred_at: "2026-09-17T15:00:00+00:00",
+      refused: false },
+  ],
+  next_cursor: null,
+};
+
+const incidentsOpen: unknown[] = [];
+const incidentsAll = [
+  { kind: "broker_timeout", severity: "warning", execution_state: "RECONCILING",
+    opened_at: "2026-09-16T10:00:00+00:00", resolved_at: "2026-09-16T10:05:00+00:00",
+    open: false, withheld: ["detail"] },
+];
+
+const workerEvents = { available: true, reason: null, items: [] };
+
 const routes: Record<string, unknown> = {
   "/api/v1/system/status": envelope(status),
   "/api/v1/system/proof": envelope(tiles),
@@ -193,6 +227,11 @@ const routes: Record<string, unknown> = {
   [`/api/v1/decisions/${QUALIFIED}/lifecycle`]: envelope(lifecycle),
   [`/api/v1/decisions/${QUALIFIED}/proof`]: envelope(proof),
   [`/api/v1/decisions/${QUALIFIED}/outcomes`]: envelope(horizons),
+  "/api/v1/activity?cursor=opaque-page-2": envelope(activityPage2),
+  "/api/v1/activity": envelope(activityPage1),
+  "/api/v1/incidents?state=open": envelope(incidentsOpen),
+  "/api/v1/incidents?state=all": envelope(incidentsAll),
+  "/api/v1/worker/events": envelope(workerEvents),
 };
 
 function respond(failing: Set<string> = new Set(), over: Record<string, unknown> = {}) {
@@ -455,6 +494,87 @@ describe("the depth panels", () => {
       expect(panel, `${id} vanished`).toBeInTheDocument();
       expect(panel.querySelector("h3"), `${id} lost its heading`).not.toBeNull();
     }
+  });
+});
+
+
+describe("the activity workspace", () => {
+  it("pages with the server's cursor and shows every event once", async () => {
+    // RUI-VAL-004: `sequence` restarts per decision, so the feed is paged by an
+    // opaque cursor over (occurred_at, id). The client passes it back untouched.
+    const fetchMock = respond();
+    vi.stubGlobal("fetch", fetchMock);
+    render(at("/activity"));
+
+    const feed = await screen.findByTestId("activity");
+    expect(feed.querySelectorAll("tbody tr")).toHaveLength(1);
+    // One item and a cursor: still more, however short the page was.
+    expect(screen.getByTestId("activity-count")).toHaveTextContent("more available");
+
+    await userEvent.click(screen.getByTestId("activity-more"));
+    await waitFor(() => expect(feed.querySelectorAll("tbody tr")).toHaveLength(3));
+    expect(screen.getByTestId("activity-count")).toHaveTextContent("the feed ends here");
+    expect(screen.queryByTestId("activity-more")).toBeNull();
+
+    const asked = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(asked).toContain("/api/v1/activity?cursor=opaque-page-2");
+    // Never a cursor of its own devising, and never the per-decision sequence.
+    expect(asked.filter((url) => url.includes("sequence"))).toEqual([]);
+  });
+
+  it("keeps a refusal legible as a refusal", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/activity"));
+    const feed = await screen.findByTestId("activity");
+    const refused = feed.querySelector('tr[data-refused="true"]');
+    expect(refused).not.toBeNull();
+    expect(refused).toHaveTextContent("no_qualified_setup");
+  });
+
+  it("says an empty open list is the source answering, not a filter hiding", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/activity"));
+    const incidents = await screen.findByTestId("incidents");
+    expect(incidents).toHaveAttribute("data-present", "false");
+    expect(incidents).toHaveTextContent("This is the source answering");
+  });
+
+  it("keeps the filter usable while the list is empty, and names withheld detail", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/activity"));
+    await screen.findByTestId("incidents");
+    await userEvent.click(screen.getByTestId("incidents-all"));
+    await waitFor(() =>
+      expect(screen.getByTestId("incidents")).toHaveAttribute("data-present", "true"),
+    );
+    const incidents = screen.getByTestId("incidents");
+    expect(incidents).toHaveTextContent("broker_timeout");
+    // `detail` is free text a broker error chose: named, never shown.
+    expect(incidents).toHaveTextContent("withheld: detail");
+  });
+
+  it("tells an empty worker source apart from one that cannot answer", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/activity"));
+    const panel = await screen.findByTestId("worker-events");
+    expect(panel).toHaveTextContent("holds no worker events");
+
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        "/api/v1/worker/events": envelope({
+          available: false, reason: "the worker_events table is absent", items: [],
+        }),
+      }),
+    );
+    render(at("/activity"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("worker-events")[1]).toHaveTextContent("cannot answer"),
+    );
+    expect(screen.getAllByTestId("worker-events")[1]).toHaveTextContent(
+      "the worker_events table is absent",
+    );
   });
 });
 

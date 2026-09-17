@@ -211,3 +211,22 @@ dd.hash, .hash { word-break: break-all; }
 .disclosures { margin: .5rem 0 0; font-size: .8rem; color: var(--muted); }
 .disclosures li { border-left: 2px solid var(--edge); padding-left: .6rem; margin-bottom: .3rem; }
 a[download] { font-family: var(--mono); }
+
+/* ---- RUI-5: activity ---- */
+nav { display: flex; gap: .9rem; margin: .5rem 0 0; }
+nav a { font-family: var(--mono); font-size: .68rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim); text-decoration: none; }
+nav a[data-status="active"], nav a.active { color: var(--cool); }
+.filter { display: flex; gap: .4rem; margin: .6rem 0 0; }
+.filter button, .gate button {
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase;
+  background: var(--panel); color: var(--muted); border: 1px solid var(--edge);
+  padding: .25rem .6rem; cursor: pointer; }
+.filter button[aria-pressed="true"] { color: var(--cool); border-color: var(--cool); }
+.filter button:disabled, .gate button:disabled { color: var(--dim); cursor: default; }
+.gate button { margin-left: .6rem; }
+/* A refused step is the point of the feed, so it is not styled as an error. */
+.matrix tr[data-refused="true"] td.verdict { color: var(--warm); }
+.matrix tr[data-kind="fault"] td.role { color: var(--alarm); }
+[data-severity] .m { color: var(--warm); }
+[data-open="true"] .m { color: var(--alarm); }

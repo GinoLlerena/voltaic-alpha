@@ -1629,6 +1629,54 @@ came out of it: `--edge` is now a surface the contrast test asserts, and a
 phone-width check fails any element that renders taller than 120px while
 narrower than 90px, the signature of text squeezed into a column.
 
+## 27. `RUI-5` activity and incidents — 17 September 2026
+
+Half an increment on purpose. `RUI-5` covers position attention, activity and
+incidents, and its own rule is that position attention may be built only after
+accepted position observations **and** exit decisions exist. Counted against
+this source: one position, two broker orders, **zero exit decisions**. The
+position workspace is therefore not built. Activity and incidents carry no such
+precondition.
+
+### Paged by the server's cursor, and by nothing else
+
+`RUI-VAL-004` showed why this is the whole of the work: `audit_events.sequence`
+restarts at zero for every decision, so the 26 committed events share six
+values and a cursor built from it would skip or repeat most of a feed spanning
+decisions. The client appends the server's pages in the order given, passes
+`next_cursor` back untouched, and treats `next_cursor === null` as the only end.
+
+Two mutations hold that in place — building a cursor from `sequence`, and
+treating a short page as the end — and the second needed a fixture that could
+tell: the unit test's **first** page is deliberately shorter than its second, so
+a client that stops on a short page keeps a third of the events and shows no
+sign of it. The captured fixtures page seven at a time for the same reason. The
+whole corpus fits one default page, so a default-limit fixture would exercise
+none of the loop; four pages, 26 events, no duplicates, and the browser gate
+asserts each event appears exactly once.
+
+### Two kinds of nothing
+
+The worker payload distinguishes them and so does the page: `available: true`
+with no items means the source works and holds nothing, while `available: false`
+carries the server's reason for not knowing and is not an empty feed. An empty
+open incident list says it is the source answering rather than a filter hiding
+one, and the filter stays visible while the list is empty — a control that
+disappears when a list is empty cannot be used to find out why it is empty. That
+is now a `controls` slot on `Panel` rather than a habit each panel is trusted to
+remember, which is the same lesson `RUI-VAL-012` produced for absence itself.
+
+Incident `detail` is assembled from broker exception text, so it is named
+through `withheld` and never shown.
+
+### A note on the word opaque
+
+An activity cursor is base64 of `["occurred_at", "id"]` and decodes in one line.
+It was checked before being committed to the fixtures. **Opaque here means the
+client must not construct one**, not that it is confidential: it carries a
+timestamp and a row id that the feed already displays. Anything that needed to
+be secret could not be handed to a browser in the first place.
+
 ### Exit criteria not yet met
 
 `RUI-3`'s exit is now met on the committed evidence: both journeys were walked,
