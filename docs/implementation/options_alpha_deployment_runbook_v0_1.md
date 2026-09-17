@@ -529,3 +529,54 @@ credentials.
 Backups are local to the worker. Losing the instance loses them with it.
 
 Credential rotation is still undocumented, so precondition 7 is not wholly met.
+
+## 11. The React surface, and what a cutover would take (17 September 2026)
+
+`RUI-6` asks for the default route to move to React once the release gates
+pass, with Streamlit retained one release as a rollback path. Neither step has
+been taken, and the reason is worth stating plainly rather than filed as
+pending: **there is nothing deployed to cut over to.**
+
+Measured on the host:
+
+| | |
+|---|---|
+| `options-alpha` (Streamlit) | `active`, listening on `0.0.0.0:8501` |
+| `options-alpha-port80` | `active`, redirecting 80 → 8501 |
+| `options-alpha-api` | `active`, listening on **`127.0.0.1:8600` only** |
+| React build | **not deployed** — no unit, no files served |
+
+So the public surface is Streamlit, the API is reachable only from the host
+itself, and the browser client exists solely in the repository and in CI.
+
+### What a cutover would require
+
+1. Build `frontend/` and place `dist/` on the host. The build is static; it
+   needs a file server, not Node.
+2. Expose the API to the browser. It binds loopback deliberately — it has no
+   authentication because nothing outside the host can reach it. Publishing it
+   changes that assumption and must be decided, not inherited: at minimum the
+   static files and `/api` must be served from one origin so the browser's
+   same-origin requests continue to hold.
+3. Point `options-alpha-port80` at the new port instead of 8501.
+4. Leave `options-alpha` running. It is the rollback.
+
+### The rollback, once a cutover has happened
+
+Redirect port 80 back to Streamlit and stop the new server:
+
+```
+sudo iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port <new>
+sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8501
+sudo systemctl stop <the new unit>
+```
+
+The rule is reapplied at boot by a oneshot unit (section 7.6), so the same edit
+belongs in `options-alpha-port80.service`. No database change is involved in
+either direction: both surfaces read the same records through the same read
+layer, and neither writes. **A rollback therefore cannot lose data** — the worst
+case is that the dashboard is serving again within one command.
+
+This is written before a cutover rather than after, so the procedure exists at
+the moment it would be needed rather than being reconstructed under pressure.
+It has not been rehearsed, because there is nothing yet to rehearse it against.
