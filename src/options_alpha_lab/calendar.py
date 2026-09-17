@@ -20,6 +20,7 @@ treated as closed rather than assumed open.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
@@ -101,6 +102,12 @@ class TradingCalendar:
 
     def __init__(self, sessions: dict[date, Session]) -> None:
         self._sessions = sessions
+        #: Close times in order, so counting completed sessions is a binary
+        #: search rather than a scan. `CIIP-008` reviews ask this question once
+        #: per candidate observation per job, which made a linear count the hot
+        #: loop: 402 jobs over 201 observations against 105 sessions is 8.5
+        #: million comparisons, and it did not finish inside a ten-minute window.
+        self._closes = sorted(session.close_at for session in sessions.values())
 
     @classmethod
     def from_payload(cls, payload: Any) -> TradingCalendar:
@@ -123,11 +130,20 @@ class TradingCalendar:
     def is_trading_day(self, day: date) -> bool:
         return day in self._sessions
 
+    def closes_through(self, moment: datetime) -> int:
+        """Sessions that had closed at or before `moment`."""
+        return bisect_right(self._closes, moment)
+
     def completed_sessions_between(self, start: datetime, end: datetime) -> int:
-        """Trading sessions that closed strictly between two moments."""
-        return sum(
-            1 for session in self._sessions.values() if start < session.close_at <= end
-        )
+        """Trading sessions that closed strictly between two moments.
+
+        Counted by difference of two binary searches. The result is identical to
+        the scan it replaces -- a test compares them across every boundary case,
+        which is how the clamp below earned its place: a difference goes negative
+        where a scan simply counts nothing -- and the cost stops depending on how
+        many sessions the calendar holds.
+        """
+        return max(0, self.closes_through(end) - self.closes_through(start))
 
     def evaluate_entry(self, moment: datetime) -> WindowDecision:
         """Whether a new entry may be opened at this instant."""

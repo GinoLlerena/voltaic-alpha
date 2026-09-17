@@ -27,7 +27,7 @@
       "src/options_alpha_lab/architecture/contracts.py": "sha256:ae85b7100b48ee9dd4d5baa2e4745f352296109dbb3ad22d0818dc17c82e4be7",
       "src/options_alpha_lab/architecture/ports.py": "sha256:979fe77c8f82bb7df30af834f35e3277e70ea83577d0f66a4129efeeed624097",
       "src/options_alpha_lab/architecture/workflow.py": "sha256:00a3651fe2d1e981f8980d7f4325a4e2f9e5bf8f0e17eaf4e8e1448a73e51ada",
-      "src/options_alpha_lab/calendar.py": "sha256:4b479ebdcca608f334561c26a456e51b4c1b6b717ac83391cfab83cc116f9508",
+      "src/options_alpha_lab/calendar.py": "sha256:d17104b7c3e9660ce34706ae30ce4024e6b779be4641713d868acb2ddd88cbce",
       "src/options_alpha_lab/cli.py": "sha256:ea7a1869bc8c8030e105cf32559f560e1cd6ec817ba43c3e54ea5a9c7efbc05a",
       "src/options_alpha_lab/components.py": "sha256:732e8462252654a107681e2174ae818a6c8bc33192d408c667cc965060b1ddde",
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
@@ -45,7 +45,7 @@
       "src/options_alpha_lab/lifecycle.py": "sha256:69db7c3e2182cd40bab62e57a86e74b5a08146c7e8e3b9bbdf307dce4229c7d3",
       "src/options_alpha_lab/models.py": "sha256:7ecd96768d341af63f461fffb743c88bfd4f868afb787cc545f6ce02467b3e1f",
       "src/options_alpha_lab/orchestrator.py": "sha256:f77958773038cccd00ce2a8ddfe3bbfa9b37a9a69acd51410f77b774b2ae8f48",
-      "src/options_alpha_lab/outcomes.py": "sha256:dd362b6a384eb1bdbbdab9d3db32c90e9ef184cd151ba10b83094c4bbcd3d668",
+      "src/options_alpha_lab/outcomes.py": "sha256:b98c0832af48756eaf498ca9a0eaf1a96e76620dc9ab01d59019e746e31e6edc",
       "src/options_alpha_lab/persistence/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/persistence/models.py": "sha256:29152eb085984851b79a0ce158d28df174114fa946c8d13afd021065cd0a1953",
       "src/options_alpha_lab/persistence/repository.py": "sha256:e388fb0d4317793be8a9d315e8913c19cff9c4a2001a4e17393b64f7e551b998",
@@ -112,8 +112,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:8de1e8294dd33c7d5a401620a514744d1b108d5b",
-  "freeze_digest": "sha256:3e182d63953442ce13445720abe4fa7298fa43e6641a543faa267a67cf8820c9",
-  "frozen_at": "2026-09-16T23:37:01.309437+00:00",
+  "commit": "git:92f529dfd0f383f67b97e56b5b925d135c361dce",
+  "freeze_digest": "sha256:72191d0c7ff5ecc2239e6c0a7e2526f00f41d0e755d7254bcc9b9bead89a775f",
+  "frozen_at": "2026-09-17T00:01:33.248554+00:00",
   "manifest_version": "release_freeze.v1"
 }
