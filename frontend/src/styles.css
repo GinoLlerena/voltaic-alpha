@@ -206,3 +206,8 @@ dd .src { display: block; }
    hard break; everything else breaks only where it must. */
 dd { word-break: normal; overflow-wrap: anywhere; }
 dd.hash, .hash { word-break: break-all; }
+
+/* The manifest's disclosures, quoted from the file the reader is downloading. */
+.disclosures { margin: .5rem 0 0; font-size: .8rem; color: var(--muted); }
+.disclosures li { border-left: 2px solid var(--edge); padding-left: .6rem; margin-bottom: .3rem; }
+a[download] { font-family: var(--mono); }

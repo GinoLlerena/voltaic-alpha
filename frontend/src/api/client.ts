@@ -60,6 +60,9 @@ export const api = {
     published("/api/v1/decisions/{digest}/lifecycle").replace("{digest}", digest) as ApiUrl,
   proof: (digest: string) =>
     published("/api/v1/decisions/{digest}/proof").replace("{digest}", digest) as ApiUrl,
+  /** The committed manifest as a file. The server sets the attachment name. */
+  proofExport: (digest: string) =>
+    published("/api/v1/proof/{digest}.json").replace("{digest}", digest) as ApiUrl,
   proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
   reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
   tour: () => published("/api/v1/tour") as ApiUrl,

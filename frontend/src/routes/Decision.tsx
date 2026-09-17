@@ -77,7 +77,7 @@ export function Decision({ digest }: { digest: string }) {
       <Risk risk={ready(risk)} />
       <Invalidation market={ready(market)} memo={ready(memo)} />
       <Lifecycle lifecycle={ready(lifecycle)} />
-      <ProofLineage lifecycle={ready(lifecycle)} proof={ready(proof)} />
+      <ProofLineage digest={digest} lifecycle={ready(lifecycle)} proof={ready(proof)} />
     </>
   );
 }

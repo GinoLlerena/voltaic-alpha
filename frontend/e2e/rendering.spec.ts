@@ -236,6 +236,22 @@ test.describe("the depth panels (RUI-4)", () => {
     expect(state.absent.filter((panel) => !panel.heading || !panel.source)).toEqual([]);
   });
 
+  test("offers the manifest as a download the reader can verify", async ({ page }) => {
+    await replayApi(page);
+    await page.goto(`/decisions/${MODEL_WROTE_THE_MEMO}`);
+    await page.waitForLoadState("networkidle");
+    const link = page.getByTestId("proof-download");
+    await expect(link).toBeVisible();
+    // Same origin and a real published path: the client never assembles the
+    // manifest, it links to the one the server committed.
+    await expect(link).toHaveAttribute(
+      "href",
+      `/api/v1/proof/${MODEL_WROTE_THE_MEMO}.json`,
+    );
+    await expect(link).toHaveAttribute("download", "");
+    await expect(page.getByTestId("proof-export")).toContainText("shasum -a 256");
+  });
+
   test("marks evidence that belongs to another decision", async ({ page }) => {
     // Selected-decision isolation. The committed receipt describes a different
     // evaluation of the same snapshot, and the page must not imply otherwise.

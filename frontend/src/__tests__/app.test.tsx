@@ -168,7 +168,13 @@ const lifecycle = {
     reason: "a corpus-level result over 5 frozen cases", facts: {} },
 };
 
-const proof = { manifest_digest: "sha256:manifest", manifest: {} };
+const proof = {
+  manifest_digest: "sha256:manifest",
+  manifest: {
+    manifest_version: "proof-manifest-2",
+    disclosures: ["Alpaca Paper only. No live endpoint exists in this build.", "Nothing here is investment advice."],
+  },
+};
 
 const routes: Record<string, unknown> = {
   "/api/v1/system/status": envelope(status),
@@ -396,6 +402,35 @@ describe("the depth panels", () => {
     expect(receipt).not.toBeNull();
     expect(receipt).toHaveAttribute("data-belongs", "false");
     expect(lineage).toHaveTextContent("a different evaluation of the same snapshot");
+  });
+
+  it("offers the manifest as a file, and says how to verify it", async () => {
+    // The digest shown is over the bytes the API serves, so the downloaded file
+    // hashes to it. A hash nobody is told how to check is decoration.
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${QUALIFIED}`));
+    const panel = await screen.findByTestId("proof-export");
+    const link = screen.getByTestId("proof-download");
+    expect(link).toHaveAttribute("href", `/api/v1/proof/${QUALIFIED}.json`);
+    expect(link).toHaveAttribute("download");
+    expect(panel).toHaveTextContent("sha256:manifest");
+    expect(panel).toHaveTextContent("shasum -a 256");
+  });
+
+  it("quotes the manifest's own disclosures rather than restating them", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${QUALIFIED}`));
+    const panel = await screen.findByTestId("proof-export");
+    expect(panel).toHaveTextContent("Alpaca Paper only");
+    expect(panel).toHaveTextContent("Nothing here is investment advice");
+  });
+
+  it("says there is nothing to export when no manifest exists", async () => {
+    vi.stubGlobal("fetch", respond(new Set([`/api/v1/decisions/${QUALIFIED}/proof`])));
+    render(at(`/decisions/${QUALIFIED}`));
+    const panel = await screen.findByTestId("proof-export");
+    expect(panel).toHaveAttribute("data-present", "false");
+    expect(panel).toHaveTextContent("nothing to export");
   });
 
   it("says nothing reached the broker when nothing did", async () => {
