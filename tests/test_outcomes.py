@@ -377,5 +377,40 @@ class RecordedDecisionsCarryTheirJobsTests(unittest.TestCase):
                 self.assertEqual(horizons, [h.label for h in outcomes.HORIZONS])
 
 
+class ReviewScaleTests(OutcomeCase):
+    """The shape that timed out in production: many jobs over many observations.
+
+    The first implementation queried the observations again for every job and
+    re-counted sessions for every candidate. At 402 jobs over 201 observations
+    that did not finish inside a ten-minute window, and it was the worker's own
+    review clock that would have run it.
+    """
+
+    def test_four_hundred_jobs_resolve_quickly(self) -> None:
+        import time as _time
+
+        days = [f"2026-0{m}-{d:02d}" for m in (9,) for d in range(1, 29)]
+        calendar = TradingCalendar.from_payload(
+            {"sessions": [{"date": d, "open": "09:30", "close": "16:00"} for d in days]}
+        )
+        base = self.snapshot("anchor", et("2026-09-01", 16), "600")
+        for n, day in enumerate(days[1:], start=1):
+            self.snapshot(f"obs-{n}", et(day, 16), str(600 + n))
+        for n in range(200):
+            decision = self.decision(base, decided_at=et("2026-09-01", 16))
+            decision.snapshot_id = f"d{n}"
+            outcomes.ensure_jobs(self.session, decision)
+        self.session.commit()
+        jobs = len(self.session.scalars(select(ReviewJob)).all())
+        self.assertGreaterEqual(jobs, 400)
+
+        started = _time.monotonic()
+        summary = outcomes.review(self.session, calendar, now=et("2026-09-28", 17))
+        elapsed = _time.monotonic() - started
+        self.session.commit()
+        self.assertEqual(summary.completed, jobs)
+        self.assertLess(elapsed, 10.0, f"{jobs} jobs took {elapsed:.1f}s")
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

@@ -29,6 +29,7 @@ decision was right; at this sample size no such claim is available.
 from __future__ import annotations
 
 import uuid
+from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -168,25 +169,43 @@ def ensure_jobs(session: Session, decision: Decision) -> list[ReviewJob]:
     return created
 
 
-def _observation(
-    session: Session, calendar: TradingCalendar, job: ReviewJob
-) -> tuple[MarketSnapshot, int] | None:
-    """The earliest completed close at or after the horizon, or `None`.
+@dataclass(frozen=True)
+class _Observations:
+    """Every recorded observation once, with its completed-session count.
 
-    Ordered by `source_time`, so the observation is the first close that
-    satisfies the horizon rather than the most recent one available -- taking the
-    latest would silently lengthen the horizon as time passed.
+    Built per review pass rather than per job. The reviewer used to query the
+    snapshots again for each job and re-count sessions for each candidate, which
+    is quadratic in evidence: at 402 jobs over 201 observations it did not finish
+    inside a ten-minute window. The counts are monotone in `source_time`, so the
+    first observation satisfying a horizon is a binary search.
     """
-    candidates = session.scalars(
-        select(MarketSnapshot)
-        .where(MarketSnapshot.source_time > job.decided_at)
-        .order_by(MarketSnapshot.source_time)
-    ).all()
-    for snapshot in candidates:
-        elapsed = sessions_elapsed(calendar, job.decided_at, aware(snapshot.source_time))
-        if elapsed >= job.horizon_sessions:
-            return snapshot, elapsed
-    return None
+
+    snapshots: tuple[MarketSnapshot, ...]
+    closes: tuple[int, ...]
+
+    @classmethod
+    def load(cls, session: Session, calendar: TradingCalendar) -> _Observations:
+        rows = tuple(
+            session.scalars(
+                select(MarketSnapshot).order_by(MarketSnapshot.source_time)
+            ).all()
+        )
+        return cls(rows, tuple(calendar.closes_through(aware(r.source_time)) for r in rows))
+
+    def after(
+        self, calendar: TradingCalendar, decided_at: datetime, horizon: int
+    ) -> tuple[MarketSnapshot, int] | None:
+        """The earliest observation at or after the horizon, or `None`.
+
+        The earliest, never the latest: taking the most recent available would
+        silently lengthen the horizon as time passed.
+        """
+        base = calendar.closes_through(aware(decided_at))
+        index = bisect_left(self.closes, base + horizon)
+        if index >= len(self.snapshots):
+            return None
+        snapshot = self.snapshots[index]
+        return snapshot, self.closes[index] - base
 
 
 @dataclass(frozen=True)
@@ -210,6 +229,7 @@ def review(
     """
     moment = now or datetime.now(UTC)
     completed = pending = 0
+    observations = _Observations.load(session, calendar)
     for job in session.scalars(select(ReviewJob).where(ReviewJob.state == PENDING)).all():
         decision = session.get(Decision, job.decision_id)
         if decision is None:  # pragma: no cover - a foreign key makes this unreachable
@@ -217,7 +237,7 @@ def review(
         if sessions_elapsed(calendar, job.decided_at, moment) < job.horizon_sessions:
             pending += 1
             continue
-        found = _observation(session, calendar, job)
+        found = observations.after(calendar, job.decided_at, job.horizon_sessions)
         if found is None:
             pending += 1
             continue

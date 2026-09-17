@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from options_alpha_lab.calendar import (
@@ -197,4 +197,34 @@ class SessionStopAcrossAHolidayTests(unittest.TestCase):
         self.assertEqual(
             cal.completed_sessions_between(et("2026-11-25", 16, 0), et("2026-11-27", 13, 1)),
             1,
+        )
+
+
+class SessionCountingEquivalenceTests(unittest.TestCase):
+    """`CIIP-008`. Counting moved from a scan to a binary search; the answer must
+    not have moved with it."""
+
+    def test_it_agrees_with_the_scan_it_replaced(self) -> None:
+        cal = calendar()
+        closes = sorted(s.close_at for s in cal._sessions.values())  # noqa: SLF001
+
+        def scan(start: datetime, end: datetime) -> int:
+            return sum(1 for close in closes if start < close <= end)
+
+        probes = [c + timedelta(seconds=offset) for c in closes for offset in (-1, 0, 1)]
+        probes += [closes[0] - timedelta(days=5), closes[-1] + timedelta(days=5)]
+        for start in probes:
+            for end in probes:
+                with self.subTest(start=start.isoformat(), end=end.isoformat()):
+                    self.assertEqual(
+                        cal.completed_sessions_between(start, end), scan(start, end)
+                    )
+
+    def test_a_close_is_counted_at_its_exact_moment_not_a_second_later(self) -> None:
+        cal = calendar()
+        close = sorted(s.close_at for s in cal._sessions.values())[0]  # noqa: SLF001
+        before = close - timedelta(minutes=1)
+        self.assertEqual(cal.completed_sessions_between(before, close), 1)
+        self.assertEqual(
+            cal.completed_sessions_between(before, close - timedelta(seconds=1)), 0
         )
