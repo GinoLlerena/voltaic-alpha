@@ -1191,3 +1191,45 @@ worker change, so it belongs in its own increment with its own decision.
 
 Until then, the honest statement about the strategy is that it has declined 201
 times on healthy data, and nothing recorded says how nearly it accepted.
+
+### `CIIP-VAL-012` — resolved, 17 September 2026
+
+A refusal now records the arithmetic behind it.
+
+`evidence.structure_reading` recomputes the structure gate and reports where it
+stopped: `insufficient_bars`, `ema_unavailable`, `separation_or_side`,
+`no_retest`, or `passed`, with the EMAs, the separation, which side price closed,
+whether a retest touched, and a signed shortfall — negative is short of the
+threshold, positive cleared it. Migration `0006` stores one row per decision,
+written in the decision's own transaction.
+
+**It diagnoses without deciding.** `build_signals` is untouched, nothing consumes
+the reading, and no gate depends on it. A diagnostic that could change an outcome
+would be a second classifier.
+
+**It cannot move a hash.** The reading is recorded beside the decision, never
+inside `DecisionSnapshot`, so `input_hash` and `decision_hash` are unaffected —
+verified by rebuilding the committed evidence and comparing every hash, and
+asserted by a test that records the same decision with and without a reading.
+
+**The duplication has a guard, and the first version of it was too weak.** Two
+functions computing the same gates can drift, so a test holds them to the same
+answer: the reading says `passed` exactly when `build_signals` produces a
+structure signal. The first version tested a trend twenty times the threshold and
+a flat series at zero — tripling the threshold in one implementation left every
+test passing. The tests now bisect for series that land 5% either side of the
+line, which is the only place a drifted constant shows. The same mutation now
+fails.
+
+**Not back-filled.** The bars those 201 decisions were made on were never stored,
+so their readings cannot be reconstructed. A replayed fixture records no reading
+either: it carries signals rather than the series behind them, and a zero row
+would claim a measurement nobody made.
+
+Surfaced where the question is asked. The dashboard's "no setup qualified" card
+now says, for example, that EMA20 sat a given distance from EMA50 with the close
+on one side and names the shortfall; `GET /api/v1/decisions/{hash}/market` carries
+the same reading.
+
+From the next live tick onward, "waiting for a rare setup" and "effectively
+switched off" are distinguishable from the records.

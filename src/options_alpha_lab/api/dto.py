@@ -218,6 +218,9 @@ class MarketOut(Public):
     #: None when no setup qualified: the deterministic classifier declined
     #: before any model was consulted.
     qualification: QualificationOut | None
+    #: None for a decision recorded before `CIIP-VAL-012`, or replayed from a
+    #: fixture that carries no bars.
+    structure: StructureReadingOut | None = None
 
 
 class ThesisOut(Public):
@@ -523,3 +526,23 @@ class DecisionHorizonOut(Public):
     direction_agreed: bool | None
     realized: str | None
     observed_snapshot_id: str | None
+
+
+class StructureReadingOut(Public):
+    """What the structure gate computed, whether or not it produced a signal.
+
+    `CIIP-VAL-012`. Without it a refusal is a reason code with no arithmetic
+    behind it, and 201 of them cannot be told apart.
+    """
+
+    gate: str
+    bars_considered: int
+    bars_required: int
+    fast_ema: str | None
+    slow_ema: str | None
+    separation: str | None
+    last_close: str | None
+    close_side: str | None
+    retest_touched: bool | None
+    #: Negative is a shortfall; positive cleared the threshold.
+    separation_shortfall: str | None

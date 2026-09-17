@@ -561,6 +561,45 @@ class ExitDecisionRecord(Base):
     schema_version: Mapped[str] = _schema_version()
 
 
+class StructureReadingRecord(Base):
+    """What the structure gate computed for one decision, signal or not.
+
+    `CIIP-VAL-012`. `build_signals` returns nothing the moment a gate declines, so
+    201 live refusals reached the records with zero signal rows and no way to tell
+    a trend that missed by a hair from no trend at all. This is that arithmetic,
+    kept per decision.
+
+    A reading, not a decision: nothing consumes it and no gate depends on it. It
+    is written in the decision's own transaction, so a decision cannot exist
+    without the measurement that explains it.
+    """
+
+    __tablename__ = "structure_readings"
+
+    id: Mapped[str] = _pk()
+    decision_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("decisions.id"), nullable=False, unique=True
+    )
+    market_snapshot_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("market_snapshots.id"), nullable=False, index=True
+    )
+    #: The first gate that declined, or `passed`.
+    gate: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    bars_considered: Mapped[int] = mapped_column(Integer, nullable=False)
+    bars_required: Mapped[int] = mapped_column(Integer, nullable=False)
+    fast_ema: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    slow_ema: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    separation: Mapped[Any | None] = mapped_column(Numeric(18, 8), nullable=True)
+    last_close: Mapped[Any | None] = mapped_column(Numeric(18, 6), nullable=True)
+    close_side: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    retest_touched: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    #: Negative is a shortfall, positive cleared the threshold.
+    separation_shortfall: Mapped[Any | None] = mapped_column(Numeric(18, 8), nullable=True)
+    policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()
+
+
 class ReviewJob(Base):
     """One scheduled look back at a decision, at a declared horizon.
 
