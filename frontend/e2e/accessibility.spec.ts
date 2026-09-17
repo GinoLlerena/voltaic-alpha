@@ -103,3 +103,38 @@ test("every decision is reachable and openable from the keyboard alone", async (
   }
   expect(opened).toBe(first);
 });
+
+test("no text is squeezed into a vertical column at phone width", async ({ page }) => {
+  // The overflow check above passes happily while text is unreadable: a flex row
+  // written for two children was given three, and at 400px its label rendered
+  // 73px wide and 1300px tall — one letter per line — inside a page that did
+  // not overflow at all. Tall-and-narrow is the signature, so look for it.
+  await replayApi(page);
+  await page.setViewportSize({ width: 400, height: 800 });
+  for (const route of routes) {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+    const squeezed = await page.evaluate(() =>
+      [...document.querySelectorAll("body *")]
+        .filter((el) => {
+          const text = (el.textContent ?? "").trim();
+          if (text.length < 8 || el.children.length > 0) return false;
+          // Measure the text's own line boxes, not the element's. A table cell
+          // is as tall as its row, so a short cell beside a wrapped paragraph
+          // looks squeezed by any box-height rule and is not — a false positive
+          // that appeared only on CI's Linux, where the prose wrapped further.
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const lines = [...range.getClientRects()].filter((r) => r.width > 0);
+          if (lines.length < 6) return false;
+          const widest = Math.max(...lines.map((r) => r.width));
+          // Six or more lines, none wider than a couple of words: a column.
+          return widest < 90;
+        })
+        .map((el) => `${el.tagName.toLowerCase()}.${el.className || "-"}: ${
+          (el.textContent ?? "").trim().slice(0, 24)
+        }`),
+    );
+    expect(squeezed, `${route} renders text in a vertical column`).toEqual([]);
+  }
+});

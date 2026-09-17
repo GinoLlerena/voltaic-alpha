@@ -472,6 +472,371 @@
    "structure": null
   }
  },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/memo": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "produced": true,
+   "thesis": {
+    "synthesizer_name": "deterministic_baseline_v0",
+    "direction": "bullish",
+    "confidence": "0.7050",
+    "evidence_ids": [
+     "sig-structure-trend-retest",
+     "sig-volatility-regime"
+    ],
+    "counter_evidence_ids": [],
+    "invalidation_conditions": [
+     "close below 759.53 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "reasoning_summary": "Deterministic baseline: trend_continuation_retest qualified bullish on SPY from 2 aligned signal(s); 0 opposing signal(s) recorded. No model input."
+   },
+   "model_call": null
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/structure": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "selected": {
+    "candidate_id": "spy-trend-retest-spy-live-20260828T153310Z-vertical",
+    "strategy": "bull_call_debit_spread",
+    "long_contract_symbol": "SPY260911C00774000",
+    "short_contract_symbol": "SPY260911C00780000",
+    "quantity": 1,
+    "estimated_debit": "3.620000",
+    "calculated_max_loss": "362.000000",
+    "selected": true,
+    "rejection_reasons": [],
+    "leg_quotes": [
+     {
+      "contract_symbol": "SPY260911C00774000",
+      "option_type": "call",
+      "expiration": "2026-09-11",
+      "dte": 14,
+      "strike": "774",
+      "bid": "6.96",
+      "ask": "7.31",
+      "quote_as_of": "2026-08-28T15:33:07.883382+00:00",
+      "feed": "indicative",
+      "delta": "0.5519",
+      "implied_volatility": "0.1019",
+      "open_interest": null,
+      "open_interest_date": null,
+      "recent_volume": null
+     },
+     {
+      "contract_symbol": "SPY260911C00780000",
+      "option_type": "call",
+      "expiration": "2026-09-11",
+      "dte": 14,
+      "strike": "780",
+      "bid": "3.88",
+      "ask": "3.91",
+      "quote_as_of": "2026-08-28T15:33:08.293408+00:00",
+      "feed": "indicative",
+      "delta": "0.3903",
+      "implied_volatility": "0.0943",
+      "open_interest": null,
+      "open_interest_date": null,
+      "recent_volume": null
+     }
+    ]
+   },
+   "candidates": [
+    {
+     "candidate_id": "spy-trend-retest-spy-live-20260828T153310Z-vertical",
+     "strategy": "bull_call_debit_spread",
+     "long_contract_symbol": "SPY260911C00774000",
+     "short_contract_symbol": "SPY260911C00780000",
+     "quantity": 1,
+     "estimated_debit": "3.620000",
+     "calculated_max_loss": "362.000000",
+     "selected": true,
+     "rejection_reasons": [],
+     "leg_quotes": [
+      {
+       "contract_symbol": "SPY260911C00774000",
+       "option_type": "call",
+       "expiration": "2026-09-11",
+       "dte": 14,
+       "strike": "774",
+       "bid": "6.96",
+       "ask": "7.31",
+       "quote_as_of": "2026-08-28T15:33:07.883382+00:00",
+       "feed": "indicative",
+       "delta": "0.5519",
+       "implied_volatility": "0.1019",
+       "open_interest": null,
+       "open_interest_date": null,
+       "recent_volume": null
+      },
+      {
+       "contract_symbol": "SPY260911C00780000",
+       "option_type": "call",
+       "expiration": "2026-09-11",
+       "dte": 14,
+       "strike": "780",
+       "bid": "3.88",
+       "ask": "3.91",
+       "quote_as_of": "2026-08-28T15:33:08.293408+00:00",
+       "feed": "indicative",
+       "delta": "0.3903",
+       "implied_volatility": "0.0943",
+       "open_interest": null,
+       "open_interest_date": null,
+       "recent_volume": null
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/risk": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "decisions": [
+    {
+     "governor_name": "deterministic_risk_governor_v0",
+     "approved": true,
+     "reason_codes": [],
+     "checks": [
+      {
+       "check": "legs_present",
+       "passed": true
+      },
+      {
+       "check": "max_loss_recomputed",
+       "passed": true,
+       "recomputed": "362.00",
+       "claimed": "362.00"
+      },
+      {
+       "check": "within_risk_budget",
+       "passed": true,
+       "budget": "750.00",
+       "max_loss": "362.00"
+      },
+      {
+       "check": "affordable",
+       "passed": true
+      },
+      {
+       "check": "direction_matches_setup",
+       "passed": true
+      }
+     ],
+     "risk_budget": "750.000000",
+     "calculated_max_loss": "362.000000",
+     "policy_version": "h0-provisional-1",
+     "intent_ttl_seconds": null
+    }
+   ],
+   "accounting": {
+    "account_equity": "100000",
+    "risk_budget": "750.000000",
+    "maximum_loss": "362.000000",
+    "budget_used_percent": "48.27"
+   }
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/lifecycle": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "reached_the_broker": false,
+   "intents": [],
+   "orders": [],
+   "positions": [],
+   "exits": [],
+   "trail": {
+    "complete": true,
+    "gaps": [],
+    "events": [
+     {
+      "correlation_id": "spy-live-20260828T153310Z",
+      "sequence": 0,
+      "stage": "OBSERVED",
+      "outcome": "accepted",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-live-20260828T153310Z",
+      "sequence": 1,
+      "stage": "QUALIFIED",
+      "outcome": "qualified",
+      "component": "deterministic_trend_retest_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-live-20260828T153310Z",
+      "sequence": 2,
+      "stage": "THESIS_READY",
+      "outcome": "synthesized",
+      "component": "deterministic_baseline_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-live-20260828T153310Z",
+      "sequence": 3,
+      "stage": "STRUCTURE_READY",
+      "outcome": "selected",
+      "component": "deterministic_vertical_selector_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-live-20260828T153310Z",
+      "sequence": 4,
+      "stage": "RISK_REVIEWED",
+      "outcome": "approved",
+      "component": "deterministic_risk_governor_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-live-20260828T153310Z",
+      "sequence": 5,
+      "stage": "DECIDED",
+      "outcome": "OPTIONS_POSITION",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.352701+00:00",
+      "refused": false
+     }
+    ]
+   },
+   "receipt": {
+    "relation": "OTHER_DECISION",
+    "belongs": false,
+    "reason": "this receipt records a different decision and is not the outcome of the selected case",
+    "matched_on": "decision_hash",
+    "facts": {
+     "open_positions": 0,
+     "equity_before": "100000.00",
+     "equity_after": "99992.90",
+     "realized": "-7.10",
+     "entry_filled_avg_price": "3.13",
+     "exit_filled_avg_price": "3.06"
+    }
+   },
+   "ablation": {
+    "relation": "NOT_DECISION_SCOPED",
+    "belongs": false,
+    "reason": "a corpus-level result over 5 frozen cases, not an outcome of the selected decision",
+    "matched_on": null,
+    "facts": {
+     "decisions_changed_by_model": 0,
+     "cases_compared": 5
+    }
+   }
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/proof": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "manifest_digest": "sha256:e1f2781838d770b086a7d7fdd09c8ffc15c4ba81de269a562c0b0462b9d5eca3",
+   "manifest": {
+    "manifest_version": "proof-manifest-2",
+    "decision": {
+     "snapshot_id": "spy-live-20260828T153310Z",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "reason_codes": [],
+     "input_hash": "sha256:49b001aeb20e02794d6e3a59e9c5158201b340f23e45b669427a71703e756d41",
+     "decision_hash": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.352701"
+    },
+    "observation": {
+     "snapshot_id": "spy-live-20260828T153310Z",
+     "symbol": "SPY",
+     "provider": "fixture",
+     "feed": "fixture",
+     "source_time": "2026-08-28T15:33:10.617491",
+     "received_time": "2026-09-17T11:47:21.352701",
+     "underlying_price": "771.100000",
+     "payload_hash": "sha256:49b001aeb20e02794d6e3a59e9c5158201b340f23e45b669427a71703e756d41"
+    },
+    "evidence": [
+     {
+      "setup_id": "spy-trend-retest-spy-live-20260828T153310Z",
+      "setup_family": "trend_continuation_retest",
+      "direction": "bullish",
+      "classifier_name": "deterministic_trend_retest_v0",
+      "evidence_ids": [
+       "sig-structure-trend-retest",
+       "sig-volatility-regime"
+      ],
+      "invalidation_conditions": [
+       "close below 759.53 invalidates the retest",
+       "loss of directional structure on the decision timeframe"
+      ],
+      "payload_hash": "sha256:c3e850a196cbc865046393f029a943b2bf418b69948405bacd681d8dd429b82f"
+     }
+    ],
+    "model_memo": {
+     "synthesizer_name": "deterministic_baseline_v0",
+     "direction": "bullish",
+     "confidence": "0.7050",
+     "evidence_ids": [
+      "sig-structure-trend-retest",
+      "sig-volatility-regime"
+     ],
+     "counter_evidence_ids": []
+    },
+    "risk": [
+     {
+      "governor_name": "deterministic_risk_governor_v0",
+      "approved": true,
+      "reason_codes": [],
+      "risk_budget": "750.000000",
+      "calculated_max_loss": "362.000000",
+      "policy_version": "h0-provisional-1"
+     }
+    ],
+    "intents": [],
+    "prepared_requests": [],
+    "broker_orders": [],
+    "positions": [],
+    "reached_the_broker": false,
+    "model_was_called": true,
+    "disclosures": [
+     "Alpaca Paper only. No live endpoint exists in this build.",
+     "Option quotes come from the indicative feed; the account has no OPRA agreement, so quotes are not trading-quality.",
+     "No alpha is claimed. The null hypothesis is not rejected, and the sample is far too small to test it. The completed round trips are counted on the dashboard's proof tiles rather than asserted here.",
+     "Nothing here is investment advice."
+    ]
+   }
+  }
+ },
  "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/outcomes": {
   "schema_version": "public.v1",
   "source_mode": "FROZEN_REPLAY",
@@ -629,6 +994,657 @@
    "structure": null
   }
  },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/memo": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "produced": true,
+   "thesis": {
+    "synthesizer_name": "deterministic_baseline_v0",
+    "direction": "bullish",
+    "confidence": "0.7050",
+    "evidence_ids": [
+     "sig-structure-trend-retest",
+     "sig-volatility-regime"
+    ],
+    "counter_evidence_ids": [],
+    "invalidation_conditions": [
+     "close below 759.53 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "reasoning_summary": "Deterministic baseline: trend_continuation_retest qualified bullish on SPY from 2 aligned signal(s); 0 opposing signal(s) recorded. No model input."
+   },
+   "model_call": null
+  }
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/structure": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "selected": {
+    "candidate_id": "spy-trend-retest-spy-lifecycle-20260828T154747Z-vertical",
+    "strategy": "bull_call_debit_spread",
+    "long_contract_symbol": "SPY260911C00772000",
+    "short_contract_symbol": "SPY260911C00778000",
+    "quantity": 1,
+    "estimated_debit": "3.500000",
+    "calculated_max_loss": "350.000000",
+    "selected": true,
+    "rejection_reasons": [],
+    "leg_quotes": [
+     {
+      "contract_symbol": "SPY260911C00772000",
+      "option_type": "call",
+      "expiration": "2026-09-11",
+      "dte": 14,
+      "strike": "772",
+      "bid": "7.17",
+      "ask": "7.35",
+      "quote_as_of": "2026-08-28T15:47:45.265912+00:00",
+      "feed": "indicative",
+      "delta": "0.5518",
+      "implied_volatility": "0.104",
+      "open_interest": null,
+      "open_interest_date": null,
+      "recent_volume": null
+     },
+     {
+      "contract_symbol": "SPY260911C00778000",
+      "option_type": "call",
+      "expiration": "2026-09-11",
+      "dte": 14,
+      "strike": "778",
+      "bid": "3.96",
+      "ask": "3.99",
+      "quote_as_of": "2026-08-28T15:47:45.814521+00:00",
+      "feed": "indicative",
+      "delta": "0.3924",
+      "implied_volatility": "0.0958",
+      "open_interest": null,
+      "open_interest_date": null,
+      "recent_volume": null
+     }
+    ]
+   },
+   "candidates": [
+    {
+     "candidate_id": "spy-trend-retest-spy-lifecycle-20260828T154747Z-vertical",
+     "strategy": "bull_call_debit_spread",
+     "long_contract_symbol": "SPY260911C00772000",
+     "short_contract_symbol": "SPY260911C00778000",
+     "quantity": 1,
+     "estimated_debit": "3.500000",
+     "calculated_max_loss": "350.000000",
+     "selected": true,
+     "rejection_reasons": [],
+     "leg_quotes": [
+      {
+       "contract_symbol": "SPY260911C00772000",
+       "option_type": "call",
+       "expiration": "2026-09-11",
+       "dte": 14,
+       "strike": "772",
+       "bid": "7.17",
+       "ask": "7.35",
+       "quote_as_of": "2026-08-28T15:47:45.265912+00:00",
+       "feed": "indicative",
+       "delta": "0.5518",
+       "implied_volatility": "0.104",
+       "open_interest": null,
+       "open_interest_date": null,
+       "recent_volume": null
+      },
+      {
+       "contract_symbol": "SPY260911C00778000",
+       "option_type": "call",
+       "expiration": "2026-09-11",
+       "dte": 14,
+       "strike": "778",
+       "bid": "3.96",
+       "ask": "3.99",
+       "quote_as_of": "2026-08-28T15:47:45.814521+00:00",
+       "feed": "indicative",
+       "delta": "0.3924",
+       "implied_volatility": "0.0958",
+       "open_interest": null,
+       "open_interest_date": null,
+       "recent_volume": null
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/risk": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "decisions": [
+    {
+     "governor_name": "deterministic_risk_governor_v0",
+     "approved": true,
+     "reason_codes": [],
+     "checks": [
+      {
+       "check": "legs_present",
+       "passed": true
+      },
+      {
+       "check": "max_loss_recomputed",
+       "passed": true,
+       "recomputed": "350.00",
+       "claimed": "350.00"
+      },
+      {
+       "check": "within_risk_budget",
+       "passed": true,
+       "budget": "750.00",
+       "max_loss": "350.00"
+      },
+      {
+       "check": "affordable",
+       "passed": true
+      },
+      {
+       "check": "direction_matches_setup",
+       "passed": true
+      }
+     ],
+     "risk_budget": "750.000000",
+     "calculated_max_loss": "350.000000",
+     "policy_version": "h0-provisional-1",
+     "intent_ttl_seconds": null
+    }
+   ],
+   "accounting": {
+    "account_equity": "100000",
+    "risk_budget": "750.000000",
+    "maximum_loss": "350.000000",
+    "budget_used_percent": "46.67"
+   }
+  }
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/lifecycle": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "reached_the_broker": true,
+   "intents": [
+    {
+     "intent_hash": "sha256:82f1b3334159eb8b9ab8689cd93356f0ef1123faa8fa210b2ad067ddeb28b20d",
+     "client_order_id": "oa-82f1b3334159eb8b9ab8689cd933",
+     "approval_reference": "risk:h0-provisional-1:open",
+     "desired_limit_price": "3.390000",
+     "expires_at": "2026-08-28T15:50:00+00:00",
+     "legs": [
+      {
+       "symbol": "SPY260911C00772000",
+       "side": "buy",
+       "position_intent": "buy_to_open"
+      },
+      {
+       "symbol": "SPY260911C00778000",
+       "side": "sell",
+       "position_intent": "sell_to_open"
+      }
+     ],
+     "requests": [
+      {
+       "request_hash": "sha256:bf2e48de34539a20dbe76a651a9365331e23f51b7a1609d9408ec3c3c7fbb31f",
+       "intent_hash_match": true,
+       "adapter_version": "alpaca-py-0.44-mleg",
+       "request_schema_version": "mleg_limit.v1",
+       "dry_run_result": "reviewed",
+       "prepared_at": "2026-08-28T15:50:00+00:00",
+       "expires_at": "2026-08-28T15:50:00+00:00",
+       "request": {
+        "order_class": "mleg",
+        "qty": "1",
+        "type": "limit",
+        "time_in_force": "day",
+        "limit_price": "3.39",
+        "client_order_id": "oa-82f1b3334159eb8b9ab8689cd933",
+        "legs": [
+         {
+          "symbol": "SPY260911C00772000",
+          "ratio_qty": "1",
+          "side": "buy",
+          "position_intent": "buy_to_open"
+         },
+         {
+          "symbol": "SPY260911C00778000",
+          "ratio_qty": "1",
+          "side": "sell",
+          "position_intent": "sell_to_open"
+         }
+        ]
+       },
+       "withheld": []
+      }
+     ]
+    },
+    {
+     "intent_hash": "sha256:82e515d1aa4f6fd6494f91e26a9b5cac2eaeb4f723734568db1d5bdd19cb57e9",
+     "client_order_id": "oa-82e515d1aa4f6fd6494f91e26a9b",
+     "approval_reference": "risk:h0-provisional-1:close",
+     "desired_limit_price": "3.050000",
+     "expires_at": "2026-08-28T15:50:00+00:00",
+     "legs": [
+      {
+       "symbol": "SPY260911C00772000",
+       "side": "sell",
+       "position_intent": "sell_to_close"
+      },
+      {
+       "symbol": "SPY260911C00778000",
+       "side": "buy",
+       "position_intent": "buy_to_close"
+      }
+     ],
+     "requests": [
+      {
+       "request_hash": "sha256:e04d7181b35fb7ee6f9a8ca9cbe197fa785c7a90761f5c94bce3541be6ca31a1",
+       "intent_hash_match": true,
+       "adapter_version": "alpaca-py-0.44-mleg",
+       "request_schema_version": "mleg_limit.v1",
+       "dry_run_result": "reviewed",
+       "prepared_at": "2026-08-28T15:50:00+00:00",
+       "expires_at": "2026-08-28T15:50:00+00:00",
+       "request": {
+        "order_class": "mleg",
+        "qty": "1",
+        "type": "limit",
+        "time_in_force": "day",
+        "limit_price": "3.05",
+        "client_order_id": "oa-82e515d1aa4f6fd6494f91e26a9b",
+        "legs": [
+         {
+          "symbol": "SPY260911C00772000",
+          "ratio_qty": "1",
+          "side": "sell",
+          "position_intent": "sell_to_close"
+         },
+         {
+          "symbol": "SPY260911C00778000",
+          "ratio_qty": "1",
+          "side": "buy",
+          "position_intent": "buy_to_close"
+         }
+        ]
+       },
+       "withheld": []
+      }
+     ]
+    }
+   ],
+   "orders": [
+    {
+     "role": "entry",
+     "status": "filled",
+     "local_state": "FILLED",
+     "terminal": true,
+     "client_order_id": "oa-82f1b3334159eb8b9ab8689cd933",
+     "strategy_quantity": 1,
+     "filled_quantity": 1,
+     "filled_avg_price": "3.130000",
+     "prepared_at": "2026-08-28T15:50:00+00:00",
+     "submitted_at": "2026-08-28T15:50:00+00:00",
+     "deadline_at": null,
+     "reconciled_at": "2026-09-17T11:47:21.460007+00:00",
+     "fills": [
+      {
+       "leg_symbol": "SPY260911C00772000",
+       "quantity": 1,
+       "price": "6.900000",
+       "filled_at": "2026-08-28T15:50:00+00:00"
+      },
+      {
+       "leg_symbol": "SPY260911C00778000",
+       "quantity": 1,
+       "price": "3.770000",
+       "filled_at": "2026-08-28T15:50:00+00:00"
+      }
+     ],
+     "withheld": [
+      "broker_order_id"
+     ]
+    },
+    {
+     "role": "close",
+     "status": "filled",
+     "local_state": "FILLED",
+     "terminal": true,
+     "client_order_id": "oa-82e515d1aa4f6fd6494f91e26a9b",
+     "strategy_quantity": 1,
+     "filled_quantity": 1,
+     "filled_avg_price": "3.060000",
+     "prepared_at": "2026-08-28T15:50:00+00:00",
+     "submitted_at": "2026-08-28T15:50:00+00:00",
+     "deadline_at": null,
+     "reconciled_at": "2026-09-17T11:47:21.471937+00:00",
+     "fills": [
+      {
+       "leg_symbol": "SPY260911C00772000",
+       "quantity": 1,
+       "price": "6.870000",
+       "filled_at": "2026-08-28T15:50:00+00:00"
+      },
+      {
+       "leg_symbol": "SPY260911C00778000",
+       "quantity": 1,
+       "price": "3.810000",
+       "filled_at": "2026-08-28T15:50:00+00:00"
+      }
+     ],
+     "withheld": []
+    }
+   ],
+   "positions": [
+    {
+     "lifecycle_status": "CLOSED",
+     "strategy": "bull_call_debit_spread",
+     "direction": "bullish",
+     "long_symbol": "SPY260911C00772000",
+     "short_symbol": "SPY260911C00778000",
+     "width": "6.000000",
+     "expiration": "2026-08-28T15:50:00+00:00",
+     "requested_quantity": 1,
+     "filled_quantity": 0,
+     "avg_entry_debit": "3.130000",
+     "open_risk": "339.000000",
+     "opened_at": "2026-08-28T15:50:00+00:00",
+     "entry_filled_at": "2026-08-28T15:50:00+00:00",
+     "closed_at": "2026-08-28T15:50:00+00:00",
+     "close_reason": "manual_demo_close",
+     "invalidation_level": null,
+     "invalidation_direction": null,
+     "invalidation_source": null
+    }
+   ],
+   "exits": [],
+   "trail": {
+    "complete": true,
+    "gaps": [],
+    "events": [
+     {
+      "correlation_id": "spy-lifecycle-20260828T154747Z",
+      "sequence": 0,
+      "stage": "OBSERVED",
+      "outcome": "accepted",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-lifecycle-20260828T154747Z",
+      "sequence": 1,
+      "stage": "QUALIFIED",
+      "outcome": "qualified",
+      "component": "deterministic_trend_retest_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-lifecycle-20260828T154747Z",
+      "sequence": 2,
+      "stage": "THESIS_READY",
+      "outcome": "synthesized",
+      "component": "deterministic_baseline_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-lifecycle-20260828T154747Z",
+      "sequence": 3,
+      "stage": "STRUCTURE_READY",
+      "outcome": "selected",
+      "component": "deterministic_vertical_selector_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-lifecycle-20260828T154747Z",
+      "sequence": 4,
+      "stage": "RISK_REVIEWED",
+      "outcome": "approved",
+      "component": "deterministic_risk_governor_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-lifecycle-20260828T154747Z",
+      "sequence": 5,
+      "stage": "DECIDED",
+      "outcome": "OPTIONS_POSITION",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.193215+00:00",
+      "refused": false
+     }
+    ]
+   },
+   "receipt": {
+    "relation": "OTHER_DECISION",
+    "belongs": false,
+    "reason": "this receipt records a different evaluation of the same snapshot; the decision it describes is not the one selected",
+    "matched_on": "decision_hash",
+    "facts": {
+     "open_positions": 0,
+     "equity_before": "100000.00",
+     "equity_after": "99992.90",
+     "realized": "-7.10",
+     "entry_filled_avg_price": "3.13",
+     "exit_filled_avg_price": "3.06"
+    }
+   },
+   "ablation": {
+    "relation": "NOT_DECISION_SCOPED",
+    "belongs": false,
+    "reason": "a corpus-level result over 5 frozen cases, not an outcome of the selected decision",
+    "matched_on": null,
+    "facts": {
+     "decisions_changed_by_model": 0,
+     "cases_compared": 5
+    }
+   }
+  }
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/proof": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "manifest_digest": "sha256:0d826d0a3394bbb230b30f7b31a6e29765e99843b698c0190765f6a67727d3c6",
+   "manifest": {
+    "manifest_version": "proof-manifest-2",
+    "decision": {
+     "snapshot_id": "spy-lifecycle-20260828T154747Z",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "reason_codes": [],
+     "input_hash": "sha256:01fb85cc81ee76f4ac4f442d7972d16bb80c08d4310f781e4836ec15cc869da6",
+     "decision_hash": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.193215"
+    },
+    "observation": {
+     "snapshot_id": "spy-lifecycle-20260828T154747Z",
+     "symbol": "SPY",
+     "provider": "fixture",
+     "feed": "fixture",
+     "source_time": "2026-08-28T15:47:47.609399",
+     "received_time": "2026-09-17T11:47:21.193215",
+     "underlying_price": "771.100000",
+     "payload_hash": "sha256:01fb85cc81ee76f4ac4f442d7972d16bb80c08d4310f781e4836ec15cc869da6"
+    },
+    "evidence": [
+     {
+      "setup_id": "spy-trend-retest-spy-lifecycle-20260828T154747Z",
+      "setup_family": "trend_continuation_retest",
+      "direction": "bullish",
+      "classifier_name": "deterministic_trend_retest_v0",
+      "evidence_ids": [
+       "sig-structure-trend-retest",
+       "sig-volatility-regime"
+      ],
+      "invalidation_conditions": [
+       "close below 759.53 invalidates the retest",
+       "loss of directional structure on the decision timeframe"
+      ],
+      "payload_hash": "sha256:ca48ec2236606c7c60107e53a56dfcb3431c7fc91d6734994411161713845c91"
+     }
+    ],
+    "model_memo": {
+     "synthesizer_name": "deterministic_baseline_v0",
+     "direction": "bullish",
+     "confidence": "0.7050",
+     "evidence_ids": [
+      "sig-structure-trend-retest",
+      "sig-volatility-regime"
+     ],
+     "counter_evidence_ids": []
+    },
+    "risk": [
+     {
+      "governor_name": "deterministic_risk_governor_v0",
+      "approved": true,
+      "reason_codes": [],
+      "risk_budget": "750.000000",
+      "calculated_max_loss": "350.000000",
+      "policy_version": "h0-provisional-1"
+     }
+    ],
+    "intents": [
+     {
+      "intent_hash": "sha256:82e515d1aa4f6fd6494f91e26a9b5cac2eaeb4f723734568db1d5bdd19cb57e9",
+      "client_order_id": "oa-82e515d1aa4f6fd6494f91e26a9b",
+      "desired_limit_price": "3.050000",
+      "approval_reference": "risk:h0-provisional-1:close",
+      "expires_at": "2026-08-28T15:50:00"
+     },
+     {
+      "intent_hash": "sha256:82f1b3334159eb8b9ab8689cd93356f0ef1123faa8fa210b2ad067ddeb28b20d",
+      "client_order_id": "oa-82f1b3334159eb8b9ab8689cd933",
+      "desired_limit_price": "3.390000",
+      "approval_reference": "risk:h0-provisional-1:open",
+      "expires_at": "2026-08-28T15:50:00"
+     }
+    ],
+    "prepared_requests": [
+     {
+      "request_hash": "sha256:bf2e48de34539a20dbe76a651a9365331e23f51b7a1609d9408ec3c3c7fbb31f",
+      "adapter_version": "alpaca-py-0.44-mleg",
+      "request_schema_version": "mleg_limit.v1",
+      "intent_hash_match": true
+     },
+     {
+      "request_hash": "sha256:e04d7181b35fb7ee6f9a8ca9cbe197fa785c7a90761f5c94bce3541be6ca31a1",
+      "adapter_version": "alpaca-py-0.44-mleg",
+      "request_schema_version": "mleg_limit.v1",
+      "intent_hash_match": true
+     }
+    ],
+    "broker_orders": [
+     {
+      "role": "close",
+      "client_order_id": "oa-82e515d1aa4f6fd6494f91e26a9b",
+      "status": "filled",
+      "local_state": "FILLED",
+      "terminal": true,
+      "strategy_quantity": 1,
+      "filled_quantity": 1,
+      "filled_avg_price": "3.060000",
+      "prepared_at": "2026-08-28T15:50:00",
+      "submitted_at": "2026-08-28T15:50:00",
+      "reconciled_at": "2026-09-17T11:47:21.471937",
+      "fills": [
+       {
+        "leg_symbol": "SPY260911C00772000",
+        "quantity": 1,
+        "price": "6.870000",
+        "filled_at": "2026-08-28T15:50:00"
+       },
+       {
+        "leg_symbol": "SPY260911C00778000",
+        "quantity": 1,
+        "price": "3.810000",
+        "filled_at": "2026-08-28T15:50:00"
+       }
+      ]
+     },
+     {
+      "role": "entry",
+      "client_order_id": "oa-82f1b3334159eb8b9ab8689cd933",
+      "status": "filled",
+      "local_state": "FILLED",
+      "terminal": true,
+      "strategy_quantity": 1,
+      "filled_quantity": 1,
+      "filled_avg_price": "3.130000",
+      "prepared_at": "2026-08-28T15:50:00",
+      "submitted_at": "2026-08-28T15:50:00",
+      "reconciled_at": "2026-09-17T11:47:21.460007",
+      "fills": [
+       {
+        "leg_symbol": "SPY260911C00772000",
+        "quantity": 1,
+        "price": "6.900000",
+        "filled_at": "2026-08-28T15:50:00"
+       },
+       {
+        "leg_symbol": "SPY260911C00778000",
+        "quantity": 1,
+        "price": "3.770000",
+        "filled_at": "2026-08-28T15:50:00"
+       }
+      ]
+     }
+    ],
+    "positions": [
+     {
+      "strategy": "bull_call_debit_spread",
+      "direction": "bullish",
+      "lifecycle_status": "CLOSED",
+      "long_symbol": "SPY260911C00772000",
+      "short_symbol": "SPY260911C00778000",
+      "expiration": "2026-08-28T15:50:00",
+      "width": "6.000000",
+      "requested_quantity": 1,
+      "filled_quantity": 0,
+      "avg_entry_debit": "3.130000",
+      "open_risk": "339.000000"
+     }
+    ],
+    "reached_the_broker": true,
+    "model_was_called": true,
+    "disclosures": [
+     "Alpaca Paper only. No live endpoint exists in this build.",
+     "Option quotes come from the indicative feed; the account has no OPRA agreement, so quotes are not trading-quality.",
+     "No alpha is claimed. The null hypothesis is not rejected, and the sample is far too small to test it. The completed round trips are counted on the dashboard's proof tiles rather than asserted here.",
+     "Nothing here is investment advice."
+    ]
+   }
+  }
+ },
  "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/outcomes": {
   "schema_version": "public.v1",
   "source_mode": "FROZEN_REPLAY",
@@ -764,6 +1780,156 @@
    ],
    "qualification": null,
    "structure": null
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/memo": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "produced": false,
+   "thesis": null,
+   "model_call": null
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/structure": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "selected": null,
+   "candidates": []
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/risk": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "decisions": [],
+   "accounting": null
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/lifecycle": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "reached_the_broker": false,
+   "intents": [],
+   "orders": [],
+   "positions": [],
+   "exits": [],
+   "trail": {
+    "complete": true,
+    "gaps": [],
+    "events": [
+     {
+      "correlation_id": "spy-refusal-2026-08-27",
+      "sequence": 0,
+      "stage": "OBSERVED",
+      "outcome": "accepted",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.119512+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-refusal-2026-08-27",
+      "sequence": 1,
+      "stage": "DECIDED",
+      "outcome": "NO_TRADE",
+      "component": "decision_workflow",
+      "reason_codes": [
+       "no_qualified_setup"
+      ],
+      "occurred_at": "2026-09-17T11:47:21.119512+00:00",
+      "refused": false
+     }
+    ]
+   },
+   "receipt": {
+    "relation": "OTHER_DECISION",
+    "belongs": false,
+    "reason": "this receipt records a different decision and is not the outcome of the selected case",
+    "matched_on": "decision_hash",
+    "facts": {
+     "open_positions": 0,
+     "equity_before": "100000.00",
+     "equity_after": "99992.90",
+     "realized": "-7.10",
+     "entry_filled_avg_price": "3.13",
+     "exit_filled_avg_price": "3.06"
+    }
+   },
+   "ablation": {
+    "relation": "NOT_DECISION_SCOPED",
+    "belongs": false,
+    "reason": "a corpus-level result over 5 frozen cases, not an outcome of the selected decision",
+    "matched_on": null,
+    "facts": {
+     "decisions_changed_by_model": 0,
+     "cases_compared": 5
+    }
+   }
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/proof": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "manifest_digest": "sha256:115256a06b06116999fd19abe5bb23bde1740be9a541f36886eef2ff1a21fa36",
+   "manifest": {
+    "manifest_version": "proof-manifest-2",
+    "decision": {
+     "snapshot_id": "spy-refusal-2026-08-27",
+     "action": "NO_TRADE",
+     "direction": "neutral",
+     "reason_codes": [
+      "no_qualified_setup"
+     ],
+     "input_hash": "sha256:b7176f51b1e9cb0f6a36b724d3a90e98a180f73c369dc8fe4e58965a062aab47",
+     "decision_hash": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.119512"
+    },
+    "observation": {
+     "snapshot_id": "spy-refusal-2026-08-27",
+     "symbol": "SPY",
+     "provider": "fixture",
+     "feed": "fixture",
+     "source_time": "2026-08-27T19:45:00",
+     "received_time": "2026-09-17T11:47:21.119512",
+     "underlying_price": "638.400000",
+     "payload_hash": "sha256:b7176f51b1e9cb0f6a36b724d3a90e98a180f73c369dc8fe4e58965a062aab47"
+    },
+    "evidence": [],
+    "model_memo": "NOT_CALLED",
+    "risk": [],
+    "intents": [],
+    "prepared_requests": [],
+    "broker_orders": [],
+    "positions": [],
+    "reached_the_broker": false,
+    "model_was_called": false,
+    "disclosures": [
+     "Alpaca Paper only. No live endpoint exists in this build.",
+     "Option quotes come from the indicative feed; the account has no OPRA agreement, so quotes are not trading-quality.",
+     "No alpha is claimed. The null hypothesis is not rejected, and the sample is far too small to test it. The completed round trips are counted on the dashboard's proof tiles rather than asserted here.",
+     "Nothing here is investment advice."
+    ]
+   }
   }
  },
  "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/outcomes": {
@@ -927,6 +2093,375 @@
    "structure": null
   }
  },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/memo": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "produced": true,
+   "thesis": {
+    "synthesizer_name": "deterministic_baseline_v0",
+    "direction": "bearish",
+    "confidence": "0.6850",
+    "evidence_ids": [
+     "sig-participation-breadth",
+     "sig-structure-trend-retest"
+    ],
+    "counter_evidence_ids": [
+     "sig-volatility-term"
+    ],
+    "invalidation_conditions": [
+     "close above 626.66 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "reasoning_summary": "Deterministic baseline: trend_continuation_retest qualified bearish on SPY from 2 aligned signal(s); 1 opposing signal(s) recorded. No model input."
+   },
+   "model_call": null
+  }
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/structure": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "selected": {
+    "candidate_id": "spy-trend-retest-spy-bearish-qualified-2026-08-27-vertical",
+    "strategy": "bear_put_debit_spread",
+    "long_contract_symbol": "SPY260918P00620000",
+    "short_contract_symbol": "SPY260918P00610000",
+    "quantity": 1,
+    "estimated_debit": "5.600000",
+    "calculated_max_loss": "560.000000",
+    "selected": true,
+    "rejection_reasons": [],
+    "leg_quotes": [
+     {
+      "contract_symbol": "SPY260918P00620000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "620",
+      "bid": "14.8",
+      "ask": "15",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.66",
+      "implied_volatility": "0.158",
+      "open_interest": 10422,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 2210
+     },
+     {
+      "contract_symbol": "SPY260918P00610000",
+      "option_type": "put",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "610",
+      "bid": "9.6",
+      "ask": "9.8",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "-0.38",
+      "implied_volatility": "0.1602",
+      "open_interest": 9140,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 1877
+     }
+    ]
+   },
+   "candidates": [
+    {
+     "candidate_id": "spy-trend-retest-spy-bearish-qualified-2026-08-27-vertical",
+     "strategy": "bear_put_debit_spread",
+     "long_contract_symbol": "SPY260918P00620000",
+     "short_contract_symbol": "SPY260918P00610000",
+     "quantity": 1,
+     "estimated_debit": "5.600000",
+     "calculated_max_loss": "560.000000",
+     "selected": true,
+     "rejection_reasons": [],
+     "leg_quotes": [
+      {
+       "contract_symbol": "SPY260918P00620000",
+       "option_type": "put",
+       "expiration": "2026-09-18",
+       "dte": 22,
+       "strike": "620",
+       "bid": "14.8",
+       "ask": "15",
+       "quote_as_of": "2026-08-27T19:44:50+00:00",
+       "feed": "indicative",
+       "delta": "-0.66",
+       "implied_volatility": "0.158",
+       "open_interest": 10422,
+       "open_interest_date": "2026-08-26",
+       "recent_volume": 2210
+      },
+      {
+       "contract_symbol": "SPY260918P00610000",
+       "option_type": "put",
+       "expiration": "2026-09-18",
+       "dte": 22,
+       "strike": "610",
+       "bid": "9.6",
+       "ask": "9.8",
+       "quote_as_of": "2026-08-27T19:44:50+00:00",
+       "feed": "indicative",
+       "delta": "-0.38",
+       "implied_volatility": "0.1602",
+       "open_interest": 9140,
+       "open_interest_date": "2026-08-26",
+       "recent_volume": 1877
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/risk": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "decisions": [
+    {
+     "governor_name": "deterministic_risk_governor_v0",
+     "approved": true,
+     "reason_codes": [],
+     "checks": [
+      {
+       "check": "legs_present",
+       "passed": true
+      },
+      {
+       "check": "max_loss_recomputed",
+       "passed": true,
+       "recomputed": "560.00",
+       "claimed": "560.00"
+      },
+      {
+       "check": "within_risk_budget",
+       "passed": true,
+       "budget": "900.00",
+       "max_loss": "560.00"
+      },
+      {
+       "check": "affordable",
+       "passed": true
+      },
+      {
+       "check": "direction_matches_setup",
+       "passed": true
+      }
+     ],
+     "risk_budget": "900.000000",
+     "calculated_max_loss": "560.000000",
+     "policy_version": "h0-provisional-1",
+     "intent_ttl_seconds": null
+    }
+   ],
+   "accounting": {
+    "account_equity": "120000",
+    "risk_budget": "900.000000",
+    "maximum_loss": "560.000000",
+    "budget_used_percent": "62.22"
+   }
+  }
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/lifecycle": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "reached_the_broker": false,
+   "intents": [],
+   "orders": [],
+   "positions": [],
+   "exits": [],
+   "trail": {
+    "complete": true,
+    "gaps": [],
+    "events": [
+     {
+      "correlation_id": "spy-bearish-qualified-2026-08-27",
+      "sequence": 0,
+      "stage": "OBSERVED",
+      "outcome": "accepted",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-bearish-qualified-2026-08-27",
+      "sequence": 1,
+      "stage": "QUALIFIED",
+      "outcome": "qualified",
+      "component": "deterministic_trend_retest_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-bearish-qualified-2026-08-27",
+      "sequence": 2,
+      "stage": "THESIS_READY",
+      "outcome": "synthesized",
+      "component": "deterministic_baseline_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-bearish-qualified-2026-08-27",
+      "sequence": 3,
+      "stage": "STRUCTURE_READY",
+      "outcome": "selected",
+      "component": "deterministic_vertical_selector_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-bearish-qualified-2026-08-27",
+      "sequence": 4,
+      "stage": "RISK_REVIEWED",
+      "outcome": "approved",
+      "component": "deterministic_risk_governor_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-bearish-qualified-2026-08-27",
+      "sequence": 5,
+      "stage": "DECIDED",
+      "outcome": "OPTIONS_POSITION",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.103428+00:00",
+      "refused": false
+     }
+    ]
+   },
+   "receipt": {
+    "relation": "OTHER_DECISION",
+    "belongs": false,
+    "reason": "this receipt records a different decision and is not the outcome of the selected case",
+    "matched_on": "decision_hash",
+    "facts": {
+     "open_positions": 0,
+     "equity_before": "100000.00",
+     "equity_after": "99992.90",
+     "realized": "-7.10",
+     "entry_filled_avg_price": "3.13",
+     "exit_filled_avg_price": "3.06"
+    }
+   },
+   "ablation": {
+    "relation": "NOT_DECISION_SCOPED",
+    "belongs": false,
+    "reason": "a corpus-level result over 5 frozen cases, not an outcome of the selected decision",
+    "matched_on": null,
+    "facts": {
+     "decisions_changed_by_model": 0,
+     "cases_compared": 5
+    }
+   }
+  }
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/proof": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "manifest_digest": "sha256:d2cb4c4f97cf88d26dc5a6e35595e6de342e5af0074ed3f3b78f4cab7f3dc634",
+   "manifest": {
+    "manifest_version": "proof-manifest-2",
+    "decision": {
+     "snapshot_id": "spy-bearish-qualified-2026-08-27",
+     "action": "OPTIONS_POSITION",
+     "direction": "bearish",
+     "reason_codes": [],
+     "input_hash": "sha256:999759c2f56691ec43e520ee4f4e6f17db57105766aae76cb19259868180976c",
+     "decision_hash": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.103428"
+    },
+    "observation": {
+     "snapshot_id": "spy-bearish-qualified-2026-08-27",
+     "symbol": "SPY",
+     "provider": "fixture",
+     "feed": "fixture",
+     "source_time": "2026-08-27T19:45:00",
+     "received_time": "2026-09-17T11:47:21.103428",
+     "underlying_price": "617.400000",
+     "payload_hash": "sha256:999759c2f56691ec43e520ee4f4e6f17db57105766aae76cb19259868180976c"
+    },
+    "evidence": [
+     {
+      "setup_id": "spy-trend-retest-spy-bearish-qualified-2026-08-27",
+      "setup_family": "trend_continuation_retest",
+      "direction": "bearish",
+      "classifier_name": "deterministic_trend_retest_v0",
+      "evidence_ids": [
+       "sig-participation-breadth",
+       "sig-structure-trend-retest"
+      ],
+      "invalidation_conditions": [
+       "close above 626.66 invalidates the retest",
+       "loss of directional structure on the decision timeframe"
+      ],
+      "payload_hash": "sha256:ceeebcd55f91c7426521f71aa0499bbb082ffee5299696e3f50cba41869b66cf"
+     }
+    ],
+    "model_memo": {
+     "synthesizer_name": "deterministic_baseline_v0",
+     "direction": "bearish",
+     "confidence": "0.6850",
+     "evidence_ids": [
+      "sig-participation-breadth",
+      "sig-structure-trend-retest"
+     ],
+     "counter_evidence_ids": [
+      "sig-volatility-term"
+     ]
+    },
+    "risk": [
+     {
+      "governor_name": "deterministic_risk_governor_v0",
+      "approved": true,
+      "reason_codes": [],
+      "risk_budget": "900.000000",
+      "calculated_max_loss": "560.000000",
+      "policy_version": "h0-provisional-1"
+     }
+    ],
+    "intents": [],
+    "prepared_requests": [],
+    "broker_orders": [],
+    "positions": [],
+    "reached_the_broker": false,
+    "model_was_called": true,
+    "disclosures": [
+     "Alpaca Paper only. No live endpoint exists in this build.",
+     "Option quotes come from the indicative feed; the account has no OPRA agreement, so quotes are not trading-quality.",
+     "No alpha is claimed. The null hypothesis is not rejected, and the sample is far too small to test it. The completed round trips are counted on the dashboard's proof tiles rather than asserted here.",
+     "Nothing here is investment advice."
+    ]
+   }
+  }
+ },
  "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/outcomes": {
   "schema_version": "public.v1",
   "source_mode": "FROZEN_REPLAY",
@@ -1086,6 +2621,375 @@
     "payload_hash": "sha256:9ab3aabbe39c80382adb64e96eb1bf4180820a30de207e0fe080f6f60f98ee36"
    },
    "structure": null
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/memo": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "produced": true,
+   "thesis": {
+    "synthesizer_name": "deterministic_baseline_v0",
+    "direction": "bullish",
+    "confidence": "0.6650",
+    "evidence_ids": [
+     "sig-participation-breadth",
+     "sig-structure-trend-retest"
+    ],
+    "counter_evidence_ids": [
+     "sig-volatility-term"
+    ],
+    "invalidation_conditions": [
+     "close below 631.63 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "reasoning_summary": "Deterministic baseline: trend_continuation_retest qualified bullish on SPY from 2 aligned signal(s); 1 opposing signal(s) recorded. No model input."
+   },
+   "model_call": null
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/structure": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "selected": {
+    "candidate_id": "spy-trend-retest-spy-qualified-2026-08-27-vertical",
+    "strategy": "bull_call_debit_spread",
+    "long_contract_symbol": "SPY260918C00640000",
+    "short_contract_symbol": "SPY260918C00645000",
+    "quantity": 1,
+    "estimated_debit": "3.200000",
+    "calculated_max_loss": "320.000000",
+    "selected": true,
+    "rejection_reasons": [],
+    "leg_quotes": [
+     {
+      "contract_symbol": "SPY260918C00640000",
+      "option_type": "call",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "640",
+      "bid": "12.4",
+      "ask": "12.6",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "0.56",
+      "implied_volatility": "0.142",
+      "open_interest": 18422,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 3110
+     },
+     {
+      "contract_symbol": "SPY260918C00645000",
+      "option_type": "call",
+      "expiration": "2026-09-18",
+      "dte": 22,
+      "strike": "645",
+      "bid": "9.6",
+      "ask": "9.8",
+      "quote_as_of": "2026-08-27T19:44:50+00:00",
+      "feed": "indicative",
+      "delta": "0.38",
+      "implied_volatility": "0.1395",
+      "open_interest": 12007,
+      "open_interest_date": "2026-08-26",
+      "recent_volume": 2088
+     }
+    ]
+   },
+   "candidates": [
+    {
+     "candidate_id": "spy-trend-retest-spy-qualified-2026-08-27-vertical",
+     "strategy": "bull_call_debit_spread",
+     "long_contract_symbol": "SPY260918C00640000",
+     "short_contract_symbol": "SPY260918C00645000",
+     "quantity": 1,
+     "estimated_debit": "3.200000",
+     "calculated_max_loss": "320.000000",
+     "selected": true,
+     "rejection_reasons": [],
+     "leg_quotes": [
+      {
+       "contract_symbol": "SPY260918C00640000",
+       "option_type": "call",
+       "expiration": "2026-09-18",
+       "dte": 22,
+       "strike": "640",
+       "bid": "12.4",
+       "ask": "12.6",
+       "quote_as_of": "2026-08-27T19:44:50+00:00",
+       "feed": "indicative",
+       "delta": "0.56",
+       "implied_volatility": "0.142",
+       "open_interest": 18422,
+       "open_interest_date": "2026-08-26",
+       "recent_volume": 3110
+      },
+      {
+       "contract_symbol": "SPY260918C00645000",
+       "option_type": "call",
+       "expiration": "2026-09-18",
+       "dte": 22,
+       "strike": "645",
+       "bid": "9.6",
+       "ask": "9.8",
+       "quote_as_of": "2026-08-27T19:44:50+00:00",
+       "feed": "indicative",
+       "delta": "0.38",
+       "implied_volatility": "0.1395",
+       "open_interest": 12007,
+       "open_interest_date": "2026-08-26",
+       "recent_volume": 2088
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/risk": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "decisions": [
+    {
+     "governor_name": "deterministic_risk_governor_v0",
+     "approved": true,
+     "reason_codes": [],
+     "checks": [
+      {
+       "check": "legs_present",
+       "passed": true
+      },
+      {
+       "check": "max_loss_recomputed",
+       "passed": true,
+       "recomputed": "320.00",
+       "claimed": "320.00"
+      },
+      {
+       "check": "within_risk_budget",
+       "passed": true,
+       "budget": "750.00",
+       "max_loss": "320.00"
+      },
+      {
+       "check": "affordable",
+       "passed": true
+      },
+      {
+       "check": "direction_matches_setup",
+       "passed": true
+      }
+     ],
+     "risk_budget": "750.000000",
+     "calculated_max_loss": "320.000000",
+     "policy_version": "h0-provisional-1",
+     "intent_ttl_seconds": null
+    }
+   ],
+   "accounting": {
+    "account_equity": "100000",
+    "risk_budget": "750.000000",
+    "maximum_loss": "320.000000",
+    "budget_used_percent": "42.67"
+   }
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/lifecycle": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "reached_the_broker": false,
+   "intents": [],
+   "orders": [],
+   "positions": [],
+   "exits": [],
+   "trail": {
+    "complete": true,
+    "gaps": [],
+    "events": [
+     {
+      "correlation_id": "spy-qualified-2026-08-27",
+      "sequence": 0,
+      "stage": "OBSERVED",
+      "outcome": "accepted",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-qualified-2026-08-27",
+      "sequence": 1,
+      "stage": "QUALIFIED",
+      "outcome": "qualified",
+      "component": "deterministic_trend_retest_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-qualified-2026-08-27",
+      "sequence": 2,
+      "stage": "THESIS_READY",
+      "outcome": "synthesized",
+      "component": "deterministic_baseline_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-qualified-2026-08-27",
+      "sequence": 3,
+      "stage": "STRUCTURE_READY",
+      "outcome": "selected",
+      "component": "deterministic_vertical_selector_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-qualified-2026-08-27",
+      "sequence": 4,
+      "stage": "RISK_REVIEWED",
+      "outcome": "approved",
+      "component": "deterministic_risk_governor_v0",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+      "refused": false
+     },
+     {
+      "correlation_id": "spy-qualified-2026-08-27",
+      "sequence": 5,
+      "stage": "DECIDED",
+      "outcome": "OPTIONS_POSITION",
+      "component": "decision_workflow",
+      "reason_codes": [],
+      "occurred_at": "2026-09-17T11:47:21.063587+00:00",
+      "refused": false
+     }
+    ]
+   },
+   "receipt": {
+    "relation": "OTHER_DECISION",
+    "belongs": false,
+    "reason": "this receipt records a different decision and is not the outcome of the selected case",
+    "matched_on": "decision_hash",
+    "facts": {
+     "open_positions": 0,
+     "equity_before": "100000.00",
+     "equity_after": "99992.90",
+     "realized": "-7.10",
+     "entry_filled_avg_price": "3.13",
+     "exit_filled_avg_price": "3.06"
+    }
+   },
+   "ablation": {
+    "relation": "NOT_DECISION_SCOPED",
+    "belongs": false,
+    "reason": "a corpus-level result over 5 frozen cases, not an outcome of the selected decision",
+    "matched_on": null,
+    "facts": {
+     "decisions_changed_by_model": 0,
+     "cases_compared": 5
+    }
+   }
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/proof": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "manifest_digest": "sha256:9c0495bd8b3171ebdf5ff24fc14f39947e79b0ce66c0d0ad59eb219aa5e32085",
+   "manifest": {
+    "manifest_version": "proof-manifest-2",
+    "decision": {
+     "snapshot_id": "spy-qualified-2026-08-27",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "reason_codes": [],
+     "input_hash": "sha256:982d1efc7d914ca243f5ce8a0e56d890ef55c9e08e7793f99955d9198894279b",
+     "decision_hash": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.063587"
+    },
+    "observation": {
+     "snapshot_id": "spy-qualified-2026-08-27",
+     "symbol": "SPY",
+     "provider": "fixture",
+     "feed": "fixture",
+     "source_time": "2026-08-27T19:45:00",
+     "received_time": "2026-09-17T11:47:21.063587",
+     "underlying_price": "641.250000",
+     "payload_hash": "sha256:982d1efc7d914ca243f5ce8a0e56d890ef55c9e08e7793f99955d9198894279b"
+    },
+    "evidence": [
+     {
+      "setup_id": "spy-trend-retest-spy-qualified-2026-08-27",
+      "setup_family": "trend_continuation_retest",
+      "direction": "bullish",
+      "classifier_name": "deterministic_trend_retest_v0",
+      "evidence_ids": [
+       "sig-participation-breadth",
+       "sig-structure-trend-retest"
+      ],
+      "invalidation_conditions": [
+       "close below 631.63 invalidates the retest",
+       "loss of directional structure on the decision timeframe"
+      ],
+      "payload_hash": "sha256:9ab3aabbe39c80382adb64e96eb1bf4180820a30de207e0fe080f6f60f98ee36"
+     }
+    ],
+    "model_memo": {
+     "synthesizer_name": "deterministic_baseline_v0",
+     "direction": "bullish",
+     "confidence": "0.6650",
+     "evidence_ids": [
+      "sig-participation-breadth",
+      "sig-structure-trend-retest"
+     ],
+     "counter_evidence_ids": [
+      "sig-volatility-term"
+     ]
+    },
+    "risk": [
+     {
+      "governor_name": "deterministic_risk_governor_v0",
+      "approved": true,
+      "reason_codes": [],
+      "risk_budget": "750.000000",
+      "calculated_max_loss": "320.000000",
+      "policy_version": "h0-provisional-1"
+     }
+    ],
+    "intents": [],
+    "prepared_requests": [],
+    "broker_orders": [],
+    "positions": [],
+    "reached_the_broker": false,
+    "model_was_called": true,
+    "disclosures": [
+     "Alpaca Paper only. No live endpoint exists in this build.",
+     "Option quotes come from the indicative feed; the account has no OPRA agreement, so quotes are not trading-quality.",
+     "No alpha is claimed. The null hypothesis is not rejected, and the sample is far too small to test it. The completed round trips are counted on the dashboard's proof tiles rather than asserted here.",
+     "Nothing here is investment advice."
+    ]
+   }
   }
  },
  "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/outcomes": {

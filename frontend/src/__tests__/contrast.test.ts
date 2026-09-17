@@ -37,11 +37,19 @@ function contrast(a: string, b: string): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-/** Surfaces text is painted on. `--edge` is absent on purpose: it shows only as
- *  the 1px rules between cells, which every child paints over. */
+/**
+ * Surfaces text is painted on.
+ *
+ * `--edge` was left out of this list once, on the reasoning that it only shows
+ * as the 1px rules between cells and every child paints over it. Within a day
+ * `RUI-4`'s panels put text on it and axe found `--dim` there at 3.77:1. It is
+ * the lightest surface in the palette and therefore the binding one, so it is
+ * listed: an ink that clears `--edge` clears everything.
+ */
 const surfaces = {
   "--ink": token("--ink"),
   "--panel": token("--panel"),
+  "--edge": token("--edge"),
   "panel2 (.spine li)": "#1b222c",
   "the current decision": "#101923",
   "the model's stage": "#1f1808",
