@@ -49,7 +49,7 @@ const walk = (node, out = []) => {
 
 const digests = [...new Set(walk(captured["/api/v1/decisions/grouped?view=Notable"].data))];
 for (const digest of digests) {
-  for (const leaf of ["summary", "market", "outcomes"]) {
+  for (const leaf of ["summary", "market", "memo", "structure", "risk", "lifecycle", "proof", "outcomes"]) {
     const path = `/api/v1/decisions/${digest}/${leaf}`;
     captured[path] = await envelope(path);
   }

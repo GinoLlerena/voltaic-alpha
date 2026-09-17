@@ -50,6 +50,16 @@ export const api = {
     published("/api/v1/decisions/{digest}/market").replace("{digest}", digest) as ApiUrl,
   outcomes: (digest: string) =>
     published("/api/v1/decisions/{digest}/outcomes").replace("{digest}", digest) as ApiUrl,
+  memo: (digest: string) =>
+    published("/api/v1/decisions/{digest}/memo").replace("{digest}", digest) as ApiUrl,
+  structure: (digest: string) =>
+    published("/api/v1/decisions/{digest}/structure").replace("{digest}", digest) as ApiUrl,
+  risk: (digest: string) =>
+    published("/api/v1/decisions/{digest}/risk").replace("{digest}", digest) as ApiUrl,
+  lifecycle: (digest: string) =>
+    published("/api/v1/decisions/{digest}/lifecycle").replace("{digest}", digest) as ApiUrl,
+  proof: (digest: string) =>
+    published("/api/v1/decisions/{digest}/proof").replace("{digest}", digest) as ApiUrl,
   proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
   reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
   tour: () => published("/api/v1/tour") as ApiUrl,

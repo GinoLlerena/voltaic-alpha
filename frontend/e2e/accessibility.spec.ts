@@ -103,3 +103,30 @@ test("every decision is reachable and openable from the keyboard alone", async (
   }
   expect(opened).toBe(first);
 });
+
+test("no text is squeezed into a vertical column at phone width", async ({ page }) => {
+  // The overflow check above passes happily while text is unreadable: a flex row
+  // written for two children was given three, and at 400px its label rendered
+  // 73px wide and 1300px tall — one letter per line — inside a page that did
+  // not overflow at all. Tall-and-narrow is the signature, so look for it.
+  await replayApi(page);
+  await page.setViewportSize({ width: 400, height: 800 });
+  for (const route of routes) {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+    const squeezed = await page.evaluate(() =>
+      [...document.querySelectorAll("body *")]
+        .filter((el) => {
+          const text = (el.textContent ?? "").trim();
+          if (text.length < 4 || el.children.length > 0) return false;
+          const box = el.getBoundingClientRect();
+          // Roughly: more than six lines tall while narrower than a few words.
+          return box.height > 120 && box.width < 90;
+        })
+        .map((el) => `${el.tagName.toLowerCase()}.${el.className || "-"}: ${
+          (el.textContent ?? "").trim().slice(0, 24)
+        }`),
+    );
+    expect(squeezed, `${route} renders text in a vertical column`).toEqual([]);
+  }
+});

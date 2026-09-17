@@ -1563,6 +1563,72 @@ guess at a reason, because it cannot derive one.
 | axe | 8 routes × 2 viewports, **0 violations** |
 | Responsive | no horizontal overflow at 400px or 768px |
 
+## 26. `RUI-4` trader decision depth — 17 September 2026
+
+`RUI-4`'s exit is that a trader answers **why direction, why now, why structure,
+max loss and invalidation in thirty seconds**, with selected-decision isolation
+holding throughout. The data for all five already existed behind
+`/decisions/{digest}/{market,memo,structure,risk,lifecycle,proof}`; the browser
+rendered two of those endpoints and none of the depth.
+
+### Thirty seconds, then the evidence
+
+Fourteen panels answer the five questions from records. They are several screens
+long, so a reader who must scroll to learn the maximum loss has not answered it
+in thirty seconds — the page opens with the five questions answered in one line
+each, every row linking to the panel that evidences it. Nothing in that strip is
+computed: each answer is selected from a record, and a question this decision
+cannot answer says **"not answerable from this decision's records"** rather than
+disappearing. A missing row would read as though the question did not apply,
+which for a refusal is the opposite of the truth.
+
+### What the panels refuse to flatter
+
+- **Counter-evidence is shown.** `role` comes from the server; signals that
+  opposed the setup and signals observed and unused sit in the same table as the
+  cited ones. A page showing only supporting signals is an argument, not a record.
+- **The recomputed maximum loss sits beside the claimed one.** The governor not
+  taking the structure's word for it is the entire check, so every check is
+  listed, passing ones included.
+- **Invalidation conditions are never merged.** The classifier's are binding and
+  the model has no schema field to receive them; the memo's are advisory. One
+  list would imply an agreement the records do not contain.
+- **The memo carries its boundary where it is read**, not once on another page.
+- **Artifacts say whose they are.** On the committed evidence the Paper receipt
+  resolves to `OTHER_DECISION · matched on decision_hash` and the ablation to
+  `NOT_DECISION_SCOPED`. That is selected-decision isolation, visible rather
+  than asserted.
+
+### No payoff diagram, deliberately
+
+`RUI-4` lists payoff among its scope and the tabular alternative beside it. The
+leg matrix is that table. There is no diagram and no computed payoff curve,
+because authority rule 3 forbids the browser calculating P&L — a payoff drawn in
+the client would be exactly that, whether rendered as a chart or as a column of
+numbers. OHLC stays out too: its prerequisite, hashed bar-window persistence, is
+not complete. Also not in this increment: reconciliation depth beyond order
+status and fills, and export.
+
+### What the browser gate caught in this increment
+
+The gate added hours earlier failed the moment this work touched it, which is
+the only real evidence a gate is worth having:
+
+| defect | how it presented |
+|---|---|
+| `--dim` on `--edge` at **3.77:1** | the contrast test had excluded `--edge` on the reasoning that no text is drawn on it; `RUI-4`'s panels put text there the same day |
+| the page overflowed a phone by 12px | the manifest digest — one unbreakable `sha256:` token with no wrap opportunity |
+| `.chk` rows unreadable at 400px | a flex row written for two children was given three: the label rendered **73px wide and 1300px tall**, one letter per line, on a page that did not overflow at all |
+| the five-question rows laid out two-across | `.five` is a `dl`, and the global `dl` rule is `180px 1fr`, which it never overrode |
+| "records" hyphenated as "recor/ds" | `dd` carried `word-break: break-all` so hashes would wrap; it broke prose too |
+
+Only the first was an accessibility violation. The rest passed every automated
+check then in place, and were found by reading a 400px screenshot before
+accepting it as a baseline — which is the reason for that rule. Two new checks
+came out of it: `--edge` is now a surface the contrast test asserts, and a
+phone-width check fails any element that renders taller than 120px while
+narrower than 90px, the signature of text squeezed into a column.
+
 ### Exit criteria not yet met
 
 `RUI-3`'s exit is now met on the committed evidence: both journeys were walked,
