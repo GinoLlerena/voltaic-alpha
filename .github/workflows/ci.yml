@@ -51,6 +51,56 @@ jobs:
           pnpm run api-types
           git diff --exit-code src/api/schema.ts
 
+  browser:
+    # RUI-2's gate. The unit suite runs in jsdom, which applies no stylesheet,
+    # and three shipped defects proved what that misses: a palette token at
+    # 3.09:1, proof tiles with no styles at all, and a cascade that painted the
+    # model's stage on the decisions where the model never ran. All three had
+    # correct markup and a green suite.
+    #
+    # This keeps the frontend job's property of needing no Python and no
+    # database: it serves the built app and replays frozen API envelopes from
+    # frontend/fixtures/api.json, so a failure here is always the page's fault.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        # Only Chromium, and only its dependencies: the gate asserts contrast,
+        # layout and computed colour, none of which needs three engines.
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build
+        run: pnpm run build
+      - name: Accessibility, rendering and visual regression
+        run: pnpm run e2e
+      - name: Upload the report and the images this run produced
+        # Always, not just on failure: a visual baseline for Linux is taken from
+        # a run rather than guessed at, and a diff is unarguable in a way a
+        # description of a diff is not.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-gate
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            frontend/e2e/__screenshots__/
+          retention-days: 14
+          if-no-files-found: ignore
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15

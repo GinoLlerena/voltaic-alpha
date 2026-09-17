@@ -1,0 +1,156 @@
+import { expect, test } from "@playwright/test";
+import { digests, replayApi } from "./fixtures";
+
+/**
+ * What the page actually renders, asserted against a real cascade.
+ *
+ * These are the three `RUI-VAL-012` defects turned into checks. Each one had
+ * correct markup — the unit tests passed throughout — and was wrong only once a
+ * stylesheet was applied. Computed styles are used rather than pixels because
+ * they are identical on every platform, so this can gate a pull request without
+ * a font-rendering argument.
+ */
+
+const REFUSAL = "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2";
+const MODEL_WROTE_THE_MEMO = "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5";
+
+const WARM = "rgb(232, 163, 61)";
+const DIM = "rgb(121, 138, 160)";
+
+test.describe("the proof tiles", () => {
+  test("are laid out, rather than a bulleted list of same-sized text", async ({ page }) => {
+    await replayApi(page);
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const tiles = await page.evaluate(() => {
+      const list = document.querySelector(".proof");
+      if (!list) return null;
+      const size = (el: Element | null) => (el ? getComputedStyle(el).fontSize : null);
+      return {
+        display: getComputedStyle(list).display,
+        listStyle: getComputedStyle(list).listStyleType,
+        items: [...list.querySelectorAll("li")].map((li) => ({
+          mode: li.getAttribute("data-mode"),
+          value: size(li.querySelector(".n")),
+          label: size(li.querySelector(".l")),
+          chip: size(li.querySelector(".mode")),
+          source: size(li.querySelector(".src")),
+          chipColour: li.querySelector(".mode")
+            ? getComputedStyle(li.querySelector(".mode") as Element).color
+            : null,
+        })),
+      };
+    });
+
+    expect(tiles, ".proof rendered nothing").not.toBeNull();
+    expect(tiles!.display, ".proof had no layout — it shipped once with no styles at all").toBe("grid");
+    expect(tiles!.listStyle).toBe("none");
+    expect(tiles!.items.length).toBeGreaterThan(0);
+
+    for (const tile of tiles!.items) {
+      // The value, the label, the mode and the provenance each say a different
+      // kind of thing, and once all rendered at 15px in the same colour.
+      const sizes = new Set([tile.value, tile.label, tile.chip, tile.source]);
+      expect(sizes.size, `"${tile.mode}" tile renders its four parts at one size`).toBe(4);
+    }
+  });
+
+  test("distinguish an observed value from a derived one", async ({ page }) => {
+    // Authority rule 6: observed, read, replayed and derived stay visibly
+    // different. The mode is carried on `data-mode`, not inferred here.
+    await replayApi(page);
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    const byMode = await page.evaluate(() => {
+      const entries: [string, string][] = [];
+      for (const li of document.querySelectorAll(".proof li")) {
+        const chip = li.querySelector(".mode");
+        if (chip) entries.push([li.getAttribute("data-mode") ?? "?", getComputedStyle(chip).color]);
+      }
+      return entries;
+    });
+
+    const modes = new Set(byMode.map(([mode]) => mode));
+    const colours = new Set(byMode.map(([, colour]) => colour));
+    expect(modes.size).toBeGreaterThan(1);
+    expect(colours.size, `modes share one colour: ${JSON.stringify(byMode)}`).toBe(modes.size);
+  });
+});
+
+test.describe("the authority spine", () => {
+  test("gives the model's stage the model's colour only when it ran", async ({ page }) => {
+    await replayApi(page);
+
+    const memo = async (digest: string) => {
+      await page.goto(`/decisions/${digest}`);
+      await page.waitForLoadState("networkidle");
+      return page.evaluate(() => {
+        const li = document.querySelector('[data-stage="03"]');
+        const label = li?.querySelector(".l");
+        if (!li || !label) throw new Error("the spine did not render stage 03");
+        return {
+          lit: li.getAttribute("data-lit"),
+          colour: getComputedStyle(label).color,
+          spoken: li.querySelector(".sr")?.textContent ?? null,
+        };
+      });
+    };
+
+    const called = await memo(MODEL_WROTE_THE_MEMO);
+    expect(called.lit).toBe("true");
+    expect(called.colour, "the stage the model wrote must carry the model's colour").toBe(WARM);
+
+    const never = await memo(REFUSAL);
+    expect(never.lit).toBe("false");
+    // This was the inversion: a refusal that never called the model showed the
+    // memo stage warm, and a decision it had written showed it cool.
+    expect(never.colour, "a stage the model never reached must not look like the model's").toBe(DIM);
+    expect(never.spoken, "a fade alone tells a screen reader nothing").toContain("not reached");
+  });
+
+  test("never expresses a stage's state through opacity", async ({ page }) => {
+    await replayApi(page);
+    await page.goto(`/decisions/${REFUSAL}`);
+    await page.waitForLoadState("networkidle");
+    const faded = await page.evaluate(() =>
+      [...document.querySelectorAll(".spine li")]
+        .filter((li) => Number(getComputedStyle(li).opacity) < 1)
+        .map((li) => li.getAttribute("data-stage")),
+    );
+    // Opacity scales text and background together: the old `.45` rendered at
+    // 2.02:1 and could not be reasoned about from the palette.
+    expect(faded).toEqual([]);
+  });
+});
+
+test.describe("the decision ticket", () => {
+  test("says a structure reading is absent rather than dropping the section", async ({ page }) => {
+    await replayApi(page);
+    for (const digest of digests) {
+      await page.goto(`/decisions/${digest}`);
+      await page.waitForLoadState("networkidle");
+      const section = page.getByTestId("structure-reading");
+      await expect(section, `${digest.slice(0, 12)} dropped the section entirely`).toBeVisible();
+      if ((await section.getAttribute("data-present")) === "false") {
+        await expect(section).toContainText("No structure reading was recorded");
+        await expect(section).toContainText("structure_readings");
+      }
+    }
+  });
+
+  test("gives every reason a source", async ({ page }) => {
+    await replayApi(page);
+    for (const digest of digests) {
+      await page.goto(`/decisions/${digest}`);
+      await page.waitForLoadState("networkidle");
+      const missing = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid="why-decision"] li')]
+          .filter((li) => !li.querySelector(".src")?.textContent?.trim())
+          .map((li) => li.querySelector(".s")?.textContent ?? "?"),
+      );
+      expect(missing, `${digest.slice(0, 12)} has a claim with no source`).toEqual([]);
+    }
+  });
+});

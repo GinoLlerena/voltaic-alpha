@@ -1485,10 +1485,113 @@ decision's own `model_was_called` and `reached_the_broker`. Checked in a browser
 the lifecycle decision lights the memo stage and the broker stage; a refusal
 lights neither.
 
+### `RUI-VAL-011` — the palette failed contrast, and a state was carried by opacity alone — **resolved 17 September 2026**
+
+Asked whether the UI had been tested, the honest answer was that it had not been
+tested for accessibility. An axe-core 4.10.2 scan (`wcag2a`, `wcag2aa`) against
+the running app found **22 serious failures** across the two routes, none of
+which reading the stylesheet would have revealed.
+
+Sixteen were one token. `--dim: #5c697a`, inherited from the Streamlit palette,
+rendered at **3.38:1** on `--ink` and **3.09:1** on `--panel` where AA requires
+4.5:1 — the source labels, the status keys and the "why" provenance lines, which
+is to say most of the text whose whole purpose is to say where a number came
+from. It is now `#798aa0`, the same hue lightened until the worst surface it can
+land on (`#1b222c`, the spine's cells) clears the bar at **4.54:1**.
+
+The other six were a different mistake. The authority spine faded the stages a
+decision never reached with `opacity: .45`, which scales text and background
+together — `#4b596b` on `#212a37`, **2.02:1** — and, worse, told a screen reader
+nothing at all: "not reached" existed only as a `data-lit` attribute and a
+visual fade. Those stages now recede by colour and an inset rule, and each one
+says `— not reached` in words that assistive technology can read.
+
+Both routes now scan clean (0 violations, 16 and 13 passes). Keyboard-only
+navigation reaches all five decisions and opens one with Enter, the focus ring
+survives because nothing suppresses it, and neither route overflows at 400px or
+768px.
+
+A browser is the only place axe can measure contrast, so the regression test
+asserts the same arithmetic without one: every ink token against every surface
+it can be drawn on, plus a rule that the spine may not express state through
+opacity. Reintroducing each defect fails it — five cases for the token, one each
+for the fade and the missing words.
+
+### `RUI-VAL-012` — walking the evaluator journeys found three defects no test could see — **17 September 2026**
+
+`RUI-3`'s exit is the ten-second and 90-second evaluator journeys passing with
+no missing source. Walked as journeys, against the real API, they did not pass.
+All three failures were invisible to the unit tests, because jsdom applies no
+stylesheet: the markup was right in every case and the rendering was wrong.
+
+**The proof tiles had no styles at all.** The first viewport's three claims —
+the reconciled lifecycle, the model's measured influence, the single authorized
+write path — rendered as a disc-bulleted list in which the value, the label, the
+mode and the provenance were all 15px in the same colour. `.proof` matched
+nothing in the stylesheet. Authority rule 6 requires observed, read, replayed
+and derived values to stay visibly different; four of the five modes were not
+distinguishable from each other or from the prose around them. The tiles now use
+the status strip's grid, and the mode is a chip coloured by what it actually is,
+carried on `data-mode` rather than inferred.
+
+**The spine painted the product's one claim backwards.** `.spine li.on .l`
+followed `.spine li.model .l` at equal specificity and therefore won. The
+consequence: on a refusal, where the model was never called, the memo stage was
+painted in the model's warm; on a decision where the model had written the memo,
+it was painted the same cool as the deterministic code stages. Measured in the
+browser — refusal `rgb(232,163,61)`, live decision `rgb(90,179,240)`. The one
+distinction the product exists to make, inverted, on the page that makes it. The
+model's stage now keeps its colour only when it ran and recedes with every other
+unreached stage when it did not.
+
+**A missing structure reading rendered as nothing.** `CIIP-VAL-012` added the
+reading so a refusal could say how nearly it qualified. Every one of the five
+committed-evidence decisions has `structure: null` — recorded before that work,
+or replayed from a fixture carrying no bars — so the section silently vanished,
+taking the refusal's central question off the page with no account of why. This
+is `RUI-VAL-009`'s omission again. The client now states that the record is
+absent and names `structure_readings` as where it would come from. It does not
+guess at a reason, because it cannot derive one.
+
+### What the journeys now show
+
+| | |
+|---|---|
+| Ten-second read | source banner, six status cells each naming its source, `WORKER UNKNOWN` kept unknown with the reason, three proof tiles with mode and provenance, the review caveat, five decisions |
+| 90-second read | qualified, refusal and lifecycle each open by URL; 3–6 `why` lines each, **none** missing prose or a source; horizons render the waiting ones as waiting |
+| The memorable distinction | the fence — "the model may only write the memo" — on every decision, and the spine now lights it truthfully |
+| axe | 8 routes × 2 viewports, **0 violations** |
+| Responsive | no horizontal overflow at 400px or 768px |
+
 ### Exit criteria not yet met
 
-`RUI-3`'s exit is the ten-second and 90-second evaluator journeys passing with no
-missing source. The screens exist and every value on them carries its source, but
-the journeys have not been walked as journeys, and `RUI-2`'s accessibility,
-visual-regression and responsive gates are still outstanding. Those remain the
-honest blockers before either increment is called done.
+`RUI-3`'s exit is now met on the committed evidence: both journeys were walked,
+the three defects they exposed are fixed, and no value on either screen lacks a
+source. It is met on five decisions and one refusal, which is the whole corpus
+that exists — a live refusal carrying a real structure reading has not yet been
+walked, and should be once the worker records one.
+
+`RUI-2`'s gate is now met, and is a gate rather than a check. A `browser` job
+runs the built app in Chromium against frozen API envelopes
+(`frontend/fixtures/api.json`, `observed_at` pinned), so it needs no Python and
+no database — the same property the `frontend` job was designed around — and a
+failure is therefore always the page's fault.
+
+Three layers, because they catch different things:
+
+| layer | asserts | catches |
+|---|---|---|
+| `accessibility.spec.ts` | axe `wcag2a`/`wcag2aa` on every route at 1280px and 400px; no horizontal overflow; every decision tab-reachable and openable with Enter, with a focus ring | the palette, and anything that makes the page unusable without a mouse |
+| `rendering.spec.ts` | computed styles: the tiles are laid out and render four parts at four sizes, each mode has its own colour, the model's stage carries the model's colour only when it ran, no stage states anything through opacity, no claim lacks a source | the three defects above, by the property each violated |
+| `visual.spec.ts` | a narrow pixel diff over four screens at two widths | drift in a screen nobody was editing |
+
+Measured, rather than assumed: reintroducing the unstyled tiles leaves vitest
+entirely green — 57 passed — and fails the browser gate. A 3px padding change
+passes all 24 property tests and fails 4 visual ones. Computed styles are used
+for the properties rather than pixels because they are identical on every
+platform; only the pixel baselines are per-platform, and the Linux ones were
+taken from a CI run and read before being trusted, since a baseline of a broken
+render would lock the breakage in.
+
+What remains for `RUI-2` is the Storybook state matrix and light/dark themes
+from its original scope, neither of which is a gate.

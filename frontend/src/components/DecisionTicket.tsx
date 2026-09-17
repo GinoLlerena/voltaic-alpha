@@ -50,7 +50,7 @@ export function DecisionTicket({
       </dl>
 
       {structure ? (
-        <section data-testid="structure-reading">
+        <section data-testid="structure-reading" data-present="true">
           <h3>Why the setup did not qualify</h3>
           <p className="gate">
             Gate: <strong>{structure.gate}</strong>
@@ -92,7 +92,20 @@ export function DecisionTicket({
             </dd>
           </dl>
         </section>
-      ) : null}
+      ) : (
+        /* A missing reading is itself worth saying. Rendering nothing put the
+           refusal's central question — how nearly did it qualify? — off the page
+           with no account of why, which is the omission `RUI-VAL-009` found in
+           the dashboard. The client states that the record is absent and names
+           where it would come from; it does not guess at a reason. */
+        <section data-testid="structure-reading" data-present="false">
+          <h3>Why the setup did not qualify</h3>
+          <p className="gate">
+            <span className="t na">No structure reading was recorded for this decision.</span>
+            <span className="src">structure_readings</span>
+          </p>
+        </section>
+      )}
 
       <section data-testid="why-decision">
         <h3>Why this decision?</h3>

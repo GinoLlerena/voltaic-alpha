@@ -10,6 +10,9 @@ export default defineConfig({
     proxy: { "/api": { target: "http://127.0.0.1:8600", changeOrigin: false } },
   },
   test: {
+    // Scoped to src, because e2e/*.spec.ts belongs to Playwright: vitest would
+    // otherwise collect the browser gate and fail it in jsdom.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],

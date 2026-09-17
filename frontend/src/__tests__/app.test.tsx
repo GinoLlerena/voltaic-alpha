@@ -173,6 +173,8 @@ describe("the ticket shows the server's own reasoning", () => {
     const memo = spine.querySelector('[data-stage="03"]');
     expect(memo).toHaveClass("model");
     expect(memo).toHaveAttribute("data-lit", "false");
+    // The stage a refusal never reached must say so, not merely look faint.
+    expect(spine.querySelector('[data-stage="07"]')?.textContent).toContain("not reached");
   });
 
   it("explains how nearly the setup qualified", async () => {
@@ -182,6 +184,23 @@ describe("the ticket shows the server's own reasoning", () => {
     expect(structure).toHaveTextContent("separation_or_side");
     expect(structure).toHaveTextContent("-0.00168750");
     expect(structure).toHaveTextContent("short of the threshold");
+  });
+
+  it("says so when no structure reading was recorded, rather than dropping the section", async () => {
+    // Every committed-evidence decision has `structure: null`, so this is the
+    // case the demo actually shows. Silently omitting it put a refusal's
+    // central question off the page with no account of why.
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [`/api/v1/decisions/${DIGEST}/market`]: envelope({ ...market, structure: null }),
+      }),
+    );
+    render(at(`/decisions/${DIGEST}`));
+    const structure = await screen.findByTestId("structure-reading");
+    expect(structure).toHaveAttribute("data-present", "false");
+    expect(structure).toHaveTextContent("No structure reading was recorded");
+    expect(structure).toHaveTextContent("structure_readings");
   });
 
   it("shows a waiting horizon as waiting rather than hiding it", async () => {

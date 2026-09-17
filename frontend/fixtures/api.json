@@ -1,0 +1,1124 @@
+{
+ "/api/v1/system/status": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": [
+   {
+    "label": "Environment",
+    "value": "Paper",
+    "tone": "ok",
+    "known": true,
+    "source": "code invariant: gateway refuses a non-Paper endpoint",
+    "observed_at": null,
+    "reason": null
+   },
+   {
+    "label": "Order writes",
+    "value": "Disabled",
+    "tone": "ok",
+    "known": true,
+    "source": "runs.trading_enabled",
+    "observed_at": "2026-09-17T11:47:21.008551+00:00",
+    "reason": null
+   },
+   {
+    "label": "Worker mode",
+    "value": "observe",
+    "tone": "ok",
+    "known": true,
+    "source": "runs.bot_mode",
+    "observed_at": "2026-09-17T11:47:21.008551+00:00",
+    "reason": null
+   },
+   {
+    "label": "Worker",
+    "value": "UNKNOWN",
+    "tone": "unknown",
+    "known": false,
+    "source": "worker_leases",
+    "observed_at": null,
+    "reason": "no worker has ever held the lease"
+   },
+   {
+    "label": "Open positions",
+    "value": "0",
+    "tone": "ok",
+    "known": true,
+    "source": "derived from positions",
+    "observed_at": null,
+    "reason": null
+   },
+   {
+    "label": "Open incidents",
+    "value": "0",
+    "tone": "ok",
+    "known": true,
+    "source": "derived from incidents",
+    "observed_at": null,
+    "reason": null
+   }
+  ]
+ },
+ "/api/v1/system/proof": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": [
+   {
+    "value": "1",
+    "label": "reconciled Paper lifecycle",
+    "mode": "OBSERVED PAPER",
+    "available": true,
+    "source": "positions joined through decisions to broker_orders and fills",
+    "detail": "4 recorded fills, entry and close reconciled"
+   },
+   {
+    "value": "0",
+    "label": "decisions changed by the model, over 5 cases",
+    "mode": "DERIVED",
+    "available": true,
+    "source": "ablation_h0.json · metrics.decisions_changed_by_model",
+    "detail": "a mechanism check on a tiny sample, not evidence about returns"
+   },
+   {
+    "value": "1",
+    "label": "authorized broker-write path",
+    "mode": "DERIVED",
+    "available": true,
+    "source": "check_no_write_path.py · fails the build if a second appears",
+    "detail": "the dashboard has none; the model has none"
+   }
+  ]
+ },
+ "/api/v1/outcomes": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "horizons": [
+    {
+     "horizon": "T+1",
+     "sessions": 1,
+     "resolved": 0,
+     "pending": 5,
+     "trades": 0,
+     "refusals": 0,
+     "agreed": 0,
+     "disagreed": 0,
+     "unanswerable": 0,
+     "with_realized": 0,
+     "smallest_move": null,
+     "largest_move": null
+    },
+    {
+     "horizon": "T+3",
+     "sessions": 3,
+     "resolved": 0,
+     "pending": 5,
+     "trades": 0,
+     "refusals": 0,
+     "agreed": 0,
+     "disagreed": 0,
+     "unanswerable": 0,
+     "with_realized": 0,
+     "smallest_move": null,
+     "largest_move": null
+    }
+   ],
+   "decisions": 5,
+   "decisions_reviewed": 0,
+   "positions_ever": 1,
+   "resolved": 0,
+   "pending": 10,
+   "caveat": "No horizon has elapsed yet, so nothing has been reviewed."
+  }
+ },
+ "/api/v1/tour": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": [
+   {
+    "number": 1,
+    "title": "What was observed",
+    "narration": "Every decision starts from a recorded observation carrying its provider, feed, source time and payload hash. The underlying price is the last completed daily close, never a forming bar — the system cannot see a price it would not have had.",
+    "tab": 0,
+    "snapshot_id": "spy-qualified-2026-08-27",
+    "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0"
+   },
+   {
+    "number": 2,
+    "title": "What the code decided before the model ran",
+    "narration": "A deterministic classifier chose the direction and set the invalidation conditions. Both were fixed before any model was called, and the model has no field in which to return either.",
+    "tab": 0,
+    "snapshot_id": "spy-qualified-2026-08-27",
+    "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0"
+   },
+   {
+    "number": 3,
+    "title": "What the model contributed",
+    "narration": "The model returned a memo under a strict schema: direction, confidence, cited and counter-cited evidence, and a summary. A direction that disagrees with the setup is coerced to neutral and recorded as an attempt. This is its entire authority.",
+    "tab": 1,
+    "snapshot_id": "spy-qualified-2026-08-27",
+    "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0"
+   },
+   {
+    "number": 4,
+    "title": "What was authorized",
+    "narration": "Deterministic risk sized the position and an immutable intent was recorded. The client order id is derived from the intent hash, so a duplicate submit collides at the broker instead of opening a second position.",
+    "tab": 2,
+    "snapshot_id": "spy-lifecycle-20260828T154747Z",
+    "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d"
+   },
+   {
+    "number": 5,
+    "title": "What Alpaca actually did",
+    "narration": "One Paper round trip, reconciled to flat. Acknowledgement was recorded as SUBMITTED; the fills were written only from a reconciled broker record. The round trip lost money, which is on screen because a demo that shows only the winning trade is a brochure.",
+    "tab": 3,
+    "snapshot_id": "spy-lifecycle-20260828T154747Z",
+    "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d"
+   },
+   {
+    "number": 6,
+    "title": "What refusal looks like",
+    "narration": "The setup did not qualify, so the model was never called. There is no memo to reject — the question never reached it. This costs one classifier and no tokens, and is recorded with the same evidence hashes as a trade.",
+    "tab": 1,
+    "snapshot_id": "spy-refusal-2026-08-27",
+    "decision_id": "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2"
+   }
+  ]
+ },
+ "/api/v1/copy": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "what_this_is": "A read-only view of decisions this system already made. It has no controls: it cannot start a run, approve an intent, or reach a broker.",
+   "disclosures": [
+    "Alpaca **Paper** only. No live endpoint exists in this build.",
+    "Option quotes come from the **indicative** feed. The account has no OPRA agreement, so quotes are not trading-quality.",
+    "**No alpha is claimed.** A `NO_TRADE` refusal and a deterministic baseline beating the model are both valid results.",
+    "Nothing here is investment advice."
+   ],
+   "write_guards": [
+    {
+     "name": "Configuration permits writes",
+     "effect": "blocks any mode but paper_execute"
+    },
+    {
+     "name": "Resolved endpoint is Paper",
+     "effect": "blocks a client pointing anywhere else"
+    },
+    {
+     "name": "Execution state allows the write",
+     "effect": "blocks NO_NEW_RISK and FREEZE_ALL_WRITES"
+    },
+    {
+     "name": "An operator has approved",
+     "effect": "blocks an autonomous open when approval is required"
+    },
+    {
+     "name": "No strategy already open",
+     "effect": "blocks a second concurrent position"
+    },
+    {
+     "name": "Intent has not expired",
+     "effect": "blocks a stale approval past its 90 s TTL"
+    },
+    {
+     "name": "Request still matches the intent hash",
+     "effect": "blocks bytes that drifted after approval"
+    }
+   ],
+   "write_guards_note": "They run before every order rather than at startup, because the interesting failures develop between the two. Risk-reducing closes are exempt from guards 3, 4 and 5: those exist to stop new risk, and applying them to an exit would trap exposure at the moment it most needs reducing.",
+   "model_limits": [
+    {
+     "name": "Pick a direction",
+     "effect": "may agree or abstain; a reversal is coerced to abstention"
+    },
+    {
+     "name": "Change an invalidation level",
+     "effect": "never sent to the model; absent from its schema"
+    },
+    {
+     "name": "Size the position",
+     "effect": "not in the prompt; computed after the memo"
+    },
+    {
+     "name": "Choose the contracts",
+     "effect": "deterministic, from the observed chain"
+    },
+    {
+     "name": "Reach a broker",
+     "effect": "no order tool exists on the model path"
+    }
+   ],
+   "halt_states": [
+    {
+     "state": "NORMAL",
+     "tone": "ok",
+     "explanation": "New risk permitted. Closes and cancels also permitted."
+    },
+    {
+     "state": "NO_NEW_RISK",
+     "tone": "warn",
+     "explanation": "New or increased risk blocked. Cancels and risk-reducing closes stay permitted, because blocking a close during a loss would trap exposure."
+    },
+    {
+     "state": "FREEZE_ALL_WRITES",
+     "tone": "bad",
+     "explanation": "All writes blocked, including closes. Reserved for adapter, credential or endpoint integrity incidents, and it raises an incident precisely because it can temporarily prevent risk reduction."
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/grouped?view=Notable": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "view": "Notable",
+   "entries": [
+    {
+     "decision_id": "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+     "snapshot_id": "spy-live-20260828T153310Z",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "label": "SPY live 20260828T153310Z\nposition · bullish",
+     "count": 1,
+     "member_ids": [
+      "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5"
+     ]
+    },
+    {
+     "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+     "snapshot_id": "spy-lifecycle-20260828T154747Z",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "label": "SPY lifecycle 20260828T154747Z\nposition · bullish",
+     "count": 1,
+     "member_ids": [
+      "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d"
+     ]
+    },
+    {
+     "decision_id": "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+     "snapshot_id": "spy-refusal-2026-08-27",
+     "action": "NO_TRADE",
+     "direction": "neutral",
+     "label": "SPY refusal 2026 08 27\nno_qualified_setup",
+     "count": 1,
+     "member_ids": [
+      "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2"
+     ]
+    },
+    {
+     "decision_id": "b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+     "snapshot_id": "spy-bearish-qualified-2026-08-27",
+     "action": "OPTIONS_POSITION",
+     "direction": "bearish",
+     "label": "SPY bearish qualified 2026 08 27\nposition · bearish",
+     "count": 1,
+     "member_ids": [
+      "b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5"
+     ]
+    },
+    {
+     "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+     "snapshot_id": "spy-qualified-2026-08-27",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "label": "SPY qualified 2026 08 27\nposition · bullish",
+     "count": 1,
+     "member_ids": [
+      "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0"
+     ]
+    }
+   ],
+   "shown": 5,
+   "total": 5,
+   "grouped": false,
+   "pin_missing": false
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/summary": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "decision_id": "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+   "snapshot_id": "spy-live-20260828T153310Z",
+   "action": "OPTIONS_POSITION",
+   "direction": "bullish",
+   "reason_codes": [],
+   "input_hash": "sha256:49b001aeb20e02794d6e3a59e9c5158201b340f23e45b669427a71703e756d41",
+   "decision_hash": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+   "policy_version": "h0-provisional-1",
+   "decided_at": "2026-09-17T11:47:21.352701+00:00",
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-28T15:33:10.617491+00:00",
+    "received_time": "2026-09-17T11:47:21.352701+00:00",
+    "underlying_price": "771.100000",
+    "payload_hash": "sha256:49b001aeb20e02794d6e3a59e9c5158201b340f23e45b669427a71703e756d41"
+   },
+   "reached_the_broker": false,
+   "model_was_called": true,
+   "why": [
+    {
+     "stage": "Observed",
+     "text": "A deterministic classifier (deterministic_trend_retest_v0) identified a bullish trend continuation retest setup, citing 2 signals.",
+     "source": "evidence_packs",
+     "present": true
+    },
+    {
+     "stage": "Invalidation",
+     "text": "It set 2 invalidation conditions: close below 759.53 invalidates the retest; loss of directional structure on the decision timeframe. The model never received these and has no schema field for them.",
+     "source": "evidence_packs.invalidation_conditions",
+     "present": true
+    },
+    {
+     "stage": "Model memo",
+     "text": "The model returned bullish at confidence 0.7. Its entire contribution is this memo; a direction disagreeing with the setup is coerced to neutral and recorded as an attempt.",
+     "source": "theses",
+     "present": true
+    },
+    {
+     "stage": "Deterministic risk",
+     "text": "Risk arithmetic approved the structure at a maximum loss of 362 against a budget of 750.",
+     "source": "risk_decisions",
+     "present": true
+    },
+    {
+     "stage": "Authorized intent",
+     "text": "No intent was created. The decision resolved to OPTIONS_POSITION, so nothing was ever prepared for the broker.",
+     "source": "order_intents",
+     "present": false
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/market": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": {
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-28T15:33:10.617491+00:00",
+    "received_time": "2026-09-17T11:47:21.352701+00:00",
+    "underlying_price": "771.100000",
+    "payload_hash": "sha256:49b001aeb20e02794d6e3a59e9c5158201b340f23e45b669427a71703e756d41"
+   },
+   "observation_kind": "fixture",
+   "signals": [
+    {
+     "signal_id": "sig-volatility-regime",
+     "family": "volatility_options",
+     "direction": "bullish",
+     "strength": "0.7600",
+     "as_of": "2026-08-28T15:33:10.617491+00:00",
+     "source": "alpaca:option_chain:atm_implied_volatility",
+     "summary": "At-the-money implied volatility is 0.0908, at or below the 0.22 calm threshold, so the option market is not pricing stress that would contradict continuation.",
+     "role": "cited"
+    },
+    {
+     "signal_id": "sig-structure-trend-retest",
+     "family": "structure",
+     "direction": "bullish",
+     "strength": "0.6500",
+     "as_of": "2026-08-28T15:33:10.617491+00:00",
+     "source": "alpaca:daily_bars:ema20_50_retest",
+     "summary": "EMA20 is 0.0130 from EMA50 in the bullish direction, price closed at 771.1 on the bullish side of EMA20, and price retested it within the last 5 completed sessions.",
+     "role": "cited"
+    }
+   ],
+   "qualification": {
+    "setup_id": "spy-trend-retest-spy-live-20260828T153310Z",
+    "setup_family": "trend_continuation_retest",
+    "direction": "bullish",
+    "classifier_name": "deterministic_trend_retest_v0",
+    "evidence_ids": [
+     "sig-structure-trend-retest",
+     "sig-volatility-regime"
+    ],
+    "invalidation_conditions": [
+     "close below 759.53 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "payload_hash": "sha256:c3e850a196cbc865046393f029a943b2bf418b69948405bacd681d8dd429b82f"
+   },
+   "structure": null
+  }
+ },
+ "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/outcomes": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+  "data": [
+   {
+    "horizon": "T+1",
+    "sessions": 1,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   },
+   {
+    "horizon": "T+3",
+    "sessions": 3,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   }
+  ]
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/summary": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+   "snapshot_id": "spy-lifecycle-20260828T154747Z",
+   "action": "OPTIONS_POSITION",
+   "direction": "bullish",
+   "reason_codes": [],
+   "input_hash": "sha256:01fb85cc81ee76f4ac4f442d7972d16bb80c08d4310f781e4836ec15cc869da6",
+   "decision_hash": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+   "policy_version": "h0-provisional-1",
+   "decided_at": "2026-09-17T11:47:21.193215+00:00",
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-28T15:47:47.609399+00:00",
+    "received_time": "2026-09-17T11:47:21.193215+00:00",
+    "underlying_price": "771.100000",
+    "payload_hash": "sha256:01fb85cc81ee76f4ac4f442d7972d16bb80c08d4310f781e4836ec15cc869da6"
+   },
+   "reached_the_broker": true,
+   "model_was_called": true,
+   "why": [
+    {
+     "stage": "Observed",
+     "text": "A deterministic classifier (deterministic_trend_retest_v0) identified a bullish trend continuation retest setup, citing 2 signals.",
+     "source": "evidence_packs",
+     "present": true
+    },
+    {
+     "stage": "Invalidation",
+     "text": "It set 2 invalidation conditions: close below 759.53 invalidates the retest; loss of directional structure on the decision timeframe. The model never received these and has no schema field for them.",
+     "source": "evidence_packs.invalidation_conditions",
+     "present": true
+    },
+    {
+     "stage": "Model memo",
+     "text": "The model returned bullish at confidence 0.7. Its entire contribution is this memo; a direction disagreeing with the setup is coerced to neutral and recorded as an attempt.",
+     "source": "theses",
+     "present": true
+    },
+    {
+     "stage": "Deterministic risk",
+     "text": "Risk arithmetic approved the structure at a maximum loss of 350 against a budget of 750.",
+     "source": "risk_decisions",
+     "present": true
+    },
+    {
+     "stage": "Authorized intent",
+     "text": "An immutable intent was recorded at limit 3.39, with client order id oa-82f1b3334159eb8b9ab8689cd933 derived from its own hash so a duplicate submit collides at the broker.",
+     "source": "order_intents",
+     "present": true
+    },
+    {
+     "stage": "Broker",
+     "text": "Alpaca Paper acknowledged close and entry order(s). Acknowledgement is recorded as SUBMITTED; a fill is only written from a reconciled broker record.",
+     "source": "broker_orders",
+     "present": true
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/market": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-28T15:47:47.609399+00:00",
+    "received_time": "2026-09-17T11:47:21.193215+00:00",
+    "underlying_price": "771.100000",
+    "payload_hash": "sha256:01fb85cc81ee76f4ac4f442d7972d16bb80c08d4310f781e4836ec15cc869da6"
+   },
+   "observation_kind": "fixture",
+   "signals": [
+    {
+     "signal_id": "sig-volatility-regime",
+     "family": "volatility_options",
+     "direction": "bullish",
+     "strength": "0.7600",
+     "as_of": "2026-08-28T15:47:47.609399+00:00",
+     "source": "alpaca:option_chain:atm_implied_volatility",
+     "summary": "At-the-money implied volatility is 0.0919, at or below the 0.22 calm threshold, so the option market is not pricing stress that would contradict continuation.",
+     "role": "cited"
+    },
+    {
+     "signal_id": "sig-structure-trend-retest",
+     "family": "structure",
+     "direction": "bullish",
+     "strength": "0.6500",
+     "as_of": "2026-08-28T15:47:47.609399+00:00",
+     "source": "alpaca:daily_bars:ema20_50_retest",
+     "summary": "EMA20 is 0.0130 from EMA50 in the bullish direction, price closed at 771.1 on the bullish side of EMA20, and price retested it within the last 5 completed sessions.",
+     "role": "cited"
+    }
+   ],
+   "qualification": {
+    "setup_id": "spy-trend-retest-spy-lifecycle-20260828T154747Z",
+    "setup_family": "trend_continuation_retest",
+    "direction": "bullish",
+    "classifier_name": "deterministic_trend_retest_v0",
+    "evidence_ids": [
+     "sig-structure-trend-retest",
+     "sig-volatility-regime"
+    ],
+    "invalidation_conditions": [
+     "close below 759.53 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "payload_hash": "sha256:ca48ec2236606c7c60107e53a56dfcb3431c7fc91d6734994411161713845c91"
+   },
+   "structure": null
+  }
+ },
+ "/api/v1/decisions/75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d/outcomes": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": [
+   {
+    "horizon": "T+1",
+    "sessions": 1,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   },
+   {
+    "horizon": "T+3",
+    "sessions": 3,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   }
+  ]
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/summary": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "decision_id": "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+   "snapshot_id": "spy-refusal-2026-08-27",
+   "action": "NO_TRADE",
+   "direction": "neutral",
+   "reason_codes": [
+    "no_qualified_setup"
+   ],
+   "input_hash": "sha256:b7176f51b1e9cb0f6a36b724d3a90e98a180f73c369dc8fe4e58965a062aab47",
+   "decision_hash": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+   "policy_version": "h0-provisional-1",
+   "decided_at": "2026-09-17T11:47:21.119512+00:00",
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-27T19:45:00+00:00",
+    "received_time": "2026-09-17T11:47:21.119512+00:00",
+    "underlying_price": "638.400000",
+    "payload_hash": "sha256:b7176f51b1e9cb0f6a36b724d3a90e98a180f73c369dc8fe4e58965a062aab47"
+   },
+   "reached_the_broker": false,
+   "model_was_called": false,
+   "why": [
+    {
+     "stage": "Observed",
+     "text": "No evidence pack exists: the setup did not qualify, so nothing downstream was asked to run.",
+     "source": "evidence_packs",
+     "present": false
+    },
+    {
+     "stage": "Model memo",
+     "text": "No memo exists. The model was never called, which is the cheapest possible refusal: one classifier and no tokens.",
+     "source": "theses",
+     "present": false
+    },
+    {
+     "stage": "Authorized intent",
+     "text": "No intent was created. The decision resolved to NO_TRADE (no_qualified_setup), so nothing was ever prepared for the broker.",
+     "source": "order_intents",
+     "present": false
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/market": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": {
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-27T19:45:00+00:00",
+    "received_time": "2026-09-17T11:47:21.119512+00:00",
+    "underlying_price": "638.400000",
+    "payload_hash": "sha256:b7176f51b1e9cb0f6a36b724d3a90e98a180f73c369dc8fe4e58965a062aab47"
+   },
+   "observation_kind": "fixture",
+   "signals": [
+    {
+     "signal_id": "sig-momentum-divergence",
+     "family": "momentum",
+     "direction": "bearish",
+     "strength": "0.7800",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:momentum_divergence",
+     "summary": "Momentum has diverged sharply from price and contradicts the continuation thesis above the veto threshold.",
+     "role": "counter-evidence"
+    },
+    {
+     "signal_id": "sig-structure-trend-retest",
+     "family": "structure",
+     "direction": "bullish",
+     "strength": "0.7100",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:daily_ema_stack",
+     "summary": "Price is still above a rising 20/50 EMA stack and is retesting the 20 EMA.",
+     "role": "counter-evidence"
+    },
+    {
+     "signal_id": "sig-participation-breadth",
+     "family": "participation",
+     "direction": "bullish",
+     "strength": "0.5800",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:advance_decline",
+     "summary": "Breadth is mildly positive on the retest session.",
+     "role": "counter-evidence"
+    }
+   ],
+   "qualification": null,
+   "structure": null
+  }
+ },
+ "/api/v1/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2/outcomes": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+  "data": [
+   {
+    "horizon": "T+1",
+    "sessions": 1,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   },
+   {
+    "horizon": "T+3",
+    "sessions": 3,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   }
+  ]
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/summary": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "decision_id": "b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+   "snapshot_id": "spy-bearish-qualified-2026-08-27",
+   "action": "OPTIONS_POSITION",
+   "direction": "bearish",
+   "reason_codes": [],
+   "input_hash": "sha256:999759c2f56691ec43e520ee4f4e6f17db57105766aae76cb19259868180976c",
+   "decision_hash": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+   "policy_version": "h0-provisional-1",
+   "decided_at": "2026-09-17T11:47:21.103428+00:00",
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-27T19:45:00+00:00",
+    "received_time": "2026-09-17T11:47:21.103428+00:00",
+    "underlying_price": "617.400000",
+    "payload_hash": "sha256:999759c2f56691ec43e520ee4f4e6f17db57105766aae76cb19259868180976c"
+   },
+   "reached_the_broker": false,
+   "model_was_called": true,
+   "why": [
+    {
+     "stage": "Observed",
+     "text": "A deterministic classifier (deterministic_trend_retest_v0) identified a bearish trend continuation retest setup, citing 2 signals.",
+     "source": "evidence_packs",
+     "present": true
+    },
+    {
+     "stage": "Invalidation",
+     "text": "It set 2 invalidation conditions: close above 626.66 invalidates the retest; loss of directional structure on the decision timeframe. The model never received these and has no schema field for them.",
+     "source": "evidence_packs.invalidation_conditions",
+     "present": true
+    },
+    {
+     "stage": "Model memo",
+     "text": "The model returned bearish at confidence 0.68. Its entire contribution is this memo; a direction disagreeing with the setup is coerced to neutral and recorded as an attempt.",
+     "source": "theses",
+     "present": true
+    },
+    {
+     "stage": "Deterministic risk",
+     "text": "Risk arithmetic approved the structure at a maximum loss of 560 against a budget of 900.",
+     "source": "risk_decisions",
+     "present": true
+    },
+    {
+     "stage": "Authorized intent",
+     "text": "No intent was created. The decision resolved to OPTIONS_POSITION, so nothing was ever prepared for the broker.",
+     "source": "order_intents",
+     "present": false
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/market": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": {
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-27T19:45:00+00:00",
+    "received_time": "2026-09-17T11:47:21.103428+00:00",
+    "underlying_price": "617.400000",
+    "payload_hash": "sha256:999759c2f56691ec43e520ee4f4e6f17db57105766aae76cb19259868180976c"
+   },
+   "observation_kind": "fixture",
+   "signals": [
+    {
+     "signal_id": "sig-structure-trend-retest",
+     "family": "structure",
+     "direction": "bearish",
+     "strength": "0.7400",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:daily_ema_stack",
+     "summary": "Price holds below a falling 20/50 EMA stack and has retested the 20 EMA from beneath without closing above it.",
+     "role": "cited"
+    },
+    {
+     "signal_id": "sig-participation-breadth",
+     "family": "participation",
+     "direction": "bearish",
+     "strength": "0.6300",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:advance_decline",
+     "summary": "Declining issues outpace advancing issues on the retest session, a different family from price structure.",
+     "role": "cited"
+    },
+    {
+     "signal_id": "sig-volatility-term",
+     "family": "volatility_options",
+     "direction": "bullish",
+     "strength": "0.3100",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:term_structure",
+     "summary": "Front-month implied volatility is easing, which argues mildly against continued downside but is below the veto threshold.",
+     "role": "counter-evidence"
+    }
+   ],
+   "qualification": {
+    "setup_id": "spy-trend-retest-spy-bearish-qualified-2026-08-27",
+    "setup_family": "trend_continuation_retest",
+    "direction": "bearish",
+    "classifier_name": "deterministic_trend_retest_v0",
+    "evidence_ids": [
+     "sig-participation-breadth",
+     "sig-structure-trend-retest"
+    ],
+    "invalidation_conditions": [
+     "close above 626.66 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "payload_hash": "sha256:ceeebcd55f91c7426521f71aa0499bbb082ffee5299696e3f50cba41869b66cf"
+   },
+   "structure": null
+  }
+ },
+ "/api/v1/decisions/b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5/outcomes": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+  "data": [
+   {
+    "horizon": "T+1",
+    "sessions": 1,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   },
+   {
+    "horizon": "T+3",
+    "sessions": 3,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   }
+  ]
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/summary": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+   "snapshot_id": "spy-qualified-2026-08-27",
+   "action": "OPTIONS_POSITION",
+   "direction": "bullish",
+   "reason_codes": [],
+   "input_hash": "sha256:982d1efc7d914ca243f5ce8a0e56d890ef55c9e08e7793f99955d9198894279b",
+   "decision_hash": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+   "policy_version": "h0-provisional-1",
+   "decided_at": "2026-09-17T11:47:21.063587+00:00",
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-27T19:45:00+00:00",
+    "received_time": "2026-09-17T11:47:21.063587+00:00",
+    "underlying_price": "641.250000",
+    "payload_hash": "sha256:982d1efc7d914ca243f5ce8a0e56d890ef55c9e08e7793f99955d9198894279b"
+   },
+   "reached_the_broker": false,
+   "model_was_called": true,
+   "why": [
+    {
+     "stage": "Observed",
+     "text": "A deterministic classifier (deterministic_trend_retest_v0) identified a bullish trend continuation retest setup, citing 2 signals.",
+     "source": "evidence_packs",
+     "present": true
+    },
+    {
+     "stage": "Invalidation",
+     "text": "It set 2 invalidation conditions: close below 631.63 invalidates the retest; loss of directional structure on the decision timeframe. The model never received these and has no schema field for them.",
+     "source": "evidence_packs.invalidation_conditions",
+     "present": true
+    },
+    {
+     "stage": "Model memo",
+     "text": "The model returned bullish at confidence 0.66. Its entire contribution is this memo; a direction disagreeing with the setup is coerced to neutral and recorded as an attempt.",
+     "source": "theses",
+     "present": true
+    },
+    {
+     "stage": "Deterministic risk",
+     "text": "Risk arithmetic approved the structure at a maximum loss of 320 against a budget of 750.",
+     "source": "risk_decisions",
+     "present": true
+    },
+    {
+     "stage": "Authorized intent",
+     "text": "No intent was created. The decision resolved to OPTIONS_POSITION, so nothing was ever prepared for the broker.",
+     "source": "order_intents",
+     "present": false
+    }
+   ]
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/market": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": {
+   "observation": {
+    "symbol": "SPY",
+    "provider": "fixture",
+    "feed": "fixture",
+    "source_time": "2026-08-27T19:45:00+00:00",
+    "received_time": "2026-09-17T11:47:21.063587+00:00",
+    "underlying_price": "641.250000",
+    "payload_hash": "sha256:982d1efc7d914ca243f5ce8a0e56d890ef55c9e08e7793f99955d9198894279b"
+   },
+   "observation_kind": "fixture",
+   "signals": [
+    {
+     "signal_id": "sig-structure-trend-retest",
+     "family": "structure",
+     "direction": "bullish",
+     "strength": "0.7200",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:daily_ema_stack",
+     "summary": "Price holds above a rising 20/50 EMA stack and has retested the 20 EMA without closing below it.",
+     "role": "cited"
+    },
+    {
+     "signal_id": "sig-participation-breadth",
+     "family": "participation",
+     "direction": "bullish",
+     "strength": "0.6100",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:advance_decline",
+     "summary": "Advancing issues outpace declining issues on the retest session, a different family from price structure.",
+     "role": "cited"
+    },
+    {
+     "signal_id": "sig-volatility-term",
+     "family": "volatility_options",
+     "direction": "bearish",
+     "strength": "0.3400",
+     "as_of": "2026-08-27T19:45:00+00:00",
+     "source": "synthetic:term_structure",
+     "summary": "Front-month implied volatility is mildly elevated, which argues against the continuation but is below the veto threshold.",
+     "role": "counter-evidence"
+    }
+   ],
+   "qualification": {
+    "setup_id": "spy-trend-retest-spy-qualified-2026-08-27",
+    "setup_family": "trend_continuation_retest",
+    "direction": "bullish",
+    "classifier_name": "deterministic_trend_retest_v0",
+    "evidence_ids": [
+     "sig-participation-breadth",
+     "sig-structure-trend-retest"
+    ],
+    "invalidation_conditions": [
+     "close below 631.63 invalidates the retest",
+     "loss of directional structure on the decision timeframe"
+    ],
+    "payload_hash": "sha256:9ab3aabbe39c80382adb64e96eb1bf4180820a30de207e0fe080f6f60f98ee36"
+   },
+   "structure": null
+  }
+ },
+ "/api/v1/decisions/1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0/outcomes": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+  "data": [
+   {
+    "horizon": "T+1",
+    "sessions": 1,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   },
+   {
+    "horizon": "T+3",
+    "sessions": 3,
+    "state": "PENDING",
+    "resolved": false,
+    "underlying_at_decision": null,
+    "underlying_at_horizon": null,
+    "change": null,
+    "direction_agreed": null,
+    "realized": null,
+    "observed_snapshot_id": null
+   }
+  ]
+ }
+}

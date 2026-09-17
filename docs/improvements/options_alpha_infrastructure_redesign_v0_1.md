@@ -301,8 +301,14 @@ not at redeployment.**
 ### Not started
 
 `CIIP-I-003` tiered partitioning (the table is empty; better done with the
-rollup job), and `CIIP-I-006`–`008` logging changes, which are code rather than
-infrastructure.
+rollup job).
+
+`CIIP-I-006`–`008` were listed here as not started and are not: they were code
+rather than infrastructure, and the code landed. §11 proves `006` and `008`
+against the live worker. `007` is `telemetry.CadenceFilter`, wired at
+`worker.py:438` and covered by `tests/test_telemetry.py` — cadence is suppressed
+by repetition rather than by rate, so the tick where an action changes is the one
+that survives. Corrected 17 September 2026.
 
 
 ## 11. Worker start and self-monitoring — 11 September 2026
