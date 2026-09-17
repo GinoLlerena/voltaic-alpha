@@ -118,10 +118,18 @@ test("no text is squeezed into a vertical column at phone width", async ({ page 
       [...document.querySelectorAll("body *")]
         .filter((el) => {
           const text = (el.textContent ?? "").trim();
-          if (text.length < 4 || el.children.length > 0) return false;
-          const box = el.getBoundingClientRect();
-          // Roughly: more than six lines tall while narrower than a few words.
-          return box.height > 120 && box.width < 90;
+          if (text.length < 8 || el.children.length > 0) return false;
+          // Measure the text's own line boxes, not the element's. A table cell
+          // is as tall as its row, so a short cell beside a wrapped paragraph
+          // looks squeezed by any box-height rule and is not — a false positive
+          // that appeared only on CI's Linux, where the prose wrapped further.
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const lines = [...range.getClientRects()].filter((r) => r.width > 0);
+          if (lines.length < 6) return false;
+          const widest = Math.max(...lines.map((r) => r.width));
+          // Six or more lines, none wider than a couple of words: a column.
+          return widest < 90;
         })
         .map((el) => `${el.tagName.toLowerCase()}.${el.className || "-"}: ${
           (el.textContent ?? "").trim().slice(0, 24)
