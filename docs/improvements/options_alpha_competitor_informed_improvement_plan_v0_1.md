@@ -1097,3 +1097,51 @@ series end to end, where both horizons resolve from the right closes.
 Wire it into the worker: `ensure_jobs` when a decision is recorded, `review` on a
 slow clock. That changes the live single writer and belongs in its own change,
 deployed outside market hours.
+
+### `CIIP-008` deployed — 17 September 2026
+
+Wired, deployed, back-filled and running.
+
+**Wiring.** Review jobs are created inside `record_decision`'s own transaction, so
+a decision cannot exist without the questions that will be asked of it. The worker
+runs a review clock beside the order and position clocks, default 900 seconds —
+slow by nature, because a horizon that has not elapsed cannot be hurried by asking
+often. `python -m options_alpha_lab.review` runs the same work on demand.
+
+**Deployment.** A verified backup first (17,095,693 bytes, 21 tables, 824 rows,
+rev `0004`), then the code, then migration `0005` on the live database, then the
+back-fill, then the worker restart. The restarted worker records
+`review_clock_seconds: 900` in its durable start event and reconciled clean.
+
+**Back-fill.** 201 decisions had no jobs; `--backfill` created 402. It was run
+deliberately rather than by default: a job's horizon derives from `decided_at` and
+completed sessions, so a late job still measures the right window, but it cannot
+claim the question was asked at the time.
+
+**First evidence.** 160 horizons resolved, 242 still pending — every `T+1` row at
+exactly one completed session, every `T+3` at exactly three. All are `NO_TRADE`,
+which is what 201 refusals should produce, and every `direction_agreed` is `NULL`
+because a neutral decision has no direction to agree with. No realised figures,
+because nothing traded. One row end to end: decided 11 September at 757.83,
+observed against the completed close of 764.29 that Monday's first tick carried,
++6.46 over one session.
+
+### The back-fill found a defect the tests could not
+
+`402` jobs over `201` observations did not finish inside a ten-minute window. Two
+quadratic behaviours: `completed_sessions_between` scanned the whole calendar and
+was asked once per candidate observation per job — 8.5 million comparisons — and
+the reviewer re-queried the observations for every job. Both are now binary
+searches over sorted data, and the same work takes **7.5 seconds** against the
+live database.
+
+It was found by running it at real scale, not by the unit tests, which exercised
+handfuls of rows. The scale test added afterwards pins the failing shape. The
+production worker was never affected: the process running at the time predated
+the deploy and had no review clock, which is the only reason a quadratic loop
+scheduled every 900 seconds did not run against a live database first.
+
+**Not yet surfaced.** No dashboard or API surface reads `decision_outcomes` yet.
+The records exist and are queryable; presenting them is separate work, and
+presenting them badly — a win rate over 160 refusals with no trades — would be
+worse than not presenting them at all.
