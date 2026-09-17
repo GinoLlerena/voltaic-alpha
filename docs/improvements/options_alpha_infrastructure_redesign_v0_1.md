@@ -602,3 +602,54 @@ treating this as settled.
 backups, the database, the read-only role and its credential sit on one disk on
 one stopped host. Nothing is off-host. The evidence is small enough now that
 losing it would cost little; that stops being true the moment `CIIP-4` starts.
+
+## 14. Stopping point — 17 September 2026
+
+State at stop, so tomorrow starts from a fact rather than a memory.
+
+| | |
+|---|---|
+| `main` | `1a4ae5c`, CI green, nothing unpushed, working tree clean |
+| Host | `options-alpha-demo` — **running**, all six units active |
+| Database | revision `0005_decision_outcomes`; 201 decisions, 160 outcomes, 242 horizons pending |
+| Backup | verified at the stop: 17,135,240 bytes, 23 tables, 1,390 rows, rev `0005` |
+| Disk | 3.9 GB of 40 GB (11%) |
+
+### The host is left running, deliberately
+
+The lever is worth about $0.86 a day and was taken on 11 September. The restart
+was then missed and Monday lost 1.7 hours of live session — more evidence than
+the saving is worth, on the one input that cannot be regenerated. It stays up
+until either a scheduled weekday start exists or the evidence clock stops
+mattering.
+
+Nothing needs doing before the open at 13:30 UTC.
+
+### Shipped since the last stopping point
+
+`CIIP-008` end to end: schema, logic, worker clock, back-fill, and a surface.
+`CIIP-I-016` finished — all seven units in `deploy/systemd/`, which exposed a
+watchdog that had lost `--record` and a port-80 unit that could never have
+worked. `RUI-2`: a React frontend generated from the API's own contract, with its
+own CI lane. Eight pull requests, each with CI green before merge.
+
+### Where to pick up
+
+1. **`CIIP-VAL-012`'s fix** — persist the structure gate's computed values, so a
+   refusal records how nearly it accepted. Proposed and argued, not built: it is a
+   schema and worker change, and the first that alters what the system records
+   about its own decisions.
+2. **`CIIP-009`** — the strategy candidate and promotion catalog, next in the
+   chain and unblocked by `CIIP-008`.
+3. **`RUI-3`** — the first vertical slice, or `RUI-2`'s remaining exit criteria
+   (Storybook, axe, visual regression, responsive QA).
+
+### Still waiting on the owner
+
+**Disable the old Alibaba AccessKey.** Every host call since the rotation has
+used the new one.
+
+**`CIIP-I-BLK-001`.** OSS remains disabled at a $0.00 balance. 201 decisions, 160
+outcomes and 12 backups sit on one disk with no off-host copy, and that disk now
+holds the only record of two weeks of live evidence. This is the item whose risk
+compounds; everything else on this list can be rebuilt from the repository.
