@@ -1571,9 +1571,27 @@ source. It is met on five decisions and one refusal, which is the whole corpus
 that exists — a live refusal carrying a real structure reading has not yet been
 walked, and should be once the worker records one.
 
-`RUI-2` is not done. Keyboard, axe and responsive checks now pass, but they pass
-*by hand*. The regression tests assert the stylesheet's arithmetic and cascade
-order, not the rendered page, because jsdom applies no CSS — which is precisely
-how all three of the defects above survived a green suite. A browser-based axe
-and visual-regression gate in CI is the remaining blocker, and this increment is
-the argument for it.
+`RUI-2`'s gate is now met, and is a gate rather than a check. A `browser` job
+runs the built app in Chromium against frozen API envelopes
+(`frontend/fixtures/api.json`, `observed_at` pinned), so it needs no Python and
+no database — the same property the `frontend` job was designed around — and a
+failure is therefore always the page's fault.
+
+Three layers, because they catch different things:
+
+| layer | asserts | catches |
+|---|---|---|
+| `accessibility.spec.ts` | axe `wcag2a`/`wcag2aa` on every route at 1280px and 400px; no horizontal overflow; every decision tab-reachable and openable with Enter, with a focus ring | the palette, and anything that makes the page unusable without a mouse |
+| `rendering.spec.ts` | computed styles: the tiles are laid out and render four parts at four sizes, each mode has its own colour, the model's stage carries the model's colour only when it ran, no stage states anything through opacity, no claim lacks a source | the three defects above, by the property each violated |
+| `visual.spec.ts` | a narrow pixel diff over four screens at two widths | drift in a screen nobody was editing |
+
+Measured, rather than assumed: reintroducing the unstyled tiles leaves vitest
+entirely green — 57 passed — and fails the browser gate. A 3px padding change
+passes all 24 property tests and fails 4 visual ones. Computed styles are used
+for the properties rather than pixels because they are identical on every
+platform; only the pixel baselines are per-platform, and the Linux ones were
+taken from a CI run and read before being trusted, since a baseline of a broken
+render would lock the breakage in.
+
+What remains for `RUI-2` is the Storybook state matrix and light/dark themes
+from its original scope, neither of which is a gate.
