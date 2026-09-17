@@ -173,6 +173,8 @@ describe("the ticket shows the server's own reasoning", () => {
     const memo = spine.querySelector('[data-stage="03"]');
     expect(memo).toHaveClass("model");
     expect(memo).toHaveAttribute("data-lit", "false");
+    // The stage a refusal never reached must say so, not merely look faint.
+    expect(spine.querySelector('[data-stage="07"]')?.textContent).toContain("not reached");
   });
 
   it("explains how nearly the setup qualified", async () => {

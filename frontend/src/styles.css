@@ -1,7 +1,7 @@
 :root {
   --ink: #0d1117; --panel: #151b23; --edge: #263040;
   --cool: #5ab3f0; --warm: #e8a33d; --affirm: #46d08a; --alarm: #ff6161;
-  --text: #e7edf5; --muted: #8896a8; --dim: #5c697a;
+  --text: #e7edf5; --muted: #8896a8; --dim: #798aa0;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
   color-scheme: dark;
 }
@@ -49,7 +49,10 @@ header a { color: inherit; text-decoration: none; }
 .spine { list-style: none; display: flex; gap: 1px; padding: 0; margin: .8rem 0;
   background: var(--edge); border: 1px solid var(--edge); flex-wrap: wrap; }
 .spine li { background: var(--panel2, #1b222c); padding: .45rem .6rem; flex: 1; min-width: 92px; }
-.spine li.off { opacity: .45; }
+.spine li.off { color: var(--dim); box-shadow: inset 2px 0 0 var(--edge); }
+/* A stage the decision never reached. Dimming it with opacity failed contrast
+   and said nothing to a screen reader; the state is carried by colour, an inset
+   rule, and the visually-hidden note in AuthoritySpine. */
 .spine li.model { background: #1f1808; }
 .spine li.model .l { color: var(--warm); }
 .spine li.on .l { color: var(--cool); }
@@ -79,3 +82,8 @@ header a { color: inherit; text-decoration: none; }
 .decisions a { display: flex; gap: .6rem; align-items: baseline; padding: .55rem .7rem;
   background: var(--panel); color: inherit; text-decoration: none; }
 .decisions a:hover { background: #101923; }
+
+/* Readable only by assistive technology. */
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  border: 0; }

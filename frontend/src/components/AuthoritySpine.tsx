@@ -38,6 +38,7 @@ export function AuthoritySpine({
         >
           <span className="n">{stage.key}</span>
           <span className="l">{stage.label}</span>
+          {!lit(stage.key) && <span className="sr"> — not reached</span>}
         </li>
       ))}
       <li className="fence" aria-hidden="true">

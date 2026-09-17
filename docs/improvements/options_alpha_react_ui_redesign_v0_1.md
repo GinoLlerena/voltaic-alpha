@@ -1485,10 +1485,44 @@ decision's own `model_was_called` and `reached_the_broker`. Checked in a browser
 the lifecycle decision lights the memo stage and the broker stage; a refusal
 lights neither.
 
+### `RUI-VAL-011` — the palette failed contrast, and a state was carried by opacity alone — **resolved 17 September 2026**
+
+Asked whether the UI had been tested, the honest answer was that it had not been
+tested for accessibility. An axe-core 4.10.2 scan (`wcag2a`, `wcag2aa`) against
+the running app found **22 serious failures** across the two routes, none of
+which reading the stylesheet would have revealed.
+
+Sixteen were one token. `--dim: #5c697a`, inherited from the Streamlit palette,
+rendered at **3.38:1** on `--ink` and **3.09:1** on `--panel` where AA requires
+4.5:1 — the source labels, the status keys and the "why" provenance lines, which
+is to say most of the text whose whole purpose is to say where a number came
+from. It is now `#798aa0`, the same hue lightened until the worst surface it can
+land on (`#1b222c`, the spine's cells) clears the bar at **4.54:1**.
+
+The other six were a different mistake. The authority spine faded the stages a
+decision never reached with `opacity: .45`, which scales text and background
+together — `#4b596b` on `#212a37`, **2.02:1** — and, worse, told a screen reader
+nothing at all: "not reached" existed only as a `data-lit` attribute and a
+visual fade. Those stages now recede by colour and an inset rule, and each one
+says `— not reached` in words that assistive technology can read.
+
+Both routes now scan clean (0 violations, 16 and 13 passes). Keyboard-only
+navigation reaches all five decisions and opens one with Enter, the focus ring
+survives because nothing suppresses it, and neither route overflows at 400px or
+768px.
+
+A browser is the only place axe can measure contrast, so the regression test
+asserts the same arithmetic without one: every ink token against every surface
+it can be drawn on, plus a rule that the spine may not express state through
+opacity. Reintroducing each defect fails it — five cases for the token, one each
+for the fade and the missing words.
+
 ### Exit criteria not yet met
 
 `RUI-3`'s exit is the ten-second and 90-second evaluator journeys passing with no
 missing source. The screens exist and every value on them carries its source, but
-the journeys have not been walked as journeys, and `RUI-2`'s accessibility,
-visual-regression and responsive gates are still outstanding. Those remain the
-honest blockers before either increment is called done.
+the journeys have not been walked as journeys. `RUI-2`'s accessibility gate is
+now partly met — the contrast and state findings above are fixed and guarded by a
+unit test — but axe itself runs only by hand; a browser-based gate in CI, visual
+regression and a deliberate responsive pass are still outstanding. Those remain
+the honest blockers before either increment is called done.
