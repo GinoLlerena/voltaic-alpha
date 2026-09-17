@@ -7,11 +7,22 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   // Typed rules need a project, and the config file itself is not in one.
-  { files: ["**/*.js"], ...tseslint.configs.disableTypeChecked },
+  // Typed rules need a project. The eslint config and the fixture-capture
+  // script are plain ESM run by node, and belong to none.
+  {
+    files: ["**/*.js", "**/*.mjs"],
+    ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      globals: { process: "readonly", fetch: "readonly", console: "readonly", URL: "readonly" },
+    },
+  },
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
-      parserOptions: { project: ["./tsconfig.app.json", "./tsconfig.node.json"], tsconfigRootDir: import.meta.dirname },
+      parserOptions: {
+        project: ["./tsconfig.app.json", "./tsconfig.node.json", "./tsconfig.e2e.json"],
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     plugins: { "react-hooks": reactHooks },
     rules: {

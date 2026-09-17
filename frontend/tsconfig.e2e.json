@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": [
-      "ES2023"
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
     ],
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -13,9 +15,11 @@
     "noEmit": true,
     "composite": true,
     "skipLibCheck": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+    "resolveJsonModule": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo"
   },
   "include": [
-    "vite.config.ts"
+    "playwright.config.ts",
+    "e2e/**/*.ts"
   ]
 }
