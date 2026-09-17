@@ -54,7 +54,9 @@ def _frozen_client() -> TestClient:
     return TestClient(create_app(resolve("", DB), clock=lambda: NOW))
 
 
-WORKSPACES = ("summary", "proof", "market", "memo", "structure", "risk", "lifecycle")
+WORKSPACES = (
+    "summary", "proof", "market", "memo", "structure", "risk", "lifecycle", "outcomes",
+)
 
 
 def _json_paths(client: TestClient) -> list[str]:
@@ -71,6 +73,7 @@ def _json_paths(client: TestClient) -> list[str]:
         "/api/v1/tour",
         "/api/v1/decisions/grouped",
         "/api/v1/copy",
+        "/api/v1/outcomes",
     ]
 
 
@@ -523,6 +526,35 @@ class ListAndCopyParityTests(unittest.TestCase):
 
         states = {h["state"] for h in self.client.get("/api/v1/copy").json()["data"]["halt_states"]}
         self.assertEqual(states, {s.value for s in ExecutionState})
+
+
+class OutcomeSurfaceTests(unittest.TestCase):
+    """`CIIP-008`'s records, served as counts and nothing more."""
+
+    def setUp(self) -> None:
+        self.client = _frozen_client()
+
+    def test_the_overview_reports_counts_and_no_rate(self) -> None:
+        data = self.client.get("/api/v1/outcomes").json()["data"]
+        for horizon in data["horizons"]:
+            for key in horizon:
+                self.assertNotRegex(key, r"rate|ratio|percent|pct|accuracy|score|win")
+        self.assertIn("caveat", data)
+
+    def test_the_caveat_is_derived_from_the_records(self) -> None:
+        data = self.client.get("/api/v1/outcomes").json()["data"]
+        if data["resolved"] == 0:
+            self.assertIn("No horizon has elapsed", data["caveat"])
+
+    def test_a_waiting_horizon_is_served_rather_than_omitted(self) -> None:
+        """A decision awaiting review must not look reviewed."""
+        digest = _all_digests(self.client)[0]
+        rows = self.client.get(f"/api/v1/decisions/{digest}/outcomes").json()["data"]
+        self.assertTrue(rows, "the committed evidence carries review jobs")
+        for row in rows:
+            self.assertIn(row["state"], {"PENDING", "COMPLETE", "UNRESOLVABLE"})
+            if not row["resolved"]:
+                self.assertIsNone(row["change"])
 
 
 class PaginationTests(unittest.TestCase):

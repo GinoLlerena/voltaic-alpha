@@ -481,3 +481,45 @@ class CopyOut(Public):
     write_guards_note: str
     model_limits: list[RuleOut]
     halt_states: list[HaltStateOut]
+
+
+class HorizonCountsOut(Public):
+    """Counts only. There is no rate field, and that is deliberate: over a corpus
+    where every row is unanswerable, a rate would be a sentence about nothing."""
+
+    horizon: str
+    sessions: int
+    resolved: int
+    pending: int
+    trades: int
+    refusals: int
+    agreed: int
+    disagreed: int
+    unanswerable: int
+    with_realized: int
+    smallest_move: str | None
+    largest_move: str | None
+
+
+class ReviewOverviewOut(Public):
+    horizons: list[HorizonCountsOut]
+    decisions: int
+    decisions_reviewed: int
+    positions_ever: int
+    resolved: int
+    pending: int
+    #: Derived from the counts, so it cannot drift from them.
+    caveat: str
+
+
+class DecisionHorizonOut(Public):
+    horizon: str
+    sessions: int
+    state: str
+    resolved: bool
+    underlying_at_decision: str | None
+    underlying_at_horizon: str | None
+    change: str | None
+    direction_agreed: bool | None
+    realized: str | None
+    observed_snapshot_id: str | None

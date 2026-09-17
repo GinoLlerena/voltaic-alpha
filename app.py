@@ -41,6 +41,8 @@ from options_alpha_lab.presentation.decision import load as decision_view
 from options_alpha_lab.presentation.explain import why_decision
 from options_alpha_lab.presentation.export import digest as proof_digest
 from options_alpha_lab.presentation.export import render as proof_bytes
+from options_alpha_lab.presentation.horizons import for_decision as horizons_for_decision
+from options_alpha_lab.presentation.horizons import overview as horizons_overview
 from options_alpha_lab.presentation.proof import completed_round_trips, proof_tiles
 from options_alpha_lab.presentation.source import Resolver
 from options_alpha_lab.presentation.status import system_status
@@ -770,6 +772,42 @@ with tabs[3]:
             "show is the friction any real edge would have to clear first. "
             "An ablation that cannot return &ldquo;no difference&rdquo; is not "
             "measuring anything, so that result is published rather than buried."
+            "</div>"
+        )
+
+    # CIIP-008. What the declared horizons have produced for this decision, and
+    # what is still waiting. A horizon that has not elapsed is shown as waiting
+    # rather than omitted: a reader who sees only resolved rows cannot tell a
+    # reviewed decision from one whose review has not come due.
+    with Session(engine()) as _horizon_session:
+        decision_horizons = horizons_for_decision(_horizon_session, decision)
+        review_overview = horizons_overview(_horizon_session)
+    if decision_horizons:
+        heading("Review horizons", "asked once the horizon elapsed, in completed sessions")
+        rows_html = []
+        for h in decision_horizons:
+            if not h.resolved:
+                rows_html.append(
+                    f'<div><span>{esc(h.horizon)} · {h.sessions} completed '
+                    f'session{"s" if h.sessions != 1 else ""}</span>'
+                    '<span class="m" style="color:var(--dim)">WAITING</span></div>'
+                )
+                continue
+            agreed = (
+                "—" if h.direction_agreed is None
+                else ("direction agreed" if h.direction_agreed else "direction disagreed")
+            )
+            rows_html.append(
+                f'<div><span>{esc(h.horizon)} · underlying {money(h.underlying_at_decision)} '
+                f'&rarr; {money(h.underlying_at_horizon)} '
+                f'({"+" if (h.change or 0) >= 0 else ""}{money(h.change)})</span>'
+                f'<span class="m">{esc(agreed)}</span></div>'
+            )
+        block(f'<div class="chk">{"".join(rows_html)}</div>')
+        block(
+            '<div class="note" style="margin-top:.5rem">'
+            f"{esc(review_overview.caveat)} Across this source: "
+            f"{review_overview.resolved} resolved, {review_overview.pending} waiting."
             "</div>"
         )
 

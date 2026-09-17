@@ -36,6 +36,7 @@ from ..presentation import (
     decision,
     explain,
     export,
+    horizons,
     listing,
     proof,
     status,
@@ -249,6 +250,46 @@ def create_app(
     def scoped(db: Session, digest: str) -> tuple[Any, decision.DecisionView]:
         row = found(db, digest)
         return row, decision.load(db, row)
+
+    @api.get("/outcomes", response_model=dto.Envelope[dto.ReviewOverviewOut])
+    def review_overview(db: Db) -> dict[str, Any]:
+        """`CIIP-008`'s evidence, as counts. No rate is served because none is
+        available: see `presentation/horizons.py`."""
+        view = horizons.overview(db)
+        return envelope(db, dto.ReviewOverviewOut(
+            horizons=[
+                dto.HorizonCountsOut(
+                    horizon=h.horizon, sessions=h.sessions, resolved=h.resolved,
+                    pending=h.pending, trades=h.trades, refusals=h.refusals,
+                    agreed=h.agreed, disagreed=h.disagreed, unanswerable=h.unanswerable,
+                    with_realized=h.with_realized,
+                    smallest_move=dto.decimal(h.smallest_move),
+                    largest_move=dto.decimal(h.largest_move),
+                )
+                for h in view.horizons
+            ],
+            decisions=view.decisions, decisions_reviewed=view.decisions_reviewed,
+            positions_ever=view.positions_ever, resolved=view.resolved,
+            pending=view.pending, caveat=view.caveat,
+        ))
+
+    @api.get(
+        "/decisions/{digest}/outcomes",
+        response_model=dto.Envelope[list[dto.DecisionHorizonOut]],
+    )
+    def decision_outcomes(db: Db, digest: Digest) -> dict[str, Any]:
+        row = found(db, digest)
+        return envelope(db, [
+            dto.DecisionHorizonOut(
+                horizon=h.horizon, sessions=h.sessions, state=h.state, resolved=h.resolved,
+                underlying_at_decision=dto.decimal(h.underlying_at_decision),
+                underlying_at_horizon=dto.decimal(h.underlying_at_horizon),
+                change=dto.decimal(h.change), direction_agreed=h.direction_agreed,
+                realized=dto.decimal(h.realized),
+                observed_snapshot_id=h.observed_snapshot_id,
+            )
+            for h in horizons.for_decision(db, row)
+        ], correlation_id=row.decision_hash)
 
     @api.get("/decisions/{digest}/market", response_model=dto.Envelope[dto.MarketOut])
     def decision_market(db: Db, digest: Digest) -> dict[str, Any]:
