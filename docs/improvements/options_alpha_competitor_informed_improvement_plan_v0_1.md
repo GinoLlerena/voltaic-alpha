@@ -1145,3 +1145,49 @@ scheduled every 900 seconds did not run against a live database first.
 The records exist and are queryable; presenting them is separate work, and
 presenting them badly — a win rate over 160 refusals with no trades — would be
 worse than not presenting them at all.
+
+### `CIIP-VAL-012` — 201 refusals, and the records cannot say how close any of them came
+
+Asked why 201 live decisions produced zero positions. The answer is in two parts,
+and the second is the actionable one.
+
+**The strategy is behaving as designed.** `evidence.build_signals` emits a
+structure signal only when SPY is in a trend *and* has retested it: EMA20 must sit
+at least 0.2% from EMA50, price must close on the correct side of EMA20, and a bar
+in the last five sessions must have touched EMA20 within 1%. It is not a
+continuous strength reading that happens to fall short of a threshold — with no
+pattern there is no signal at all, so the classifier's first gate
+(`MIN_STRUCTURE_STRENGTH = 0.60`) is never even reached. 201 refusals means 201
+ticks where that pattern was absent.
+
+The data was healthy throughout. All 201 snapshots record `missing_fields: []`,
+`stale_fields: []` and `provider_errors: []`, and insufficient bars would have
+appeared as `daily_bars:N_of_M`, so the bar history was sufficient every time.
+This is refusal, not breakage.
+
+**The records cannot say how close it came, and that is a gap.** Three facts
+compound:
+
+- `signals` rows are written from `snapshot.signals`, and the live snapshots carry
+  none — so all 201 refusals are recorded with **zero** evidence rows;
+- the stored snapshot payload has no `bars` key (`CIIP-VAL-003` again, from the
+  other side: it blocked a chart, and it also blocks this);
+- the computed intermediates — EMA separation, which side price closed, whether a
+  retest touched — are never persisted.
+
+So `no_qualified_setup` is recorded without the evidence that produced it. The
+dashboard can say a decision refused; it cannot say the trend was 0.19% from
+qualifying, or that the trend qualified and the retest did not. Over 201 refusals
+that is the difference between "the strategy is waiting for a rare setup" and
+"the strategy is effectively switched off", and the records do not distinguish
+them.
+
+**Proposed fix, not implemented here.** Persist the structure gate's computed
+values on every decision — separation, fast and slow EMA, which side price closed,
+whether a retest touched, and the bar-window hash. Small, append-only, and it
+turns every refusal into a measurable near-miss rather than a silence. It would
+also give `CIIP-VAL-003`'s chart its missing source. This is a schema change and a
+worker change, so it belongs in its own increment with its own decision.
+
+Until then, the honest statement about the strategy is that it has declined 201
+times on healthy data, and nothing recorded says how nearly it accepted.
