@@ -19,6 +19,7 @@ import { replayApi } from "./fixtures";
 const SCREENS = [
   { name: "overview", path: "/" },
   { name: "tour-step", path: "/?tour=4" },
+  { name: "activity", path: "/activity" },
   {
     name: "decision-refusal",
     path: "/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
