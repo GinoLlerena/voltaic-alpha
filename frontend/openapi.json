@@ -262,6 +262,107 @@
         "title": "CopyOut",
         "type": "object"
       },
+      "DecisionHorizonOut": {
+        "additionalProperties": false,
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "direction_agreed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction Agreed"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "observed_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Snapshot Id"
+          },
+          "realized": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "boolean"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "underlying_at_decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying At Decision"
+          },
+          "underlying_at_horizon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying At Horizon"
+          }
+        },
+        "required": [
+          "horizon",
+          "sessions",
+          "state",
+          "resolved",
+          "underlying_at_decision",
+          "underlying_at_horizon",
+          "change",
+          "direction_agreed",
+          "realized",
+          "observed_snapshot_id"
+        ],
+        "title": "DecisionHorizonOut",
+        "type": "object"
+      },
       "DecisionListItem": {
         "additionalProperties": false,
         "properties": {
@@ -927,6 +1028,55 @@
         "title": "Envelope[ProofOut]",
         "type": "object"
       },
+      "Envelope_ReviewOverviewOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewOverviewOut"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[ReviewOverviewOut]",
+        "type": "object"
+      },
       "Envelope_RiskOut_": {
         "additionalProperties": false,
         "properties": {
@@ -1072,6 +1222,59 @@
           "data"
         ],
         "title": "Envelope[WorkerEventsOut]",
+        "type": "object"
+      },
+      "Envelope_list_DecisionHorizonOut__": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionHorizonOut"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[list[DecisionHorizonOut]]",
         "type": "object"
       },
       "Envelope_list_IncidentOut__": {
@@ -1485,6 +1688,90 @@
           "explanation"
         ],
         "title": "HaltStateOut",
+        "type": "object"
+      },
+      "HorizonCountsOut": {
+        "additionalProperties": false,
+        "description": "Counts only. There is no rate field, and that is deliberate: over a corpus\nwhere every row is unanswerable, a rate would be a sentence about nothing.",
+        "properties": {
+          "agreed": {
+            "title": "Agreed",
+            "type": "integer"
+          },
+          "disagreed": {
+            "title": "Disagreed",
+            "type": "integer"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "largest_move": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Move"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "refusals": {
+            "title": "Refusals",
+            "type": "integer"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "smallest_move": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smallest Move"
+          },
+          "trades": {
+            "title": "Trades",
+            "type": "integer"
+          },
+          "unanswerable": {
+            "title": "Unanswerable",
+            "type": "integer"
+          },
+          "with_realized": {
+            "title": "With Realized",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "horizon",
+          "sessions",
+          "resolved",
+          "pending",
+          "trades",
+          "refusals",
+          "agreed",
+          "disagreed",
+          "unanswerable",
+          "with_realized",
+          "smallest_move",
+          "largest_move"
+        ],
+        "title": "HorizonCountsOut",
         "type": "object"
       },
       "IncidentOut": {
@@ -2502,6 +2789,53 @@
           "withheld"
         ],
         "title": "RequestOut",
+        "type": "object"
+      },
+      "ReviewOverviewOut": {
+        "additionalProperties": false,
+        "properties": {
+          "caveat": {
+            "title": "Caveat",
+            "type": "string"
+          },
+          "decisions": {
+            "title": "Decisions",
+            "type": "integer"
+          },
+          "decisions_reviewed": {
+            "title": "Decisions Reviewed",
+            "type": "integer"
+          },
+          "horizons": {
+            "items": {
+              "$ref": "#/components/schemas/HorizonCountsOut"
+            },
+            "title": "Horizons",
+            "type": "array"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "positions_ever": {
+            "title": "Positions Ever",
+            "type": "integer"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "horizons",
+          "decisions",
+          "decisions_reviewed",
+          "positions_ever",
+          "resolved",
+          "pending",
+          "caveat"
+        ],
+        "title": "ReviewOverviewOut",
         "type": "object"
       },
       "RiskDecisionOut": {
@@ -3524,6 +3858,48 @@
         "summary": "Decision Memo"
       }
     },
+    "/api/v1/decisions/{digest}/outcomes": {
+      "get": {
+        "operationId": "decision_outcomes_api_v1_decisions__digest__outcomes_get",
+        "parameters": [
+          {
+            "description": "decision_hash hex, no prefix",
+            "in": "path",
+            "name": "digest",
+            "required": true,
+            "schema": {
+              "description": "decision_hash hex, no prefix",
+              "pattern": "^[0-9a-f]{64}$",
+              "title": "Digest",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_DecisionHorizonOut__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decision Outcomes"
+      }
+    },
     "/api/v1/decisions/{digest}/proof": {
       "get": {
         "operationId": "decision_proof_api_v1_decisions__digest__proof_get",
@@ -3731,6 +4107,25 @@
           }
         },
         "summary": "Incidents"
+      }
+    },
+    "/api/v1/outcomes": {
+      "get": {
+        "description": "`CIIP-008`'s evidence, as counts. No rate is served because none is\navailable: see `presentation/horizons.py`.",
+        "operationId": "review_overview_api_v1_outcomes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ReviewOverviewOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Review Overview"
       }
     },
     "/api/v1/proof/{digest}.json": {

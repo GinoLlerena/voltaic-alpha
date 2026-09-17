@@ -126,6 +126,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decisions/{digest}/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Decision Outcomes */
+        get: operations["decision_outcomes_api_v1_decisions__digest__outcomes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decisions/{digest}/proof": {
         parameters: {
             query?: never;
@@ -203,6 +220,27 @@ export interface paths {
         };
         /** Incidents */
         get: operations["incidents_api_v1_incidents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review Overview
+         * @description `CIIP-008`'s evidence, as counts. No rate is served because none is
+         *     available: see `presentation/horizons.py`.
+         */
+        get: operations["review_overview_api_v1_outcomes_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -382,6 +420,29 @@ export interface components {
             write_guards: components["schemas"]["RuleOut"][];
             /** Write Guards Note */
             write_guards_note: string;
+        };
+        /** DecisionHorizonOut */
+        DecisionHorizonOut: {
+            /** Change */
+            change: string | null;
+            /** Direction Agreed */
+            direction_agreed: boolean | null;
+            /** Horizon */
+            horizon: string;
+            /** Observed Snapshot Id */
+            observed_snapshot_id: string | null;
+            /** Realized */
+            realized: string | null;
+            /** Resolved */
+            resolved: boolean;
+            /** Sessions */
+            sessions: number;
+            /** State */
+            state: string;
+            /** Underlying At Decision */
+            underlying_at_decision: string | null;
+            /** Underlying At Horizon */
+            underlying_at_horizon: string | null;
         };
         /** DecisionListItem */
         DecisionListItem: {
@@ -642,6 +703,27 @@ export interface components {
              */
             source_mode: "LIVE" | "FROZEN_REPLAY";
         };
+        /** Envelope[ReviewOverviewOut] */
+        Envelope_ReviewOverviewOut_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["ReviewOverviewOut"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
         /** Envelope[RiskOut] */
         Envelope_RiskOut_: {
             /** Correlation Id */
@@ -689,6 +771,28 @@ export interface components {
             /** Correlation Id */
             correlation_id?: string | null;
             data: components["schemas"]["WorkerEventsOut"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
+        /** Envelope[list[DecisionHorizonOut]] */
+        Envelope_list_DecisionHorizonOut__: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            /** Data */
+            data: components["schemas"]["DecisionHorizonOut"][];
             /** Observed At */
             observed_at: string;
             /**
@@ -854,6 +958,37 @@ export interface components {
              * @enum {string}
              */
             tone: "ok" | "warn" | "bad";
+        };
+        /**
+         * HorizonCountsOut
+         * @description Counts only. There is no rate field, and that is deliberate: over a corpus
+         *     where every row is unanswerable, a rate would be a sentence about nothing.
+         */
+        HorizonCountsOut: {
+            /** Agreed */
+            agreed: number;
+            /** Disagreed */
+            disagreed: number;
+            /** Horizon */
+            horizon: string;
+            /** Largest Move */
+            largest_move: string | null;
+            /** Pending */
+            pending: number;
+            /** Refusals */
+            refusals: number;
+            /** Resolved */
+            resolved: number;
+            /** Sessions */
+            sessions: number;
+            /** Smallest Move */
+            smallest_move: string | null;
+            /** Trades */
+            trades: number;
+            /** Unanswerable */
+            unanswerable: number;
+            /** With Realized */
+            with_realized: number;
         };
         /** IncidentOut */
         IncidentOut: {
@@ -1121,6 +1256,23 @@ export interface components {
             request_schema_version: string;
             /** Withheld */
             withheld: string[];
+        };
+        /** ReviewOverviewOut */
+        ReviewOverviewOut: {
+            /** Caveat */
+            caveat: string;
+            /** Decisions */
+            decisions: number;
+            /** Decisions Reviewed */
+            decisions_reviewed: number;
+            /** Horizons */
+            horizons: components["schemas"]["HorizonCountsOut"][];
+            /** Pending */
+            pending: number;
+            /** Positions Ever */
+            positions_ever: number;
+            /** Resolved */
+            resolved: number;
         };
         /** RiskDecisionOut */
         RiskDecisionOut: {
@@ -1529,6 +1681,38 @@ export interface operations {
             };
         };
     };
+    decision_outcomes_api_v1_decisions__digest__outcomes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description decision_hash hex, no prefix */
+                digest: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_DecisionHorizonOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     decision_proof_api_v1_decisions__digest__proof_get: {
         parameters: {
             query?: never;
@@ -1684,6 +1868,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_overview_api_v1_outcomes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ReviewOverviewOut_"];
                 };
             };
         };
