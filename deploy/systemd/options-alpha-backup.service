@@ -1,0 +1,15 @@
+[Unit]
+Description=Verified PostgreSQL dump for Options Alpha
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+UMask=0077
+WorkingDirectory=/opt/options-alpha
+# CIIP-I-002 is blocked: OSS is disabled on the account, so these dumps sit on
+# the same disk as the database they protect. That is NOT a backup - it is a
+# fast-restore convenience. Retention is 12 rather than the old 48 because
+# forty-eight near-identical copies of one disk is not forty-eight backups.
+Environment=BACKUP_KEEP=12
+ExecStart=/opt/options-alpha/scripts/backup_database.sh

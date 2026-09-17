@@ -1,0 +1,13 @@
+[Unit]
+Description=Redirect 80 to the Streamlit dashboard on 8501
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8501
+ExecStop=/usr/sbin/iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8501
+
+[Install]
+WantedBy=multi-user.target

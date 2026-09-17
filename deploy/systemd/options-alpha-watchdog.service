@@ -1,0 +1,13 @@
+[Unit]
+Description=Check that the Options Alpha worker is still working
+After=options-alpha-worker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/options-alpha
+EnvironmentFile=/etc/options-alpha.env
+# `--record` is what makes this monitoring rather than a console line: without
+# it the watchdog detects and prints, and the durable incident record -- the
+# one every other integrity failure lands in -- never hears about it. The
+# deployed unit had lost the flag; restore_hosted_demo.sh always had it.
+ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.watchdog --record
