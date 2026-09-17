@@ -1387,3 +1387,63 @@ labels to equal the rendered radio options in all four views.
 holds for everything the page derives from records or states as a rule. What a
 React client still owns is layout, styling, interface microcopy and interaction
 — which is what a presentation client is for.
+
+## 24. `RUI-2` first increment — 17 September 2026
+
+The frontend exists, builds, is tested, and runs against the real API. It is a
+shell, not the dashboard: source banner, status strip, decision list, and one
+decision's identity. The workspaces are `RUI-3` onward, and a half-built tab that
+looks finished is worse than an absent one.
+
+### The contract is generated, and cannot drift quietly
+
+`scripts/export_openapi.py` writes the API's own schema to
+`frontend/openapi.json`; `openapi-typescript` generates `src/api/schema.ts` from
+it. Neither the type check nor CI needs Python or a running server.
+
+Two guards keep that trustworthy. `tests/test_openapi_contract.py` regenerates
+the document and fails if the committed copy has drifted — shown to fail by
+adding a route without regenerating. CI regenerates the types and fails on any
+diff.
+
+`get` accepts only URLs built by `api.*`, each checked against the generated
+paths. The first version took `Path | string`, which made the union decorative:
+any typo would have type-checked. The lint rule that flagged it was right.
+
+### The read-only boundary, in the browser
+
+The client has no write helper, no `method:`, no body and no credentials, and a
+test asserts that against the source **with comments stripped** — for the reason
+`check_no_write_path.py` gives: a guard that cannot tell a call from prose
+explaining why we never make that call punishes documentation and gets deleted.
+Adding a `submit()` helper fails it.
+
+The contract test also proves the document a client generates from publishes only
+`get`, and that every JSON response carries an envelope except the kept proof
+bytes.
+
+### What the shell refuses to invent
+
+Tone, `known`, the grouping, the labels and the run counts all come from the
+server. A second implementation in the browser is how two surfaces come to
+disagree, which `RUI-VAL-009` demonstrated once already.
+
+A failed refresh keeps the last verified response and says *"Showing last
+verified state"*; a first load that fails says the API is unreachable rather than
+rendering an empty shell that looks like real emptiness. Both are tested.
+
+### Verified end to end
+
+Built app, real API, real browser: the banner reads `COMMITTED EVIDENCE`, the
+status strip shows `Worker UNKNOWN — no worker has ever held the lease` with the
+unknown intact, **five** decisions are listed (`RUI-VAL-009`'s fix, visible), and
+selecting the lifecycle case renders its action, direction, decision hash and
+both authority flags. No exception, and the only console error is a missing
+favicon.
+
+### Not in this increment
+
+Storybook, the axe accessibility pass, visual-regression and responsive QA — all
+part of `RUI-2`'s stated exit. Routing is not here either: with one screen there
+is nothing to route between, and `@tanstack/react-router` arrives with `RUI-3`'s
+second screen rather than as scaffolding for it.
