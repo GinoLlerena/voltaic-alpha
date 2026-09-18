@@ -659,3 +659,104 @@ used the new one.
 outcomes and 12 backups sit on one disk with no off-host copy, and that disk now
 holds the only record of two weeks of live evidence. This is the item whose risk
 compounds; everything else on this list can be rebuilt from the repository.
+
+## 15. Stopping point — 18 September 2026
+
+State at stop, measured rather than remembered.
+
+| | |
+|---|---|
+| `main` | `bcb04f4`, CI green on all three jobs, no open pull requests, working tree clean |
+| Host | `options-alpha-demo` — running; dashboard, API, port-80, worker, watchdog timer and backup timer all `active` |
+| Database | revision `0007_strategy_catalog` — **266 decisions**, 65 structure readings, 160 outcomes, 372 review jobs pending, 0 positions, 0 open incidents |
+| Backup | verified `2026-09-18T03:01:59Z`: 22,461,348 bytes, 27 tables, 1,853 rows restored and dropped, rev `0007`, 12 retained |
+| Disk | 4.0 GB of 40 GB (11%) |
+| Worker | heartbeat current at the stop |
+
+Nothing needs doing before the next open.
+
+### Shipped since §14
+
+Seven pull requests, each CI-green before merge: `CIIP-VAL-012` (structure
+readings), `CIIP-009` (the strategy catalog), `RUI-3` (the first vertical
+slice), and then four in one sitting — the browser gate, `RUI-4`, `RUI-5` and
+`RUI-6`.
+
+The gate is the one that changes how the rest is built. The unit suite runs in
+jsdom, which applies no stylesheet, and three defects had shipped through it
+with correct markup: a palette token at 3.09:1, proof tiles with **no styles at
+all**, and a cascade that painted the model's stage on the decisions where the
+model never ran — the product's one claim, inverted, on the page that makes it.
+`main` now runs axe, computed-style properties and a pixel diff in Chromium on
+every pull request, against frozen API fixtures so the job needs no Python and
+no database. It failed on five defects in `RUI-4` within hours of existing, four
+of which no automated check then in place would have caught.
+
+`tests/test_parity.py` asserts the dashboard and the browser make the same
+claims about the same records — the export compared byte for byte, `why` lines
+in authority order, unknown status cells still unknown.
+
+### A finding worth picking up first
+
+The live table now holds 65 structure readings across 65 distinct market
+snapshots, and **one** distinct close, EMA pair and bar count. That is the
+look-ahead protection working exactly as designed: the reading is computed from
+the last completed daily close, which does not move intraday. The consequence is
+that the table gains roughly thirty rows a day carrying one day's worth of
+information.
+
+Nothing recorded is false. The risk is arithmetic done later: **any aggregate
+over `structure_readings` is tick-weighted, not day-weighted**, so an average
+shortfall across readings would be one trading day counted thirty times and
+would look far better evidenced than it is. Either deduplicate per completed
+session or make the per-day grouping explicit wherever those rows are counted —
+before anything starts quoting them.
+
+### Where to pick up
+
+1. **The structure-reading duplication above.** Cheap, and it stops a wrong
+   number being computed rather than correcting one afterwards.
+2. **`RUI-2`'s remaining scope** — the Storybook state matrix and light/dark
+   themes. Neither is a gate, and the browser gate now covers state rendering,
+   so this is the weakest of the three.
+3. **`CIIP-3`'s `evaluation_runs`** — still the heaviest entity in the plan and
+   still wanting a research harness rather than a table. `sensitivity.py` and
+   the ablation artifact remain the place to start.
+
+`CIIP-I-003` (tiered partitioning) stays unbuilt on purpose: the table is empty
+and the plan itself says it belongs with the rollup job.
+
+### Waiting on the owner
+
+**The refusal gate.** All 65 readings refuse at `separation_or_side`, and none
+of them is marginal: separation runs about three times the required minimum, and
+what fails is that price closed **below** EMA20 while the EMA stack is bullish.
+The retest condition is never evaluated, because the side gate short-circuits
+first. For a strategy named *trend continuation retest*, refusing every pullback
+that closes below EMA20 may be intended — but it is a strategy decision, and the
+records can now show exactly how nearly each refusal qualified.
+
+**Risk policy numbers** — `DEC-008` exit thresholds and `DEC-010`'s per-trade
+budget and delta-band pairing. `CIIP-010` and beyond are blocked on them.
+
+**`CIIP-I-BLK-001`.** OSS is still disabled at a $0.00 balance. 266 decisions,
+160 outcomes and 12 backups sit on one disk with no off-host copy. This is the
+item whose risk compounds; everything else here can be rebuilt from the
+repository.
+
+**The submission record.** `HK-014` still reads `PARTIAL` — "ready for the form,
+not submitted" — against a deadline that passed on 4 September. Whether or not
+it was submitted, the record should say so rather than asserting an open
+submission against a closed deadline. The checklist also still notes the demo
+video's audio has never been listened to by a human.
+
+**Whether to deploy the React surface at all.** This now gates `RUI-6`'s
+remaining half. Streamlit is the public surface on `0.0.0.0:8501` with port 80
+redirecting to it; the API listens on `127.0.0.1` only and has no authentication
+*because* nothing off-host can reach it. A cutover is therefore a decision about
+exposing that API, not a route change. The procedure and its rollback are in the
+deployment runbook §11, written before they would be needed.
+
+The superseded Alibaba AccessKey is deferred at the owner's request until the
+rest of this list clears. It is parked, not cancelled: the old key stays valid
+until someone disables it.
