@@ -1677,6 +1677,63 @@ client must not construct one**, not that it is confidential: it carries a
 timestamp and a row id that the feed already displays. Anything that needed to
 be secret could not be handed to a browser in the first place.
 
+## 28. `RUI-6` parity — 17 September 2026
+
+`RUI-6`'s exit is that rollback is documented and React shows no truth or
+safety regression. Half of it is now evidenced and half of it turns out not to
+be a task yet.
+
+### Parity is structural, and the tests say where it could still break
+
+`app.py` holds **no ORM query of its own** — `RUI-1` moved the last of them
+behind read services — and imports the same `presentation/*` modules the API
+builds its DTOs from. The values are therefore the same by construction, and
+the place a difference could still appear is the DTO layer: reshaping,
+rounding, renaming or redacting on the way out, so that the browser says
+something the dashboard does not.
+
+`tests/test_parity.py` calls exactly what `app.py` calls and asks the API for
+the same thing:
+
+| claim | asserted |
+|---|---|
+| the export | **byte-identical**, not equivalent JSON — the digest is over those bytes, so a whitespace difference would give a reviewer two files and one digest |
+| the digest | the same on the file, the `X-Proof-Digest` header, and `/proof` |
+| status cells | label, value, `known`, `reason`, `source` — an unanswerable cell must not become an answer |
+| proof tiles | value, label, mode, availability, source |
+| the decision list | the same decisions in the same order, with grouping counts intact |
+| `why` lines | wording **and order**, because the order is authority order |
+| horizons | including the ones still waiting |
+| the review caveat | the same sentence, and the same resolved/pending counts |
+
+Derived DTO fields (`shown`, `total`) are checked against what they are derived
+from rather than against themselves, so the assertion cannot be satisfied by the
+DTO agreeing with its own arithmetic.
+
+Four mutations confirm the suite bites: re-serialising the manifest instead of
+serving the rendered bytes, reversing the `why` lines, publishing an unknown
+status cell as known (caught on the `Worker` cell, which is the unknown one),
+and returning an ad hoc query to `app.py`.
+
+### The cutover is not a task yet
+
+Measured on the host rather than assumed: Streamlit is `active` on
+`0.0.0.0:8501` with port 80 redirecting to it, the API is `active` on
+**`127.0.0.1:8600` only**, and the React build **is not deployed at all**. The
+public surface is the dashboard; the browser client exists in the repository and
+in CI and nowhere else.
+
+So "cut the default route to React" has nothing to cut over to, and the step
+that matters is not a route change: the API binds loopback deliberately and has
+no authentication because nothing off-host can reach it. Publishing it changes
+that assumption, and that is a decision to take rather than inherit. The
+procedure and the rollback are written up in the deployment runbook §11, before
+a cutover rather than after, so they exist at the moment they would be needed.
+
+Neither surface writes and both read the same records through the same read
+layer, so a rollback cannot lose data — the worst case is the dashboard serving
+again within one command.
+
 ### Exit criteria not yet met
 
 `RUI-3`'s exit is now met on the committed evidence: both journeys were walked,
