@@ -712,19 +712,59 @@ would look far better evidenced than it is. Either deduplicate per completed
 session or make the per-day grouping explicit wherever those rows are counted —
 before anything starts quoting them.
 
-### Where to pick up
+### Where to pick up — the recommendation, in order
 
-1. **The structure-reading duplication above.** Cheap, and it stops a wrong
-   number being computed rather than correcting one afterwards.
-2. **`RUI-2`'s remaining scope** — the Storybook state matrix and light/dark
-   themes. Neither is a gate, and the browser gate now covers state rendering,
-   so this is the weakest of the three.
-3. **`CIIP-3`'s `evaluation_runs`** — still the heaviest entity in the plan and
-   still wanting a research harness rather than a table. `sensitivity.py` and
-   the ablation artifact remain the place to start.
+**1. Measure the refusal gate against the committed bar history. Before
+anything else.**
 
-`CIIP-I-003` (tiered partitioning) stays unbuilt on purpose: the table is empty
-and the plan itself says it belongs with the rollup job.
+The system has recorded **266 live decisions and taken zero positions**.
+Everything else is downstream of that: `CIIP-4` needs six trading weeks of
+shadow evidence, `CIIP-5` and `CIIP-6` follow it, `RUI-5`'s position workspace
+is blocked until exit decisions exist, and the 372 pending review jobs will only
+ever measure refusals. If the gate never fires, six weeks from now produces the
+same nothing.
+
+The refusals are neither marginal nor scattered. All 65 readings fail one branch
+of one gate — separation runs about three times the required minimum, and what
+fails is `close > fast_ema` while the EMA stack is bullish. The retest
+condition, which the strategy is named after, is never evaluated, because the
+side gate short-circuits first.
+
+That is a strategy question, which is why it sits with the owner. It is
+currently unanswerable in the abstract, and it does not have to be:
+`fixtures/h0/sensitivity_bars.json` holds **562 daily SPY bars, June 2024 to
+August 2026**, and `sensitivity.py` already sets both the method and the
+guardrails for this exact shape of question — *set the real constant, re-run the
+real code, compare the answers*, measuring **decision** sensitivity rather than
+outcome sensitivity.
+
+The work is to run `structure_reading` across that history, report how many
+sessions land in each gate, and show how the count moves under specific named
+variations: evaluating the retest condition instead of short-circuiting, or a
+tolerance band below EMA20. The output is a table of counts to decide against,
+not a proposal.
+
+**What it cannot say**, stated here so it is not mistaken for something it is
+not: whether the gate is right, or whether any variant makes money. One trade
+has ever been taken. Section 9 of the signal specification forbids reading this
+as evidence of an edge, and nothing produced from it may be read that way. It
+answers only how often each rule fires, and whether the current one sits on a
+knife-edge.
+
+**2. The structure-reading duplication above.** Real but prospective — nothing
+quotes those rows yet, and it is just as cheap in a week. It stops a wrong
+number being computed rather than correcting one afterwards.
+
+**3. `CIIP-3`'s `evaluation_runs`** — still the heaviest entity in the plan, and
+it wants the harness in item 1 to exist first. `sensitivity.py` and the ablation
+artifact remain the place to start, which is the same place item 1 starts.
+
+**4. `RUI-2`'s remaining scope** — the Storybook state matrix and light/dark
+themes. Ranked last on purpose: neither is a gate, and the browser gate now
+covers state rendering.
+
+`CIIP-I-003` (tiered partitioning) stays unbuilt: the table is empty and the
+plan itself says it belongs with the rollup job.
 
 ### Waiting on the owner
 
