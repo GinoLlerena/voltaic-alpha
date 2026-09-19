@@ -11,7 +11,11 @@
 # managing it under the same exit policy; check with scripts/market_check.sh.
 set -euo pipefail
 REGION=ap-southeast-1
-WORKER=i-t4nfdbjx66so1we0aysh
+# The worker moved onto the demo host with CIIP-I-001's consolidation on
+# 10 September 2026, and the separate worker instance was released. This
+# pointed at that released instance until 19 September and could only fail
+# with InvalidInstance.NotFound.
+WORKER=i-t4n88bkfwsq0lhzmfjii
 
 script='#!/bin/bash
 set -euo pipefail

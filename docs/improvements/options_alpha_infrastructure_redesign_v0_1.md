@@ -800,3 +800,83 @@ deployment runbook §11, written before they would be needed.
 The superseded Alibaba AccessKey is deferred at the owner's request until the
 rest of this list clears. It is parked, not cancelled: the old key stays valid
 until someone disables it.
+
+## 16. Stopping point — 19 September 2026
+
+State at stop, measured rather than remembered.
+
+| | |
+|---|---|
+| `main` | `62f18a2`, CI green |
+| Open | **#23** the gate study (CLEAN), and the script fix in this branch |
+| Host | `options-alpha` — worker healthy, 476 ticks, last tick `04:18Z`, `MARKET_CLOSED`, lease held |
+| Database | **331 decisions**, 0 positions, 0 incidents, 0 model calls |
+| Dashboard | `http://47.236.50.157` → 200 |
+
+### Shipped today
+
+The gate study (`#23`), and a defect it took an unrelated command to expose.
+
+### Five scripts were addressing a host that no longer exists
+
+Running `scripts/market_check.sh` to collect the state above failed with
+`InvalidInstance.NotFound`. `CIIP-I-001` consolidated the worker onto the demo
+host on 10 September and the separate worker instance was released, but five
+committed scripts still named it: `market_check.sh`, `deploy_worker.sh`,
+`arm_worker.sh`, `disarm_worker.sh` and `restore_hosted_demo.sh`.
+
+Two of those are how an operator arms and disarms autonomous Paper entry.
+**`disarm_worker.sh` — the one that turns entry off — could only fail.** It
+fails loudly rather than silently, because `set -euo pipefail` stops it on the
+API error, so nobody was ever told a disarm had worked when it had not. The
+hazard was latent rather than live: the worker is in `observe` with
+`ALPACA_TRADING_ENABLED=false`, so there was nothing armed to disarm. It is
+still the wrong thing to discover while reaching for it.
+
+Four are corrected and `market_check.sh` now runs end to end, which is how the
+state table above was collected. `restore_hosted_demo.sh` is deliberately not
+swept: nine call sites, two of them looping over both hosts, in a script that
+starts instances and changes a production host. Collapsing the two identities
+there is a change to make deliberately, and it now carries a note saying so.
+
+### The duplication finding, one level up
+
+The gate study found that 65 structure readings describe **one** completed
+close. `market_check` shows the same shape in the decisions themselves: the
+eight most recent are all `NO_TRADE` at `SPY@762.600000`, five minutes apart,
+while the worker's last action is `MARKET_CLOSED`. So the 331 is not 331
+evaluations of the market — it counts ticks, including ticks taken while the
+market is shut and the price cannot move.
+
+That is worth checking rather than assuming: whether a decision should be
+recorded at all on a closed-market tick is a design question this stopping point
+raises and does not answer.
+
+### Where to pick up
+
+1. **The duplication**, now clearly first and larger than it looked yesterday.
+   It is not only a future risk to aggregates: it is why "331 decisions, zero
+   positions" reads as systemic refusal when it describes one price observed
+   repeatedly. Worth settling at both levels — readings and decisions — and
+   deciding whether a closed-market tick should record a decision.
+2. **`CIIP-3`'s `evaluation_runs`**, which now has a harness to build on.
+3. **`RUI-2`'s remaining scope** — Storybook and themes. Still last; neither is
+   a gate.
+
+### Waiting on the owner
+
+**Merge `#23`** and the script fix, both CLEAN.
+
+**The gate decision is narrower than it was.** The gate qualifies 70.2% of
+historical sessions and refusals run in streaks of up to fifteen, so the live
+refusal streak is ordinary. What remains is a genuine question about one branch:
+99 of 117 historical refusals had separation and failed on the side test alone,
+with a median close 0.49% below EMA20.
+
+**Risk policy numbers** — `DEC-008` and `DEC-010`. **`CIIP-I-BLK-001`** — still
+no off-host copy. **`HK-014`** — still asserting an open submission against a
+deadline that passed on 4 September. **Whether to deploy the React surface**,
+which is a decision about exposing a loopback API with no authentication.
+
+The superseded AccessKey remains deferred at the owner's request: parked, not
+cancelled.

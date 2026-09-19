@@ -17,7 +17,12 @@ set -euo pipefail
 
 REGION=ap-southeast-1
 DEMO=i-t4n88bkfwsq0lhzmfjii          # options-alpha-demo, public dashboard
-WORKER=i-t4nfdbjx66so1we0aysh        # options-alpha-worker, no inbound port
+# STALE, deliberately not swept: this id names the worker instance released
+# by CIIP-I-001's consolidation. Nine call sites use it, two of them looping
+# over both hosts, and this script starts instances and changes a production
+# host — so collapsing the two ids is a change to make deliberately, not as
+# part of a find-and-replace. Every phase here would fail on it today.
+WORKER=i-t4nfdbjx66so1we0aysh        # released; see the note above
 DEMO_SG=sg-t4naetmr3bp6sry6lw7a
 STREAMLIT_PORT=8501
 PUBLIC_PORT=80
