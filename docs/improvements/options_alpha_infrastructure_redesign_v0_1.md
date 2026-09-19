@@ -842,23 +842,41 @@ there is a change to make deliberately, and it now carries a note saying so.
 ### The duplication finding, one level up
 
 The gate study found that 65 structure readings describe **one** completed
-close. `market_check` shows the same shape in the decisions themselves: the
-eight most recent are all `NO_TRADE` at `SPY@762.600000`, five minutes apart,
-while the worker's last action is `MARKET_CLOSED`. So the 331 is not 331
-evaluations of the market — it counts ticks, including ticks taken while the
-market is shut and the price cannot move.
+close. The decisions have the same shape, and counting them settles it:
 
-That is worth checking rather than assuming: whether a decision should be
-recorded at all on a closed-market tick is a design question this stopping point
-raises and does not answer.
+| | |
+|---|---|
+| decisions | 331 |
+| trading days they span | **6** (11, 14, 15–18 September) |
+| distinct completed closes | **6** — 757.83, 764.29, 760.88, 757.39, 754.05, 762.60 |
+| decisions on a full day | ~65, one every five minutes |
+
+Every decision taken within a trading day reads the same `underlying_price`,
+because that price is the last *completed* daily close and it does not move
+intraday. The structure gate's input is therefore constant within a day, and all
+sixty-five of that day's decisions necessarily reach the same verdict.
+
+This is the look-ahead protection working, not a fault. What it means is that
+**331 is six evaluations of the market, asked sixty-five times each** — and any
+summary presenting it as 331 independent decisions overstates the evidence by a
+factor of sixty-five.
+
+A first reading of this recorded here claimed decisions were being taken while
+the market was shut. That was wrong: the host reports in `+08`, and 03:12 there
+is 19:12 UTC, which is mid-session. Every decision falls between 13:45 and 19:14
+UTC. The correction is kept rather than quietly replaced, because the mistake is
+the same one the finding is about — reading a count without asking what each row
+represents.
 
 ### Where to pick up
 
 1. **The duplication**, now clearly first and larger than it looked yesterday.
    It is not only a future risk to aggregates: it is why "331 decisions, zero
-   positions" reads as systemic refusal when it describes one price observed
-   repeatedly. Worth settling at both levels — readings and decisions — and
-   deciding whether a closed-market tick should record a decision.
+   positions" reads as systemic refusal when it describes six completed closes
+   asked sixty-five times each. The records are right and should not be thinned
+   — every tick did make a decision. What needs fixing is the arithmetic on top
+   of them: anything that counts decisions should be able to say how many
+   distinct completed closes those decisions rest on.
 2. **`CIIP-3`'s `evaluation_runs`**, which now has a harness to build on.
 3. **`RUI-2`'s remaining scope** — Storybook and themes. Still last; neither is
    a gate.
