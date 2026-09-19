@@ -16,7 +16,9 @@ KEY="${OPTIONS_ALPHA_KEY:?set OPTIONS_ALPHA_KEY to the deploy private key path}"
 
 case "$TARGET" in
   worker)
-    SG=sg-t4n6kaxrojixmg4ivuh8; INSTANCE=i-t4nfdbjx66so1we0aysh
+    # Consolidated onto the demo host and its security group by CIIP-I-001;
+    # the worker's own instance and sg-t4n6kaxrojixmg4ivuh8 were released.
+    SG=sg-t4naetmr3bp6sry6lw7a; INSTANCE=i-t4n88bkfwsq0lhzmfjii
     SERVICE=options-alpha-worker
     PATHS="app.py requirements.txt pyproject.toml README.md src"
     ;;
