@@ -34,6 +34,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from .evaluations import dataset_manifest, record
 from .evidence import (
     FAST_EMA,
     MIN_BARS_REQUIRED,
@@ -263,14 +264,60 @@ def render(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def parameters() -> dict[str, Any]:
+    """The constants in force, so a later run can be compared against this one."""
+    return {
+        "MIN_BARS_REQUIRED": MIN_BARS_REQUIRED,
+        "FAST_EMA": FAST_EMA,
+        "SLOW_EMA": SLOW_EMA,
+        "MIN_EMA_SEPARATION": str(MIN_EMA_SEPARATION),
+        "RETEST_LOOKBACK_SESSIONS": RETEST_LOOKBACK_SESSIONS,
+        "RETEST_TOLERANCE": str(RETEST_TOLERANCE),
+        "LOOKBACK_DAYS": LOOKBACK_DAYS,
+        "TOLERANCES": [str(t) for t in TOLERANCES],
+    }
+
+
+def manifest(report: dict[str, Any]) -> dict[str, Any]:
+    """The dataset, named by its digest rather than its path alone."""
+    return dataset_manifest(
+        BARS_FIXTURE,
+        symbol="SPY",
+        sessions=report["sessions"],
+        first=report["first"],
+        last=report["last"],
+    )
+
+
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapper
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", help="emit the report as JSON")
+    parser.add_argument(
+        "--record", action="store_true",
+        help="append this run to evaluation_runs, so the answer survives a later change",
+    )
     args = parser.parse_args(argv)
     report = run()
     print(json.dumps(report, indent=2, default=str) if args.json else render(report))
+
+    if args.record:
+        from sqlalchemy.orm import Session
+
+        from .config import load_settings
+        from .persistence.repository import build_engine
+
+        with Session(build_engine(load_settings())) as session:
+            saved = record(
+                session,
+                harness="gate_study",
+                dataset=manifest(report),
+                parameters=parameters(),
+                outputs=report,
+            )
+            session.commit()
+            print(f"\nrecorded evaluation run {saved.id} at {saved.code_revision}")
     return 0
 
 

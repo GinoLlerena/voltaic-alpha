@@ -800,3 +800,43 @@ EXECUTION_TABLES: frozenset[str] = frozenset(
         Position.__tablename__,
     }
 )
+
+
+class EvaluationRun(Base):
+    """What a research harness was given, and what it answered.
+
+    `CIIP-3` asks for frozen dataset manifest, folds, costs, stress, parameter
+    perturbations, regime slices, code version, outputs and uncertainty. This
+    records the five of those that something can actually produce today — the
+    dataset and its digest, the parameters in force, the code revision, the
+    outputs, and the perturbations a harness swept — and names the rest in
+    `not_covered` rather than leaving them null.
+
+    That distinction is the point. A row with empty `folds` and empty `stress`
+    looks like a run that found nothing to say about them; a row that names them
+    as uncovered says no one has designed that yet. The first is a claim, the
+    second is the truth.
+
+    It exists because `gate_study` and `sensitivity` now produce numbers that
+    otherwise live only in prose. A threshold changed next week would leave no
+    record of what the previous answer was, against which dataset, at which
+    revision — which is the failure this project guards against everywhere else.
+    """
+
+    __tablename__ = "evaluation_runs"
+
+    id: Mapped[str] = _pk()
+    #: The module that produced this, e.g. `gate_study`.
+    harness: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    #: Git revision of the code that ran, so a result can be reproduced.
+    code_revision: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: The frozen dataset: path, digest, and what it contains.
+    dataset_manifest: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    #: The constants in force for this run.
+    parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    #: What the harness answered.
+    outputs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    #: `CIIP-3` dimensions this run does not answer, named rather than implied.
+    not_covered: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    recorded_at: Mapped[datetime] = _recorded_at()
+    schema_version: Mapped[str] = _schema_version()

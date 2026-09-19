@@ -1434,3 +1434,53 @@ than the feature failing.
 Closes are counted as distinct close prices, which would merge two sessions that
 closed at exactly the same price to six decimal places. That direction is
 deliberate: it claims less evidence than exists, never more.
+
+## 20. `CIIP-3`'s `evaluation_runs`, built narrowly — 19 September 2026
+
+`CIIP-009` left this table unbuilt and said why: *"recording a run before
+anything can produce one would be scaffolding pretending to be evidence."* Two
+harnesses now produce runs — `sensitivity` and `gate_study` — so the objection
+has expired.
+
+It had also become a live problem. The gate study's numbers existed only in §18
+and a commit message. A threshold changed next week would have left no record of
+what the previous answer was, against which dataset, at which revision, which is
+the failure this project guards against everywhere else.
+
+### Narrower than the specification, and it says so
+
+`CIIP-3` asks for frozen dataset manifest, folds, costs, stress, parameter
+perturbations, regime slices, code version, outputs and uncertainty. Five of
+those can be produced today and are recorded. The other five are listed on
+**every run** in `not_covered`.
+
+That distinction is the design. A row with an empty `stress` column reads as a
+run that considered stress and found nothing to say; a row naming stress as
+uncovered says nobody has designed that yet. The first is a claim the records
+cannot support, the second is the truth.
+
+### Two properties worth the table
+
+**A dataset is identified by its bytes.** The manifest carries the file's
+SHA-256, not its path and a promise, so two runs that disagree are decidably
+disagreeing about the same data or about different data.
+
+**A revision that is not what ran is not recorded as what ran.** `code_revision`
+appends `-dirty` when the working tree has uncommitted changes, because
+"reproducible at revision X" is false if X is not what executed. It returns
+`unknown` rather than guessing when git cannot answer.
+
+Values are round-tripped through JSON on the way in, so a `Decimal` or a `date`
+cannot be accepted by SQLite and rejected by PostgreSQL — the failure mode where
+a harness silently stops recording.
+
+### Nothing reads it
+
+It is a record, not an input. A test asserts that `agent.py`, the execution
+gateway, `risk.py` and `evidence.py` do not import it, because a research result
+that could steer a live decision is a different and much worse thing than a
+research result.
+
+`gate_study --record` appends a run. The table is empty on arrival and the
+committed evidence database was upgraded in place to carry it — the five
+decisions and every hash in them are untouched.
