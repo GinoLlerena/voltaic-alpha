@@ -509,6 +509,10 @@ class ReviewOverviewOut(Public):
     decisions: int
     decisions_reviewed: int
     positions_ever: int
+    #: Distinct completed daily closes behind `decisions`. The worker ticks far
+    #: more often than the close moves, so this is the number that says how many
+    #: times the market was actually evaluated.
+    closes_observed: int
     resolved: int
     pending: int
     #: Derived from the counts, so it cannot drift from them.

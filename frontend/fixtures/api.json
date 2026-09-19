@@ -135,6 +135,7 @@
    "decisions": 5,
    "decisions_reviewed": 0,
    "positions_ever": 1,
+   "closes_observed": 4,
    "resolved": 0,
    "pending": 10,
    "caveat": "No horizon has elapsed yet, so nothing has been reviewed."
