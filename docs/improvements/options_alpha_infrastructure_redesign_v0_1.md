@@ -898,3 +898,20 @@ which is a decision about exposing a loopback API with no authentication.
 
 The superseded AccessKey remains deferred at the owner's request: parked, not
 cancelled.
+
+## 17. Full deployment cost analysis — 19 September 2026
+
+§12 priced the host. A wider review now covers every paid resource in the
+account — compute, storage, network, the database, CI/CD — with utilisation
+measured against allocation and each alternative priced from the account rather
+than estimated: [Deployment Cost Analysis](options_alpha_deployment_cost_analysis_v0_1.md).
+
+Its headline is not a saving. **September's $31.07 is unpaid and the balance is
+$0.00**, which is the same condition that disabled OSS under `CIIP-I-BLK-001`.
+The host holds the only copy of the evidence, so a suspension costs more than
+any optimisation returns.
+
+After that: the instance is 98.3% idle and uses 949 MB of 3 499 MB, so
+rightsizing 2c4g → 2c2g saves **$12.99/month (39%)** with about five minutes of
+downtime, and a one-month subscription takes the total to **$14.20/month
+(−57%)** with no rebuild and no architectural change.
