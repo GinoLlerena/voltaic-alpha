@@ -2808,6 +2808,10 @@
             "title": "Caveat",
             "type": "string"
           },
+          "closes_observed": {
+            "title": "Closes Observed",
+            "type": "integer"
+          },
           "decisions": {
             "title": "Decisions",
             "type": "integer"
@@ -2841,6 +2845,7 @@
           "decisions",
           "decisions_reviewed",
           "positions_ever",
+          "closes_observed",
           "resolved",
           "pending",
           "caveat"

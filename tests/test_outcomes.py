@@ -31,6 +31,7 @@ from options_alpha_lab.persistence.models import (
     ReviewJob,
     Run,
 )
+from options_alpha_lab.presentation import horizons
 
 ET = ZoneInfo("America/New_York")
 SESSIONS = [
@@ -414,3 +415,49 @@ class ReviewScaleTests(OutcomeCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class SamplingIsStatedRatherThanImplied(unittest.TestCase):
+    """A decision count must not read as a count of evaluations.
+
+    The worker asks the same question every five minutes against a daily close
+    that cannot move until the session ends, so a trading day contributes one
+    evaluation and sixty-odd records of it. `CIIP-VAL-013`.
+    """
+
+    def _overview(self, decisions: int, closes: int, **kw: object) -> horizons.ReviewOverview:
+        counts = horizons.HorizonCounts(
+            horizon="T+1", sessions=1, resolved=int(kw.get("resolved", 1)), pending=0,
+            trades=0, refusals=1, agreed=0, disagreed=0, unanswerable=1, with_realized=0,
+            smallest_move=None, largest_move=None,
+        )
+        return horizons.ReviewOverview(
+            horizons=(counts,), decisions=decisions, decisions_reviewed=decisions,
+            positions_ever=0, closes_observed=closes,
+        )
+
+    def test_the_caveat_names_the_denominator(self) -> None:
+        caveat = self._overview(331, 6).caveat
+        self.assertIn("331 decisions rest on 6 distinct completed closes", caveat)
+        self.assertIn("55 decisions per close", caveat)
+        self.assertIn("does not move intraday", caveat)
+
+    def test_it_says_nothing_when_each_close_was_asked_once(self) -> None:
+        """A future system that observes intraday must not inherit this claim."""
+        self.assertEqual(self._overview(6, 6).sampling, "")
+        self.assertEqual(self._overview(11, 6).sampling, "")
+
+    def test_it_says_nothing_when_the_records_cannot_support_it(self) -> None:
+        self.assertEqual(self._overview(331, 0).sampling, "")
+
+    def test_the_sentence_survives_into_the_reviewed_refusal_caveat(self) -> None:
+        caveat = self._overview(331, 6, resolved=1).caveat
+        self.assertIn("no position", caveat)
+        self.assertIn("distinct completed closes", caveat)
+
+    def test_nothing_is_claimed_before_a_horizon_elapses(self) -> None:
+        empty = horizons.ReviewOverview(
+            horizons=(), decisions=331, decisions_reviewed=0, positions_ever=0,
+            closes_observed=6,
+        )
+        self.assertEqual(empty.caveat, "No horizon has elapsed yet, so nothing has been reviewed.")

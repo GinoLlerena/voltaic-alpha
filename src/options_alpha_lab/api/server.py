@@ -269,6 +269,7 @@ def create_app(
                 for h in view.horizons
             ],
             decisions=view.decisions, decisions_reviewed=view.decisions_reviewed,
+            closes_observed=view.closes_observed,
             positions_ever=view.positions_ever, resolved=view.resolved,
             pending=view.pending, caveat=view.caveat,
         ))

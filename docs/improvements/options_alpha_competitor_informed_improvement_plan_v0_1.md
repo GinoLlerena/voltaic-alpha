@@ -1290,3 +1290,59 @@ and needs a research harness rather than a table; recording a run before anythin
 can produce one would be scaffolding pretending to be evidence. The existing
 `sensitivity.py` and the ablation artifact are the nearest things to it and are
 the place to start.
+
+## 19. `CIIP-VAL-013` — a decision count is not a count of evaluations — 19 September 2026
+
+Counted on the live host: **331 decisions spanning six trading days and six
+distinct completed closes.** About sixty-five decisions a day, five minutes
+apart, every one of them reading the same `underlying_price` — because that
+price is the last *completed* daily close and does not move intraday.
+
+| trading day (UTC) | decisions | completed close |
+|---|---:|---|
+| 11 Sep | 24 | 757.83 |
+| 14 Sep | 48 | 764.29 |
+| 15 Sep | 64 | 760.88 |
+| 16 Sep | 65 | 757.39 |
+| 17 Sep | 65 | 754.05 |
+| 18 Sep | 65 | 762.60 |
+
+The structure gate's input is therefore constant within a day, and all of a
+day's decisions necessarily reach the same verdict. This is the look-ahead
+protection working exactly as designed — and it means **331 is six evaluations
+of the market, asked sixty-five times each.**
+
+### What was wrong, and it was not the records
+
+Nothing here is a fault in what the system stores. Every tick genuinely made a
+decision and recording each one is the audit trail the product exists to keep.
+The defect was in the arithmetic on top: every summary said `331` and none said
+what the 331 rested on, which invites reading sixty-five refusals as sixty-five
+pieces of evidence. The same mistake was made twice in this project's own notes
+before it was caught, once by quoting the count as though it showed a systemic
+refusal, and once by misreading the host's `+08` timestamps as UTC and
+concluding decisions were being recorded with the market shut. They were not:
+every decision falls between 13:45 and 19:14 UTC.
+
+### The fix is a second number, not fewer rows
+
+`ReviewOverview` now carries `closes_observed`, and the caveat — which is
+derived from the counts rather than templated, so it cannot drift from them —
+states the ratio in its own sentence:
+
+> The 331 decisions rest on 6 distinct completed closes — about 55 decisions per
+> close, because the input is the last completed daily close and does not move
+> intraday.
+
+It reaches both surfaces at once, because both read the same caveat.
+
+Three properties are held by tests rather than intended. The sentence is
+**absent** when each close was asked about roughly once, so a future system that
+observes intraday cannot inherit a claim it has not earned. It is absent when
+the records cannot support it. And on the committed evidence — five decisions
+over four closes — it does not appear at all, which is the guard working rather
+than the feature failing.
+
+Closes are counted as distinct close prices, which would merge two sessions that
+closed at exactly the same price to six decimal places. That direction is
+deliberate: it claims less evidence than exists, never more.

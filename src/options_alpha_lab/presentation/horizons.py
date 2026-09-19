@@ -23,7 +23,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..outcomes import COMPLETE, HORIZONS, PENDING
-from ..persistence.models import Decision, DecisionOutcomeRecord, Position, ReviewJob
+from ..persistence.models import (
+    Decision,
+    DecisionOutcomeRecord,
+    MarketSnapshot,
+    Position,
+    ReviewJob,
+)
 
 
 @dataclass(frozen=True)
@@ -56,6 +62,18 @@ class ReviewOverview:
     decisions: int
     decisions_reviewed: int
     positions_ever: int
+    #: Distinct completed daily closes the decisions were taken from.
+    #:
+    #: The worker ticks every five minutes, but `underlying_price` is the last
+    #: *completed* daily close and does not move intraday, so every decision in
+    #: a trading day reads the same input and necessarily reaches the same
+    #: verdict. A decision count therefore says how often the system was asked,
+    #: not how many times the market was evaluated. This is the second number.
+    #:
+    #: Counted as distinct close prices, which merges two sessions that closed
+    #: at exactly the same price to six decimal places. That direction is the
+    #: safe one: it claims less evidence than exists, never more.
+    closes_observed: int = 0
 
     @property
     def resolved(self) -> int:
@@ -79,6 +97,7 @@ class ReviewOverview:
                 f"All {self.decisions_reviewed} reviewed decisions are refusals: no position "
                 "has ever been opened, so there is no realised result and nothing here "
                 "measures trading. What is recorded is what the underlying did afterwards."
+                f"{self.sampling}"
             )
         answerable = sum(h.answerable for h in self.horizons)
         if answerable == 0:
@@ -88,7 +107,29 @@ class ReviewOverview:
             )
         return (
             f"{answerable} of {self.resolved} resolved horizons state a direction that can "
-            "be compared. That is a sample, not a result."
+            f"be compared. That is a sample, not a result.{self.sampling}"
+        )
+
+    @property
+    def sampling(self) -> str:
+        """How much less independent the decision count is than it looks.
+
+        The worker asks the same question every five minutes against a daily
+        close that does not move until the session ends, so a day contributes
+        one evaluation and sixty-odd records of it. Stating the decision count
+        without this invites the reading that sixty-five refusals are sixty-five
+        pieces of evidence. Empty when the records do not have that shape, so a
+        future system that observes intraday says nothing it has not earned.
+        """
+        if self.closes_observed <= 0 or self.decisions <= self.closes_observed:
+            return ""
+        per_close = self.decisions / self.closes_observed
+        if per_close < 2:
+            return ""
+        return (
+            f" The {self.decisions} decisions rest on {self.closes_observed} distinct "
+            f"completed closes — about {per_close:.0f} decisions per close, because the "
+            "input is the last completed daily close and does not move intraday."
         )
 
 
@@ -152,6 +193,9 @@ def overview(session: Session) -> ReviewOverview:
         decisions=_count(session, select(func.count()).select_from(Decision)),
         decisions_reviewed=reviewed,
         positions_ever=_count(session, select(func.count()).select_from(Position)),
+        closes_observed=_count(
+            session, select(func.count(func.distinct(MarketSnapshot.underlying_price)))
+        ),
     )
 
 

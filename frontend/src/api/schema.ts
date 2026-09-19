@@ -1262,6 +1262,8 @@ export interface components {
         ReviewOverviewOut: {
             /** Caveat */
             caveat: string;
+            /** Closes Observed */
+            closes_observed: number;
             /** Decisions */
             decisions: number;
             /** Decisions Reviewed */
