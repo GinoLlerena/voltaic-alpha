@@ -1291,6 +1291,94 @@ can produce one would be scaffolding pretending to be evidence. The existing
 `sensitivity.py` and the ablation artifact are the nearest things to it and are
 the place to start.
 
+
+## 18. The structure gate, measured — 18 September 2026
+
+Yesterday's stopping point recommended measuring the refusal gate before
+building anything else, on the premise that 266 live decisions had produced zero
+positions and the gate might therefore never fire. **The measurement contradicts
+the premise, which is the point of having taken it.**
+
+`gate_study.py` runs the gate across 493 sessions of SPY daily history
+(September 2024 – August 2026), in the 400-calendar-day window the worker
+actually receives, and reports where each session stopped.
+
+### The gate fires most of the time
+
+| branch | sessions | share |
+|---|---:|---:|
+| `passed` | 346 | **70.2%** |
+| `separation_or_side` | 117 | 23.7% |
+| `no_retest` | 30 | 6.1% |
+
+A rule that qualifies seven sessions in ten is not a rule that never fires. The
+live experience needed a different explanation, and the history supplies it:
+refusals arrive in runs. There are 39 of them, **twelve run to five sessions or
+more, and the longest runs to fifteen**. A live system that has refused
+everything so far is consistent with this history and is not, on its own,
+evidence of a misconfigured gate.
+
+### What the live evidence actually amounts to
+
+Worth stating plainly, because the headline number misleads. Since structure
+readings began, the live system has recorded **65 readings across 65 distinct
+market snapshots — and one distinct close, one EMA pair, one bar count.** Every
+reading restates the same completed daily close, because the reading is derived
+from the last *completed* close and that does not move intraday.
+
+So "266 decisions, zero positions" is not 266 observations of the gate. It is a
+handful of trading days, sampled once a tick. The system has not refused
+repeatedly; it has refused a small number of times and been asked about it
+often.
+
+### When the side test binds, it binds narrowly
+
+Of the 117 sessions refused on `separation_or_side`, **99 had separation at or
+beyond the minimum** and failed on the side test alone. Their closes sat this
+far from EMA20, signed so that negative is below it:
+
+| min | p25 | median | p75 | max |
+|---:|---:|---:|---:|---:|
+| −0.02653 | −0.01122 | **−0.00494** | −0.00030 | +0.04904 |
+
+Half of those refusals were within half a percent of EMA20. The gate is
+therefore sensitive to the side test in exactly the region where a *retest*
+would be expected to sit, which is the observation worth taking to a decision.
+
+### What a variation would cost
+
+Counts only. Each is a question someone could ask, not a proposal:
+
+| rule | qualifying sessions | share |
+|---|---:|---:|
+| as it ships | 346 | 70.2% |
+| close may sit 0.25% below EMA20 | 366 | 74.2% |
+| close may sit 0.50% below EMA20 | 378 | 76.7% |
+| close may sit 1.00% below EMA20 | 398 | 80.7% |
+| no side requirement at all | 445 | 90.3% |
+
+### What this does not say
+
+It says nothing about profit, edge, or whether the current gate is right. These
+are decision counts over one symbol's history. One trade has ever been taken.
+Section 9 of the signal specification forbids reading a count of qualifying
+sessions as evidence of an edge, and the report repeats that in its own output
+so the table cannot be pasted somewhere without it.
+
+The study re-implements the gate so variations can be applied to it, which is
+its one real risk: a drifted re-implementation would measure a system nobody is
+running and would look equally convincing. `tests/test_gate_study.py` therefore
+holds the baseline to `evidence.structure_reading` on **every** session in the
+fixture, not on a sample. If that test fails, this section is void.
+
+### What follows
+
+The gate is no longer the blocker it appeared to be, so the item that was ranked
+second is now first: the per-tick duplication of structure readings. It is not
+merely a future risk to aggregates — it is already what made "266 decisions,
+zero positions" read as a systemic refusal when it describes one completed
+close observed sixty-five times.
+
 ## 19. `CIIP-VAL-013` — a decision count is not a count of evaluations — 19 September 2026
 
 Counted on the live host: **331 decisions spanning six trading days and six
