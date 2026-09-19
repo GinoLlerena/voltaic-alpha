@@ -270,3 +270,62 @@ class ReadOnlyRoleScriptTests(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class ScriptsAddressTheHostThatExists(unittest.TestCase):
+    """Every committed script must name a live instance.
+
+    `CIIP-I-001` consolidated the worker onto the demo host on 10 September 2026
+    and the separate worker instance was released. Five scripts kept naming the
+    released one for nine days, including `disarm_worker.sh` — the command an
+    operator reaches for to turn autonomous Paper entry off. It failed loudly
+    rather than silently, and nothing was armed, so the hazard stayed latent.
+    Nothing was watching for it, which is what this fixes.
+
+    A released instance cannot be detected from here without a cloud call, so
+    the check is the other way round: the id of a machine that no longer exists
+    must not appear, and any instance id in `scripts/` must be one this file
+    knows about.
+    """
+
+    SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+    #: The consolidated host. A second entry belongs here only when a second
+    #: machine genuinely exists again.
+    LIVE = {"i-t4n88bkfwsq0lhzmfjii"}
+    #: Released by the consolidation. Naming it is the defect.
+    RELEASED = {"i-t4nfdbjx66so1we0aysh"}
+
+    def _scripts(self) -> list[Path]:
+        return sorted(self.SCRIPTS.glob("*.sh"))
+
+    def test_no_script_addresses_a_released_instance(self) -> None:
+        for path in self._scripts():
+            with self.subTest(script=path.name):
+                text = path.read_text(encoding="utf-8")
+                for dead in self.RELEASED:
+                    # Named in a comment explaining the history is fine; used as
+                    # a value is not. Strip comment bodies before looking.
+                    code = "\n".join(
+                        line.split("#", 1)[0] for line in text.splitlines()
+                    )
+                    self.assertNotIn(dead, code, f"{path.name} addresses a released instance")
+
+    def test_every_instance_id_is_one_we_know_about(self) -> None:
+        """A new id appearing without this list being updated is the same bug
+        arriving from the other direction."""
+        pattern = re.compile(r"\bi-[a-z0-9]{20,}\b")
+        for path in self._scripts():
+            code = "\n".join(line.split("#", 1)[0] for line in path.read_text().splitlines())
+            for found in pattern.findall(code):
+                with self.subTest(script=path.name, instance=found):
+                    self.assertIn(found, self.LIVE | self.RELEASED)
+                    self.assertIn(found, self.LIVE, f"{path.name} uses a released instance")
+
+    def test_the_restore_script_visits_each_machine_once(self) -> None:
+        """Both role names resolve to one box, so a loop over both would start
+        it twice and report it twice."""
+        restore = (self.SCRIPTS / "restore_hosted_demo.sh").read_text(encoding="utf-8")
+        self.assertIn("hosts()", restore)
+        self.assertIn("sort -u", restore)
+        self.assertNotIn('for id in "$DEMO" "$WORKER"', restore)
+        self.assertNotIn('for id in "$WORKER" "$DEMO"', restore)

@@ -17,12 +17,16 @@ set -euo pipefail
 
 REGION=ap-southeast-1
 DEMO=i-t4n88bkfwsq0lhzmfjii          # options-alpha-demo, public dashboard
-# STALE, deliberately not swept: this id names the worker instance released
-# by CIIP-I-001's consolidation. Nine call sites use it, two of them looping
-# over both hosts, and this script starts instances and changes a production
-# host — so collapsing the two ids is a change to make deliberately, not as
-# part of a find-and-replace. Every phase here would fail on it today.
-WORKER=i-t4nfdbjx66so1we0aysh        # released; see the note above
+# CIIP-I-001 consolidated the worker onto the demo host on 10 September 2026 and
+# released the separate worker instance. The two names are kept because they
+# still name two roles — the public dashboard and the worker service — and the
+# phases below read in those terms. They now resolve to one machine.
+#
+# Until 19 September this named the released instance, and a dry run showed what
+# that cost: phase 3 would try to start an instance that does not exist, and
+# phases 3b and 4 would ship the source and the migrations to it, leaving the
+# real worker with neither.
+WORKER="$DEMO"                       # one box since the consolidation
 DEMO_SG=sg-t4naetmr3bp6sry6lw7a
 STREAMLIT_PORT=8501
 PUBLIC_PORT=80
@@ -53,6 +57,11 @@ run() {
 }
 
 wants() { case " $PHASES " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+
+# The distinct machines behind the role names. Since the consolidation both roles
+# live on one instance, and a loop visiting it twice would start it twice and
+# report it twice. A function, so a future split needs no edit at the call sites.
+hosts() { printf '%s\n' "$DEMO" "$WORKER" | sort -u; }
 
 instance_field() {  # instance_field <instance-id> <json-key>
   aliyun ecs DescribeInstances --RegionId "$REGION" --InstanceIds "[\"$1\"]" \
@@ -169,7 +178,7 @@ if wants preflight; then
     0|0.00|0.0) warn "no available balance. Confirm a payment method before relying on this host." ;;
   esac
 
-  for id in "$DEMO" "$WORKER"; do
+  for id in $(hosts); do
     note "$(instance_field "$id" InstanceName): $(instance_field "$id" Status)"
   done
 fi
@@ -217,7 +226,7 @@ fi
 # --- start -------------------------------------------------------------------
 if wants start; then
   say "3. Start the instances"
-  for id in "$WORKER" "$DEMO"; do
+  for id in $(hosts); do
     status=$(instance_field "$id" Status)
     if [ "$status" = "Running" ]; then
       note "$(instance_field "$id" InstanceName) already running"
