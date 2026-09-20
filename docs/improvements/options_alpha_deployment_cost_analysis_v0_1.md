@@ -41,15 +41,16 @@ evidence says it is not:
 | `ModifyInstanceSpec --DryRun` | `InvalidInstanceStatus.NotStopped` — a *state* error, not `Forbidden`, `NotEnoughBalance` or an overdue code |
 | `oss ListBuckets` | **answers** (0 buckets) — where `CIIP-I-BLK-001` recorded `403 UserDisable` |
 
-That last row moved twice in one evening and is **not settled**. Measured
-20 September: `CreateBucket` **refused with `UserDisable` at 21:16Z** and
-**succeeded at 22:03Z**, balance unchanged at $0.00, followed by a clean object
-round trip. A delayed re-test is running before `CIIP-I-BLK-001` is recorded
-either way, because one result in each direction is not a trend.
+That last row moved twice in one evening, and the explanation is mundane:
+`CreateBucket` refused with `UserDisable` at 21:16Z and succeeded at 22:03Z
+because **OSS was activated in the console between the two tests**. The service
+was not enabled on the account; then it was. Delayed probes are running to
+confirm it stays enabled, after which `CIIP-I-BLK-001` can be recorded as
+resolved rather than merely quiet.
 
-§7.2 does not wait on that. It takes OSS as the Tier 2 target and treats
-availability as **intermittent by design**, which is why its monitoring makes a
-silent refusal impossible rather than assuming refusals will not happen.
+`ListBuckets` answering while `CreateBucket` refused was the tell, and it is
+worth keeping: a service can be reachable and still refuse the operation you
+need. §7.2 tests the operation it depends on, not a neighbouring one.
 
 **Treatment:** billing is not a gate. Confirm no restriction in the same hour as
 any maintenance window, because a host that stops and will not restart is the
@@ -289,13 +290,14 @@ not a high-availability design.
    **$12.99/month, 39%** base saving. Preserve the disk and EIP; record downtime.
 4. **Observe at least five consecutive trading sessions**, including a
    backup/restore overlap. Keep PAYG until §7 acceptance is met.
-5. **Stand up the recurring DR tier: a daily encrypted push to OSS** —
-   **$0.003/month today, $0.056 at six months**, with retention and deletion
-   executed by an OSS lifecycle rule rather than by anything on the host, and a
-   newest-object age check that fails at 30 hours. The age check is not
-   optional: the target refused once already, and a refusal that nobody sees is
-   the failure this tier exists to prevent. Add the monthly restore validation
-   and the Tier 3 off-account copy with it.
+5. **Stand up the recurring DR tier: a daily public-key-encrypted push to OSS**
+   — **$0.023/month at steady state, $0.063 at six months**. Two prefixes with
+   separate lifecycle rules (`daily/` expiring at 7 days, `weekly/` archived at
+   7 and expiring at 63), both enforced by OSS server-side; the host holds no
+   delete permission. A newest-object age check fails at 30 hours and any
+   non-2xx upload becomes a durable fault event. Add the monthly restore
+   validation — which runs on the operator's machine, since only it holds the
+   private key — and the Tier 3 off-account copy.
 
 6. **Convert to one-month subscription only after acceptance** — a further
    **$6.19/month** base saving. Record renewal owner, date and total quote.
@@ -422,17 +424,21 @@ The only path that destroys disk contents is the *deferred* disk rebuild
 One encrypted dump per day, pushed off the host. **This tier alone carries the
 24-hour recovery point**; Tier 0 contributes nothing to it.
 
-**Target: Alibaba OSS.** `CreateBucket` was refused with `UserDisable` at 21:16Z
-on 20 September and **succeeded at 22:03Z the same evening**, with the account
-balance unchanged at $0.00. A full round trip then passed — create, put, list,
-get with identical bytes, delete object, delete bucket — so the service works.
+**Target: Alibaba OSS.** `CreateBucket` was refused with `UserDisable` at
+21:16Z on 20 September and succeeded at 22:03Z. **OSS was activated in the
+console between those two tests**, which explains the change: the service was
+not enabled on the account, and then it was. A full round trip then passed —
+create, put, list, get with identical bytes, delete object, delete bucket.
 
-That flip is the design input, not a footnote. A target that refused an hour
-earlier may refuse again, so **the design assumes intermittent availability** and
-the monitoring below exists to make a silent refusal impossible. A re-test is
-scheduled; if OSS proves unreliable rather than merely available, the same
-design points at a third-party S3-compatible store with no other change —
-only the endpoint and credential differ.
+An earlier draft read that flip as evidence of *intermittent* availability and
+built the design around it. That was the wrong inference from the right
+observation. There is no evidence OSS comes and goes; there is evidence it was
+off and is now on.
+
+Upload-failure handling and object-age monitoring stay regardless. They are not
+compensation for an unreliable target — they are the ordinary controls any
+unattended backup needs, and their absence is how a backup stops running without
+anyone noticing.
 
 ##### The mechanism, in five parts
 
@@ -451,53 +457,96 @@ continuously except things already running.
 
 ##### Frequency, retention and automatic deletion
 
-| Parameter | Value |
-|---|---|
-| **Frequency** | **One upload per day.** Tier 0 continues hourly locally; only one of those dumps is pushed |
-| **Standard tier** | The **7 most recent daily** objects |
-| **Archive tier** | **8 weekly** objects, transitioned automatically at 7 days |
-| **Deletion** | Automatic expiry at **63 days** (7 daily + 8 weekly), enforced by the OSS lifecycle rule |
-| **Total objects** | **15**, bounded by count rather than age — which is why cost stays flat as the database grows |
-| **Never deleted** | The newest verified object, whatever the rule says |
+An earlier draft specified "one daily stream, transition at 7 days, expire at
+63" and claimed it produced 7 daily plus 8 weekly objects. **It does not.** A
+single stream under one age rule yields 63 daily objects, not a daily set and a
+weekly set. Two prefixes with separate rules are needed to express that policy.
 
-Deletion is **not** a cron job and not the operator's responsibility. An OSS
-lifecycle rule performs both the Standard→Archive transition and the expiry
-server-side. Nothing on the host decides what to delete, so a host failure
-cannot cause either runaway retention or premature deletion.
+| | `daily/` | `weekly/` |
+|---|---|---|
+| **Written** | every day | one per week, same dump, written to both prefixes |
+| **Storage class** | Standard | Standard, then Archive |
+| **Transition** | none | **to Archive at 7 days** |
+| **Expiry** | **7 days** | **63 days** |
+| **Steady-state count** | 7 | 9 |
 
-| Horizon | Standard | Archive | $/month |
-|---|---:|---:|---:|
-| Today | 0.15 GB | 0.18 GB | **0.003** |
-| At six weeks | 0.77 GB | 0.41 GB | **0.014** |
-| At six months | 2.97 GB | 2.88 GB | **0.056** |
+The uploader's only decision is whether today is also the weekly day; it writes
+the same encrypted object to one prefix or to both. It never deletes anything.
 
-Without the lifecycle transition the six-month figure is $0.100; the rule saves
-$0.044/month. Both are noise against a $14–20 base — the lifecycle rule is worth
-having because it bounds growth automatically, not because it saves money.
+**Deletion is executed by OSS lifecycle rules, server-side.** The production
+host has no delete permission and runs no pruning job, so neither a host failure
+nor a compromised host can destroy stored backups, and neither runaway retention
+nor premature deletion is possible from that side.
 
-##### Encryption
+| Horizon | Objects | Standard | Archive | $/month |
+|---|---|---:|---:|---:|
+| Day 7 | 7 daily + 2 weekly = 9 | 0.25 GB | 0.02 GB | **0.004** |
+| Day 42 | 7 + 7 = 14 | 0.88 GB | 0.37 GB | **0.016** |
+| **Day 63 — steady state** | **7 + 9 = 16** | 1.26 GB | 0.74 GB | **0.023** |
+| Day 182 | 7 + 9 = 16 | 3.40 GB | 2.88 GB | **0.063** |
 
-Encrypt the dump **client-side, before upload**, so the stored object is opaque
-to the storage account. Server-side encryption alone protects against disk
-theft at the provider, not against anything that can read the bucket.
+Steady state is **16 objects, reached at day 63**, bounded by count rather than
+age — which is why cost grows only with the database, not with elapsed time.
+The previous figure of "$0.056 for 15 objects" was arithmetic over a model that
+could not produce those objects; the corrected six-month figure is **$0.063**.
 
-The decryption key must live **outside the host**. A key stored beside the data
-it protects is decoration. It does not belong in this repository either — see
-the credential rule in the audit table above.
+##### The protected copy
+
+An age-based lifecycle rule cannot exempt "the newest verified object" — it has
+no concept of verification, and the earlier claim that such an object would
+never be deleted was not enforceable by the mechanism described.
+
+Two things replace it:
+
+1. **A third prefix, `anchor/`, with no lifecycle rule at all.** It holds the
+   one-time pre-resize copy and nothing else. Never transitioned, never expired,
+   deleted only by an explicit human action. One object, 22.5 MB, $0.0004/month.
+2. **For the rotating tiers, no exemption is claimed.** Protection there comes
+   from the retention window and the 30-hour age alert: the window is 7 days of
+   dailies, so a failure must go unnoticed for a week before the newest good
+   copy expires, and the alert fires after 30 hours.
+
+##### Encryption: public-key, so the host cannot decrypt its own backups
+
+Encrypt **client-side, before upload**, so the stored object is opaque to the
+storage account. Server-side encryption alone protects against disk theft at the
+provider, not against anything that can read the bucket.
+
+Use **asymmetric encryption**. The host holds only a **public** key and can
+therefore create backups it cannot read. The **private key never touches the
+production machine** — it lives with the operator, alongside the recovery
+runbook and away from the host it would be used to rebuild.
+
+A symmetric scheme is the obvious shortcut and is rejected deliberately: it
+requires the decryption secret to sit on the production host, so anything that
+compromises the host also gains every historical backup. The asymmetric design
+costs nothing extra and removes that entirely.
+
+Concretely: `age` with a recipient public key, or `openssl smime`/GPG with an
+RSA or ECC public key — any tool where encryption needs only the public half.
+
+Two consequences worth stating, because they are the price of this choice:
+
+- **A lost private key means unreadable backups.** There is no recovery path,
+  by design. Hold it in at least two places the host cannot reach.
+- **Restore validation (§7.2b) needs the private key**, so it runs on the
+  operator's machine, not on the host. That is the right place for it anyway —
+  a restore drill performed on the production box proves less than one performed
+  where a real recovery would happen.
 
 ##### Monitoring: what makes this an RPO rather than a hope
 
 An upload that silently stopped three weeks ago is indistinguishable from one
-that ran this morning, until the moment it is needed. Given a target that has
-already refused once, this is the part that cannot be skipped.
+that ran this morning, until the moment it is needed. This is the part that
+makes the 24-hour figure a property of the system rather than an intention.
 
 1. **Age check.** The existing watchdog already reads `backup.json` for local
    dump age. Extend it to record the **newest OSS object's timestamp** and fail
    when it exceeds **30 hours** — one daily cycle plus margin.
-2. **Alarm on refusal, not just on absence.** A `UserDisable` response is a
-   *successful* API call returning a refusal. Treat a non-2xx upload as a fault
-   event in `worker_events`, so it is durable and visible rather than a line in
-   a journal nobody reads.
+2. **Alarm on refusal, not just on absence.** An API call can succeed at the
+   transport level and still refuse the operation — `UserDisable` was exactly
+   that shape. Treat any non-2xx upload as a fault event in `worker_events`, so
+   it is durable and visible rather than a line in a journal nobody reads.
 3. **The host cannot report its own death.** An on-host check catches "uploads
    stopped while the host lives", which is the failure this target makes likely.
    Host loss is already visible through the stale worker lease on the dashboard.
@@ -551,7 +600,8 @@ target already sits outside the account.
 | 0 — local dumps | hourly | 12 copies | existing script, automatic | $0.00 |
 | 1 — pre-resize snapshot | once | 7 days after validation | operator, explicit | ~$0.05 one-off |
 | 1 — pre-resize dump, **interim operator `scp`** | once | indefinite | never | $0.00 |
-| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | 7 daily Standard + 8 weekly Archive | **OSS lifecycle rule, server-side** at 63 days | **0.003 → 0.056** as data grows |
+| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | `daily/` 7 days; `weekly/` Archive at 7, expire 63 | **OSS lifecycle rules, server-side** | **0.023 → 0.063** as data grows |
+| 2c — `anchor/` protected copy | once | **no lifecycle rule** | explicit human action only | $0.0004/mo |
 | 2b — restore validation | monthly | n/a | n/a | $0.00 |
 | 3 — off-account copy | monthly, manual | 3 rolling | operator | $0.00 |
 
@@ -565,11 +615,11 @@ records themselves are not a cost-cutting target.
 Costed against the **recurring DR tier**, now OSS. The one-time interim copy and
 the monthly Tier 3 copy are not recurring charges.
 
-| Configuration | Base | + DR backup, today | + DR backup, at six months |
+| Configuration | Base | + DR backup, steady state | + DR backup, at six months |
 |---|---:|---:|---:|
-| Current (`e-c1m2.large`, PL1 40 GB, PAYG) | 33.38 | 33.38 | **33.44** |
-| C — validation stage (`e-c1m1.large`, PAYG) | 20.39 | 20.39 | **20.45** |
-| B — preferred (`e-c1m1.large`, subscription) | 14.20 | 14.20 | **14.26** |
+| Current (`e-c1m2.large`, PL1 40 GB, PAYG) | 33.38 | 33.40 | **33.44** |
+| C — validation stage (`e-c1m1.large`, PAYG) | 20.39 | 20.41 | **20.45** |
+| B — preferred (`e-c1m1.large`, subscription) | 14.20 | 14.22 | **14.26** |
 
 Backup is **0.02–0.4%** of the bill. It adds no server, no licence and no
 recurring human task beyond one monthly copy. The recovery gap was never a cost
@@ -732,19 +782,27 @@ quoted from today's data size.
 *Scope.* The recommended change is an in-place resize, so no second host is
 created and nothing is deleted afterwards.
 
-**v0.4 — 20 September 2026.** Backup design settled on OSS after `CreateBucket`
-succeeded, having refused 47 minutes earlier at an unchanged balance. That flip
-is treated as a design input: availability is assumed intermittent, so a
-newest-object age check and durable fault events make a silent refusal
-impossible. Frequency, retention, automatic deletion and encryption are now
-exact — one daily encrypted dump, 7 Standard plus 8 weekly Archive, expiry at
-63 days enforced by an OSS lifecycle rule server-side, key held off-host. Tier 3
-becomes mandatory rather than optional, since OSS puts every automated copy in
-one account. No additional server is introduced anywhere. What happens to the
-data after the resize is spelled out: the database is untouched, the disk is
-preserved, and the only deliberate deletion is the pre-resize snapshot, seven
-days after validation. `CIIP-I-BLK-001` is **not** yet recorded as resolved; a
-delayed re-test decides that.
+**v0.4 — 20 September 2026.** Backup design settled on OSS, which was
+**activated in the console** between a refused and a successful `CreateBucket` —
+an activation, not intermittency, and an earlier draft drew the wrong inference
+from it. Upload-failure handling and object-age monitoring stay regardless, as
+ordinary controls rather than compensation.
+
+Retention reworked: a single daily stream under one age rule cannot yield a
+daily set and a weekly set, which is what the previous draft claimed. Two
+prefixes now carry separate lifecycle rules — `daily/` expiring at 7 days,
+`weekly/` transitioned to Archive at 7 and expiring at 63 — giving a steady
+state of **16 objects at $0.023/month**, $0.063 at six months. Both rules run
+server-side; the host holds no delete permission.
+
+The unenforceable "newest verified object is never deleted" is replaced by an
+`anchor/` prefix carrying no lifecycle rule, plus honest reliance on the 7-day
+window and the 30-hour alert for the rotating tiers.
+
+Encryption is **public-key**: the host holds only the public half and cannot
+read its own backups, so compromising the host does not surrender the archive.
+The private key stays with the operator, which also moves restore validation
+off the production machine — where it belonged anyway.
 
 **v0.2 — 19 September 2026.** Corrected v0.1's overstated dry-run evidence,
 zero-balance executability, suspension-versus-deletion, snapshot limits and
