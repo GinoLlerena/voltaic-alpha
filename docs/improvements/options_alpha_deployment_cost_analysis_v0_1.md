@@ -481,23 +481,47 @@ retention nor premature deletion originates on that side.
 **Withholding delete is not sufficient on its own**, and an earlier draft
 claimed more than the mechanism gives. `PutObject` overwrites an existing key by
 default, so an identity that can only write can still destroy a backup's
-contents by writing over it. Two destination-side controls close that, and at
-least one is required:
+contents by writing over it.
 
-| Control | Effect |
-|---|---|
-| **Bucket versioning** | An overwrite creates a new version and retains the previous one, so the old bytes survive. Add a noncurrent-version expiry rule, or retained versions accumulate and so does the bill |
-| **WORM retention policy** (object lock) | Objects are immutable for the retention term. Stronger, and deliberately unforgiving: a locked object cannot be removed early by anyone, including the account owner |
+**Required baseline: bucket versioning.** An overwrite then creates a new
+version and retains the previous one, so the old bytes survive the write. This
+is the control this design depends on.
 
-Alongside either, scope the uploader's RAM policy to the backup prefixes and
-deny `DeleteObject`, `DeleteObjectVersion`, `PutBucketVersioning`,
-`PutBucketLifecycle` and `PutBucketWorm`, so a compromised host cannot disable
-the protections it is subject to.
+In normal operation it costs nothing. Object keys carry the dump's date —
+`daily/2026-09-20.dump.age` — so the uploader never writes an existing key and
+no noncurrent versions are produced. Versions appear only when something
+overwrites, which is precisely the case being defended against.
 
-With versioning or WORM in place, the accurate claim is: **a compromised host
-can write new objects and can obscure the newest backup, but cannot destroy the
-retained history.** Without them, the only claim available is that deletion is
-not permitted — which leaves overwrite open, and overwrite is enough.
+Noncurrent versions still need bounding, per prefix, or an attacker who
+overwrites repeatedly inflates the bill instead of destroying the data:
+
+| Prefix | Current version | Noncurrent versions |
+|---|---|---|
+| `daily/` | expire at 7 days | expire 7 days after becoming noncurrent |
+| `weekly/` | Archive at 7 days, expire at 63 | expire 63 days after becoming noncurrent |
+| `anchor/` | no expiry | **retain** — one 22.5 MB object, and an overwrite here is the event worth keeping evidence of |
+
+**WORM is documented as an optional stronger control, not a requirement.**
+Bucket-level WORM applies a single retention period to the entire bucket, and
+this layout deliberately carries three different horizons — 7 days, 63 days and
+indefinite — which one period cannot express without changing the retention
+policy itself. Object-level WORM could, but Alibaba documents it as
+invitation-only, so the design must not depend on it. If separate buckets are
+later used per horizon, or ObjectWorm is confirmed available on this account,
+WORM becomes available as an upgrade; until then, versioning is the mechanism.
+
+Alongside it, scope the uploader's RAM policy to the backup prefixes and deny
+`DeleteObject`, **`DeleteObjectVersion`** (so a specific version cannot be
+purged), `PutBucketVersioning` (so versioning cannot be suspended),
+`PutBucketLifecycle` and `PutBucketWorm`. The uploader may create objects and
+nothing else; it cannot remove history, disable the protection that retains it,
+or rewrite the rules that bound it.
+
+With versioning in place and that policy applied, the accurate claim is: **a
+compromised host can write new objects and can obscure the newest backup, but
+cannot destroy the retained history.** Without versioning, the only claim
+available is that deletion is not permitted — which leaves overwrite open, and
+overwrite is enough.
 
 | Horizon | Objects | Standard | Archive | $/month |
 |---|---|---:|---:|---:|
@@ -644,7 +668,7 @@ target already sits outside the account.
 | 0 — local dumps | hourly | 12 copies | existing script, automatic | $0.00 |
 | 1 — pre-resize snapshot | once | 7 days after validation | operator, explicit | ~$0.05 one-off |
 | 1 — pre-resize dump, **interim operator `scp`** | once | indefinite | never | $0.00 |
-| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | `daily/` 7 days; `weekly/` Archive at 7, expire 63 (**nominal**) | **OSS lifecycle rules, server-side**, with versioning or WORM against overwrite | **~0.023 → ~0.063** as data grows |
+| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | `daily/` 7 days; `weekly/` Archive at 7, expire 63 (**nominal**) | **OSS lifecycle rules, server-side**; **bucket versioning** against overwrite | **~0.023 → ~0.063** as data grows |
 | 2c — `anchor/` protected copy | once | **no lifecycle rule** | explicit human action only | $0.0004/mo |
 | 2b — restore validation | monthly | n/a | n/a | $0.00 |
 | 3 — off-account copy | monthly, manual | 3 rolling | operator | $0.00 |
@@ -843,8 +867,13 @@ server-side.
 
 Withholding delete permission was claimed to stop a compromised host destroying
 backups. It does not: `PutObject` overwrites an existing key by default.
-Versioning or a WORM retention policy is now required alongside it, with the
-uploader's RAM policy denying the calls that would disable either.
+**Bucket versioning is now the required baseline**, with per-prefix noncurrent
+version rules so overwrites cannot inflate the bill either. WORM is documented
+as an optional upgrade rather than an alternative: bucket-level WORM applies one
+retention period to a bucket carrying three different horizons, and object-level
+WORM is invitation-only, so neither can be depended on here. The uploader's RAM
+policy denies `DeleteObjectVersion`, `PutBucketVersioning`, `PutBucketLifecycle`
+and `PutBucketWorm`.
 
 The unenforceable "newest verified object is never deleted" is replaced by an
 `anchor/` prefix carrying no lifecycle rule, plus honest reliance on the 7-day
