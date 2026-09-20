@@ -41,12 +41,15 @@ evidence says it is not:
 | `ModifyInstanceSpec --DryRun` | `InvalidInstanceStatus.NotStopped` — a *state* error, not `Forbidden`, `NotEnoughBalance` or an overdue code |
 | `oss ListBuckets` | **answers** (0 buckets) — where `CIIP-I-BLK-001` recorded `403 UserDisable` |
 
-That last row looked like a change worth acting on. **It was not.** Re-tested
-20 September: `CreateBucket` still returns **`UserDisable`**, the same code
-`CIIP-I-BLK-001` recorded. `ListBuckets` is permitted while creation is refused,
-so the earlier reading was insufficient evidence and the blocker **stands**. The
-probe bucket was deleted; nothing was provisioned. §7.2 chooses its backup
-target accordingly.
+That last row moved twice in one evening and is **not settled**. Measured
+20 September: `CreateBucket` **refused with `UserDisable` at 21:16Z** and
+**succeeded at 22:03Z**, balance unchanged at $0.00, followed by a clean object
+round trip. A delayed re-test is running before `CIIP-I-BLK-001` is recorded
+either way, because one result in each direction is not a trend.
+
+§7.2 does not wait on that. It takes OSS as the Tier 2 target and treats
+availability as **intermittent by design**, which is why its monitoring makes a
+silent refusal impossible rather than assuming refusals will not happen.
 
 **Treatment:** billing is not a gate. Confirm no restriction in the same hour as
 any maintenance window, because a host that stops and will not restart is the
@@ -286,13 +289,14 @@ not a high-availability design.
    **$12.99/month, 39%** base saving. Preserve the disk and EIP; record downtime.
 4. **Observe at least five consecutive trading sessions**, including a
    backup/restore overlap. Keep PAYG until §7 acceptance is met.
-5. **Stand up the recurring DR tier: an unattended daily push to a third-party
-   object store** — **$0.035–0.134/month**, with retention enforced at the
-   destination and object-age monitoring for failure detection. This, not
-   item 1, is what delivers the 24-hour RPO. It needs a destination and a
-   create-only credential, so it is a decision as much as a task. It can follow
-   the resize rather than gate it. Add the monthly restore validation with it.
-   Alibaba OSS becomes an alternative target only if `CIIP-I-BLK-001` lifts.
+5. **Stand up the recurring DR tier: a daily encrypted push to OSS** —
+   **$0.003/month today, $0.056 at six months**, with retention and deletion
+   executed by an OSS lifecycle rule rather than by anything on the host, and a
+   newest-object age check that fails at 30 hours. The age check is not
+   optional: the target refused once already, and a refusal that nobody sees is
+   the failure this tier exists to prevent. Add the monthly restore validation
+   and the Tier 3 off-account copy with it.
+
 6. **Convert to one-month subscription only after acceptance** — a further
    **$6.19/month** base saving. Record renewal owner, date and total quote.
 7. **Defer disk rebuild, scheduled stops and architecture migration.** The disk
@@ -415,59 +419,89 @@ The only path that destroys disk contents is the *deferred* disk rebuild
 
 #### Tier 2 — recurring off-host backup: this is the DR tier
 
-One dump per day, off the host. **This tier alone carries the 24-hour recovery
-point**; Tier 0 contributes nothing to it.
+One encrypted dump per day, pushed off the host. **This tier alone carries the
+24-hour recovery point**; Tier 0 contributes nothing to it.
 
-**The intended target is unavailable.** OSS `CreateBucket` was re-tested on
-20 September and still returns `UserDisable`, so `CIIP-I-BLK-001` stands and the
-OSS plan **cannot be executed today**.
+**Target: Alibaba OSS.** `CreateBucket` was refused with `UserDisable` at 21:16Z
+on 20 September and **succeeded at 22:03Z the same evening**, with the account
+balance unchanged at $0.00. A full round trip then passed — create, put, list,
+get with identical bytes, delete object, delete bucket — so the service works.
 
-##### The execution model matters more than the target
+That flip is the design input, not a footnote. A target that refused an hour
+earlier may refuse again, so **the design assumes intermittent availability** and
+the monitoring below exists to make a silent refusal impossible. A re-test is
+scheduled; if OSS proves unreliable rather than merely available, the same
+design points at a third-party S3-compatible store with no other change —
+only the endpoint and credential differ.
 
-A 24-hour RPO is a claim about a *mechanism*, not about a copy existing. It
-requires the transfer to run unattended, to enforce retention, and to raise an
-alarm when it does not run — otherwise the first sign of failure is discovering
-there is no backup at the moment one is needed.
+##### The mechanism, in five parts
 
-| Route | Unattended? | Failure detection | Supports a 24 h RPO? | $/month |
-|---|---|---|---|---:|
-| **Operator `scp` from a laptop** | **No** — needs the machine awake, connected, holding the key | None | **No.** Gives a point-in-time copy, not a recovery objective | 0.00 |
-| **Host pushes to a third-party object store** | **Yes** — systemd timer beside the existing backup timer | Object age check + the existing watchdog pattern | **Yes** | 0.002–0.008 today, **0.035–0.134** at six months |
-| Host pushes to Alibaba OSS | Yes | Same | Yes, *if* `CIIP-I-BLK-001` lifts | ~0.10 |
+| | What | Runs where | Cost |
+|---|---|---|---:|
+| Produce | `pg_dump -Fc`, already running hourly | existing `options-alpha-backup.service` | $0.00 |
+| Encrypt | client-side, before upload | same timer | $0.00 |
+| Push | one dump per day to OSS | new systemd timer beside the existing one | negligible |
+| Retain / delete | OSS **lifecycle rule** | **OSS itself, server-side** | $0.00 |
+| Monitor | newest-object age check | existing watchdog timer | $0.00 |
 
-**Recommendation: the third-party push, not the laptop pull.** The laptop route
-is an **interim measure** — worth doing once, before the resize, because it
-costs nothing and closes the immediate gap — but it must not be recorded as
-satisfying the RPO. Nothing about it is unattended.
+**No additional server, at any point.** The push is a timer on the host that
+already exists; retention and deletion are executed by OSS itself with no
+compute; the Tier 3 copy is a manual monthly action. Nothing here runs
+continuously except things already running.
 
-A correction to an earlier figure in this document: the "~$0.01–0.02/month"
-quoted for a third-party store was **today's** data size, not steady state. With
-daily-7 plus weekly-8 retention it is $0.002–0.008/month now and **$0.035–0.134
-at the six-month horizon**, depending on provider. Still negligible against a
-$14–20 base, and the user preference is explicit: reliable unattended recovery
-over the last few cents.
+##### Frequency, retention and automatic deletion
 
-**One security condition on the push route.** It puts a third-party credential
-on the production host, and a host that can write backups can usually delete
-them. Issue a **write-and-create-only credential with no delete permission**, or
-enable object-lock/versioning at the destination, so a compromised or misbehaving
-host cannot destroy the copies it just made. This is the one place where the
-cheaper route carries a risk the pull route does not.
+| Parameter | Value |
+|---|---|
+| **Frequency** | **One upload per day.** Tier 0 continues hourly locally; only one of those dumps is pushed |
+| **Standard tier** | The **7 most recent daily** objects |
+| **Archive tier** | **8 weekly** objects, transitioned automatically at 7 days |
+| **Deletion** | Automatic expiry at **63 days** (7 daily + 8 weekly), enforced by the OSS lifecycle rule |
+| **Total objects** | **15**, bounded by count rather than age — which is why cost stays flat as the database grows |
+| **Never deleted** | The newest verified object, whatever the rule says |
 
-Retention, once a target exists — priced at the six-month horizon with the
-database growing ~5 MB/day and dumps at ~46% of database size:
+Deletion is **not** a cron job and not the operator's responsibility. An OSS
+lifecycle rule performs both the Standard→Archive transition and the expiry
+server-side. Nothing on the host decides what to delete, so a host failure
+cannot cause either runaway retention or premature deletion.
 
-| Policy | Standard | Archive | $/month (OSS rates) |
+| Horizon | Standard | Archive | $/month |
 |---|---:|---:|---:|
-| Weekly only, 8 weeks | 2.97 GB | — | 0.051 |
-| **Daily 7 days → Archive to 90 days** | 2.94 GB | 27.95 GB | **0.101** |
-| Daily 14 days → Archive to 90 days | 5.76 GB | 26.54 GB | 0.147 |
-| *(v0.2's hourly 48 h → daily 30 d)* | 20.35 GB | 279.43 GB | *0.852* |
+| Today | 0.15 GB | 0.18 GB | **0.003** |
+| At six weeks | 0.77 GB | 0.41 GB | **0.014** |
+| At six months | 2.97 GB | 2.88 GB | **0.056** |
 
-**Recommended: daily copies kept 7 days, plus 8 weekly copies, then delete.**
-Fifteen objects, bounded by count rather than age, which is why the cost stays
-flat as the database grows. On OSS the same shape prices at ~$0.10/month; on a
-third-party store, $0.035–0.134 at six months.
+Without the lifecycle transition the six-month figure is $0.100; the rule saves
+$0.044/month. Both are noise against a $14–20 base — the lifecycle rule is worth
+having because it bounds growth automatically, not because it saves money.
+
+##### Encryption
+
+Encrypt the dump **client-side, before upload**, so the stored object is opaque
+to the storage account. Server-side encryption alone protects against disk
+theft at the provider, not against anything that can read the bucket.
+
+The decryption key must live **outside the host**. A key stored beside the data
+it protects is decoration. It does not belong in this repository either — see
+the credential rule in the audit table above.
+
+##### Monitoring: what makes this an RPO rather than a hope
+
+An upload that silently stopped three weeks ago is indistinguishable from one
+that ran this morning, until the moment it is needed. Given a target that has
+already refused once, this is the part that cannot be skipped.
+
+1. **Age check.** The existing watchdog already reads `backup.json` for local
+   dump age. Extend it to record the **newest OSS object's timestamp** and fail
+   when it exceeds **30 hours** — one daily cycle plus margin.
+2. **Alarm on refusal, not just on absence.** A `UserDisable` response is a
+   *successful* API call returning a refusal. Treat a non-2xx upload as a fault
+   event in `worker_events`, so it is durable and visible rather than a line in
+   a journal nobody reads.
+3. **The host cannot report its own death.** An on-host check catches "uploads
+   stopped while the host lives", which is the failure this target makes likely.
+   Host loss is already visible through the stale worker lease on the dashboard.
+   Neither check subsumes the other.
 
 #### Tier 2b — restore validation
 
@@ -493,18 +527,22 @@ production database or acquire the worker lease.
 
 #### Tier 3 — the single-account tail
 
-Tier 2's recommended target is a **third-party object store**, which already
-sits outside the Alibaba account, so this tail closes as a side effect of
-choosing it. No separate provision is needed.
-
-It only reappears if OSS is later chosen as the Tier 2 target once
-`CIIP-I-BLK-001` lifts, because that puts every copy back inside one account. In
-that case keep one monthly copy outside it as well — that copy is then the only
+With OSS as the Tier 2 target, **every automated copy lives inside one Alibaba
+account** — the same account whose OSS service refused a request an hour before
+it accepted one. Tier 3 is therefore required, not optional, and it is the only
 thing standing between an account-level event and the evidence.
 
-The one-time interim `scp` copy (Tier 1) also lands outside the account, but it
-is a single point-in-time artifact and ages from the moment it is taken. It does
-not stand in for this tier.
+**One copy per month, pulled to operator-controlled storage outside the account.**
+Manual, `scp`, about 25 MB today. Keep three rolling. **$0.00.**
+
+It is deliberately not automated. Automating it would need either another
+always-on machine — which this design refuses — or credentials for a second
+provider on the same host, which reintroduces the exposure Tier 3 exists to
+avoid. A monthly manual action whose absence is visible in a checklist is the
+proportionate answer for a tail risk.
+
+If Tier 2 later moves to a third-party store, this tier can be retired: that
+target already sits outside the account.
 
 #### Retention and deletion policy
 
@@ -513,9 +551,9 @@ not stand in for this tier.
 | 0 — local dumps | hourly | 12 copies | existing script, automatic | $0.00 |
 | 1 — pre-resize snapshot | once | 7 days after validation | operator, explicit | ~$0.05 one-off |
 | 1 — pre-resize dump, **interim operator `scp`** | once | indefinite | never | $0.00 |
-| 2 — daily push **(the DR tier)** | daily, unattended | 7 daily + 8 weekly copies | lifecycle rule at the destination | **0.035–0.134** third-party; ~0.10 OSS |
+| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | 7 daily Standard + 8 weekly Archive | **OSS lifecycle rule, server-side** at 63 days | **0.003 → 0.056** as data grows |
 | 2b — restore validation | monthly | n/a | n/a | $0.00 |
-| 3 — extra off-account copy | monthly | 3 rolling | operator, manual | $0.00 — **only if** Tier 2 targets OSS |
+| 3 — off-account copy | monthly, manual | 3 rolling | operator | $0.00 |
 
 Two rules on deletion. Never expire the **newest verified copy**, whatever the
 policy says. And never apply retention to live evidence rows — this policy
@@ -524,23 +562,42 @@ records themselves are not a cost-cutting target.
 
 #### Effect on the cost analysis
 
-Costed against the **recurring DR tier**, which is the unattended third-party
-push. The one-time interim copy is not a recurring cost and is excluded.
+Costed against the **recurring DR tier**, now OSS. The one-time interim copy and
+the monthly Tier 3 copy are not recurring charges.
 
-| Configuration | Base | + DR backup (third-party) | + DR backup (OSS, if it returns) |
+| Configuration | Base | + DR backup, today | + DR backup, at six months |
 |---|---:|---:|---:|
-| Current (`e-c1m2.large`, PL1 40 GB, PAYG) | 33.38 | **33.51** | 33.48 |
-| C — validation stage (`e-c1m1.large`, PAYG) | 20.39 | **20.52** | 20.49 |
-| B — preferred (`e-c1m1.large`, subscription) | 14.20 | **14.33** | 14.30 |
+| Current (`e-c1m2.large`, PL1 40 GB, PAYG) | 33.38 | 33.38 | **33.44** |
+| C — validation stage (`e-c1m1.large`, PAYG) | 20.39 | 20.39 | **20.45** |
+| B — preferred (`e-c1m1.large`, subscription) | 14.20 | 14.20 | **14.26** |
 
-Using the six-month figure of $0.134/month, the least favourable of the
-third-party rates; today it is under a cent. **$0.00 is not used here**, because
-the only $0.00 route is the manual pull, and that route does not deliver the
-recurring objective this row is paying for.
+Backup is **0.02–0.4%** of the bill. It adds no server, no licence and no
+recurring human task beyond one monthly copy. The recovery gap was never a cost
+question, and pricing it confirms that rather than changing it.
 
-Either way backup is **0.4–0.9%** of the bill and changes no configuration
-decision, which is the point of pricing it: the recovery gap was never a cost
-question.
+#### What happens to the data after the resize
+
+Asked directly, because "migration" invites the wrong assumption.
+
+**The resize is in place.** `ModifyInstanceSpec` changes the instance type of
+the existing host. The same system disk stays attached, the same EIP stays
+bound, PostgreSQL's data directory is untouched and no bytes move between
+machines. There is no new server, no copy step and therefore **no original
+server to decommission**.
+
+| Artifact | After validation |
+|---|---|
+| The database | **Untouched throughout.** Never deleted, never re-created, never restored unless something actually failed |
+| `/dev/vda3` and its contents | Preserved. The disk is not replaced |
+| Tier 0 hourly dumps | Continue unchanged; the existing script keeps pruning to 12 |
+| Pre-resize **snapshot** | **Delete 7 days after validation passes.** The only artifact created for the change and the only one deliberately removed |
+| Pre-resize **`scp` copy** | Keep indefinitely. 22.5 MB, $0.00, and it anchors the provenance of the evidence clock |
+| EIP, security group, units | Unchanged |
+
+The single deletion in the whole exercise is that snapshot, and only once the
+host has been healthy for a week. Restore data **only** on demonstrated
+corruption or loss — never to undo a memory resize, and never overwriting a
+healthy newer database with an older copy.
 
 **Exit gate for the resize:** one verified dump exists **off the instance** and
 has been restored into a throwaway PostgreSQL. The interim operator `scp` copy
@@ -674,6 +731,20 @@ quoted from today's data size.
 
 *Scope.* The recommended change is an in-place resize, so no second host is
 created and nothing is deleted afterwards.
+
+**v0.4 — 20 September 2026.** Backup design settled on OSS after `CreateBucket`
+succeeded, having refused 47 minutes earlier at an unchanged balance. That flip
+is treated as a design input: availability is assumed intermittent, so a
+newest-object age check and durable fault events make a silent refusal
+impossible. Frequency, retention, automatic deletion and encryption are now
+exact — one daily encrypted dump, 7 Standard plus 8 weekly Archive, expiry at
+63 days enforced by an OSS lifecycle rule server-side, key held off-host. Tier 3
+becomes mandatory rather than optional, since OSS puts every automated copy in
+one account. No additional server is introduced anywhere. What happens to the
+data after the resize is spelled out: the database is untouched, the disk is
+preserved, and the only deliberate deletion is the pre-resize snapshot, seven
+days after validation. `CIIP-I-BLK-001` is **not** yet recorded as resolved; a
+delayed re-test decides that.
 
 **v0.2 — 19 September 2026.** Corrected v0.1's overstated dry-run evidence,
 zero-balance executability, suspension-versus-deletion, snapshot limits and
