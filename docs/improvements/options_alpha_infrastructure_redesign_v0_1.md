@@ -898,3 +898,47 @@ which is a decision about exposing a loopback API with no authentication.
 
 The superseded AccessKey remains deferred at the owner's request: parked, not
 cancelled.
+
+## 17. Full deployment cost analysis — 19–20 September 2026
+
+§12 priced the host. A wider review now covers every paid resource in the
+account — compute, storage, network, the database, CI/CD — with utilisation
+measured against allocation and each alternative priced from the account rather
+than estimated: [Deployment Cost Analysis](options_alpha_deployment_cost_analysis_v0_1.md),
+now at v0.3.
+
+### Billing: corrected
+
+An earlier draft of this section led with September's balance as an emergency
+outranking every saving. **That was wrong and is corrected here.** The account
+is on normal end-of-month postpaid billing, where a month-to-date accrued
+balance and a $0.00 prepaid credit are the expected steady state, not a fault or
+a suspension risk. Verified 20 September: reads answer normally, and
+`ModifyInstanceSpec --DryRun` returns `InvalidInstanceStatus.NotStopped` — a
+*state* error, not `Forbidden`, `NotEnoughBalance` or an overdue code. Billing is
+a pre-flight check before a maintenance window, not a blocker.
+
+### `CIIP-I-BLK-001` is unaffected, and stands
+
+The billing correction does **not** release the OSS blocker, and the two should
+not be confused. Re-tested 20 September: `ListBuckets` answers, but
+**`CreateBucket` still returns `UserDisable`** — the same code §10 recorded. The
+probe bucket was deleted; nothing was provisioned. `ListBuckets` succeeding was
+never sufficient evidence, and the archive bucket remains impossible to create.
+
+The practical consequence is that the intended off-host backup target is
+unavailable, so the daily copy must go to a third-party object store — priced at
+$0.035–0.134/month at a six-month horizon — or, as an interim measure only, be
+pulled by an operator.
+
+### The cost finding
+
+The instance is 98.3% idle and uses 949 MB of 3 499 MB, so rightsizing 2c4g →
+2c2g saves **$12.99/month (39%)** with about five minutes of downtime, and a
+one-month subscription takes the total to **$14.20/month (−57%)** with no
+rebuild and no architectural change. Backup adds $0.00–0.13/month depending on
+route, which changes no configuration decision.
+
+The analysis also records what it could not measure, and where v0.1 overstated
+its evidence — most importantly that a failed dry run is not proof a resize
+target is valid.
