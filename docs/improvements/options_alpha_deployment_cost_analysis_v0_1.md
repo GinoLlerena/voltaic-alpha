@@ -9,7 +9,7 @@
 | Status | **Reviewed recommendation and implementation handoff.** Infrastructure changes are not executed; acceptance gates below are pending |
 | Scope | Reported Alibaba infrastructure and GitHub CI/CD costs; not total product operating cost |
 | Supersedes | v0.1 recommendations in this file. Extends [§12 of the infrastructure redesign](options_alpha_infrastructure_redesign_v0_1.md); its September 11 prices remain historical |
-| Method | Original v0.1 reports live account queries and host measurements. This revision checks repository evidence, arithmetic and provider documentation; it does not repeat account queries or host measurements |
+| Method | v0.1 from live account queries and host measurement. v0.2 checked repository evidence, arithmetic and provider documentation without re-querying. **v0.3 re-verified live on 20 September**: restriction probes, an OSS `CreateBucket` test, a host state audit, and OSS storage pricing from the billing API |
 
 **Decision:** retain the consolidated, always-on host and its existing disk/EIP.
 Use configuration C as a PAYG capacity trial, then configuration B only if the
@@ -413,14 +413,39 @@ point**; Tier 0 contributes nothing to it.
 
 **The intended target is unavailable.** OSS `CreateBucket` was re-tested on
 20 September and still returns `UserDisable`, so `CIIP-I-BLK-001` stands and the
-$0.10/month OSS plan **cannot be executed today**. Two routes remain:
+OSS plan **cannot be executed today**.
 
-| Target | Executable now? | $/month | Notes |
-|---|---|---:|---|
-| **Operator pull over `scp`** | **Yes** | **$0.00** | Port 22 is open and `deploy_worker.sh` already uses a deploy key. 22.5 MB per copy. Not via Cloud Assistant — its result payload cannot carry 22 MB |
-| Third-party object store (S3/B2/R2) | Yes, needs a credential decision | ~$0.01–0.02 | Also removes the single-account tail risk in one step |
-| Alibaba OSS | **No** — `UserDisable` | 0.10 | Preferred *if* `CIIP-I-BLK-001` lifts. Re-test `CreateBucket`, not `ListBuckets` |
-| ECS snapshot as the recurring tier | **Untested** | ~0.20 | Snapshots are an ECS feature but are stored in OSS; whether the same account restriction applies is **unknown and not tested here** |
+##### The execution model matters more than the target
+
+A 24-hour RPO is a claim about a *mechanism*, not about a copy existing. It
+requires the transfer to run unattended, to enforce retention, and to raise an
+alarm when it does not run — otherwise the first sign of failure is discovering
+there is no backup at the moment one is needed.
+
+| Route | Unattended? | Failure detection | Supports a 24 h RPO? | $/month |
+|---|---|---|---|---:|
+| **Operator `scp` from a laptop** | **No** — needs the machine awake, connected, holding the key | None | **No.** Gives a point-in-time copy, not a recovery objective | 0.00 |
+| **Host pushes to a third-party object store** | **Yes** — systemd timer beside the existing backup timer | Object age check + the existing watchdog pattern | **Yes** | 0.002–0.008 today, **0.035–0.134** at six months |
+| Host pushes to Alibaba OSS | Yes | Same | Yes, *if* `CIIP-I-BLK-001` lifts | ~0.10 |
+
+**Recommendation: the third-party push, not the laptop pull.** The laptop route
+is an **interim measure** — worth doing once, before the resize, because it
+costs nothing and closes the immediate gap — but it must not be recorded as
+satisfying the RPO. Nothing about it is unattended.
+
+A correction to an earlier figure in this document: the "~$0.01–0.02/month"
+quoted for a third-party store was **today's** data size, not steady state. With
+daily-7 plus weekly-8 retention it is $0.002–0.008/month now and **$0.035–0.134
+at the six-month horizon**, depending on provider. Still negligible against a
+$14–20 base, and the user preference is explicit: reliable unattended recovery
+over the last few cents.
+
+**One security condition on the push route.** It puts a third-party credential
+on the production host, and a host that can write backups can usually delete
+them. Issue a **write-and-create-only credential with no delete permission**, or
+enable object-lock/versioning at the destination, so a compromised or misbehaving
+host cannot destroy the copies it just made. This is the one place where the
+cheaper route carries a risk the pull route does not.
 
 Retention, once a target exists — priced at the six-month horizon with the
 database growing ~5 MB/day and dumps at ~46% of database size:
@@ -432,10 +457,10 @@ database growing ~5 MB/day and dumps at ~46% of database size:
 | Daily 14 days → Archive to 90 days | 5.76 GB | 26.54 GB | 0.147 |
 | *(v0.2's hourly 48 h → daily 30 d)* | 20.35 GB | 279.43 GB | *0.852* |
 
-**Recommended: daily copies, 7 days hot, archive to 90 days, then delete.** On
-the operator-pull route the storage is wherever the operator keeps it and the
-Alibaba cost is **$0.00**; the table above prices the OSS route for when it
-becomes available.
+**Recommended: daily copies kept 7 days, plus 8 weekly copies, then delete.**
+Fifteen objects, bounded by count rather than age, which is why the cost stays
+flat as the database grows. On OSS the same shape prices at ~$0.10/month; on a
+third-party store, $0.035–0.134 at six months.
 
 #### Tier 2b — restore validation
 
@@ -601,23 +626,28 @@ Do not publish credentials, database dumps or full account exports.
 
 ## 8. Revision history
 
-**v0.3 — 20 September 2026.** Tier 0 is local recovery history only — its dumps
-share `/dev/vda3` with the database — so Tier 2 alone carries the DR objective.
-The single-irrecoverable-state claim is now **audited**: no Redis, queue or
-second datastore exists, host artifacts match their tracked blobs by checksum,
-runtime JSON is regenerated, and only the ~50 MB database is irrecoverable.
-Monthly restore validation of the off-host copy added. **`CIIP-I-BLK-001` was
-re-tested and stands** — `CreateBucket` still returns `UserDisable`, so the OSS
-plan is not executable and the daily copy is an operator pull at $0.00. Billing reframed from blocker to monitored
-precondition: normal postpaid accrual is not a restriction, and every probe
-says the account is unrestricted. OSS answers `ListBuckets` but **refuses
-`CreateBucket` with `UserDisable`**, so `CIIP-I-BLK-001` stands. Backup rebuilt around what is
-actually irrecoverable — one ~50 MB database, since everything else is on
-GitHub — which makes continuous replication unjustified and daily proportionate.
-Retention, deletion and the distinction between the one-time copy and the
-recurring tier are now explicit. Backup costs **$0.00** on the route that can run
-today and $0.10/month on OSS if it returns, against v0.2's implied $0.85. Clarified that the recommended change is an **in-place
-resize**, so no second host exists and nothing is deleted afterwards.
+**v0.3 — 20 September 2026.** Re-verified live rather than reasoned from v0.1.
+
+*Billing.* Normal end-of-month postpaid accrual is not a restriction; every
+probe says the account is unrestricted. Demoted from blocking finding to a
+pre-flight check. `CIIP-I-BLK-001` is unaffected and **stands**: `CreateBucket`
+still returns `UserDisable`, so the OSS backup target is unavailable.
+
+*Backup.* Rebuilt around an audited claim — one ~50 MB database is the only
+irrecoverable runtime state, since no second datastore exists, host artifacts
+match their tracked blobs by checksum, and runtime JSON regenerates. Tier 0 is
+local recovery history only, sharing `/dev/vda3` with the database, so Tier 2
+alone carries the 24-hour RPO. Continuous replication is unjustified: one lost
+day costs one independent observation. Monthly restore validation added for the
+off-host copy, which nothing previously proved had survived transfer.
+
+*Execution model.* An operator laptop pull is an interim copy, not an RPO
+mechanism; the unattended route is a host push to a third-party store, priced
+honestly at $0.035–0.134/month at six months rather than the "$0.01–0.02" first
+quoted from today's data size.
+
+*Scope.* The recommended change is an in-place resize, so no second host is
+created and nothing is deleted afterwards.
 
 **v0.2 — 19 September 2026.** Corrected v0.1's overstated dry-run evidence,
 zero-balance executability, suspension-versus-deletion, snapshot limits and
@@ -625,5 +655,8 @@ cohort counts; added the implementation handoff and acceptance gates.
 
 **v0.1 — 19 September 2026.** Original account-level analysis and pricing.
 
-Only this document has changed. No account funding, backup export, host
-mutation, trading change or subscription purchase has been performed.
+This revision changes this document and §17 of the infrastructure redesign,
+which carried v0.1's superseded billing conclusion. No account funding, backup
+export, host mutation, trading change or subscription purchase has been
+performed. The only write-class call was an OSS `CreateBucket` probe, which was
+refused; its bucket would have been deleted either way.
