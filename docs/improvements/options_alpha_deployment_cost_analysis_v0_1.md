@@ -474,9 +474,30 @@ The uploader's only decision is whether today is also the weekly day; it writes
 the same encrypted object to one prefix or to both. It never deletes anything.
 
 **Deletion is executed by OSS lifecycle rules, server-side.** The production
-host has no delete permission and runs no pruning job, so neither a host failure
-nor a compromised host can destroy stored backups, and neither runaway retention
-nor premature deletion is possible from that side.
+host runs no pruning job and holds no delete permission, so neither a host
+failure nor a stray script can remove stored backups, and neither runaway
+retention nor premature deletion originates on that side.
+
+**Withholding delete is not sufficient on its own**, and an earlier draft
+claimed more than the mechanism gives. `PutObject` overwrites an existing key by
+default, so an identity that can only write can still destroy a backup's
+contents by writing over it. Two destination-side controls close that, and at
+least one is required:
+
+| Control | Effect |
+|---|---|
+| **Bucket versioning** | An overwrite creates a new version and retains the previous one, so the old bytes survive. Add a noncurrent-version expiry rule, or retained versions accumulate and so does the bill |
+| **WORM retention policy** (object lock) | Objects are immutable for the retention term. Stronger, and deliberately unforgiving: a locked object cannot be removed early by anyone, including the account owner |
+
+Alongside either, scope the uploader's RAM policy to the backup prefixes and
+deny `DeleteObject`, `DeleteObjectVersion`, `PutBucketVersioning`,
+`PutBucketLifecycle` and `PutBucketWorm`, so a compromised host cannot disable
+the protections it is subject to.
+
+With versioning or WORM in place, the accurate claim is: **a compromised host
+can write new objects and can obscure the newest backup, but cannot destroy the
+retained history.** Without them, the only claim available is that deletion is
+not permitted — which leaves overwrite open, and overwrite is enough.
 
 | Horizon | Objects | Standard | Archive | $/month |
 |---|---|---:|---:|---:|
@@ -485,10 +506,26 @@ nor premature deletion is possible from that side.
 | **Day 63 — steady state** | **7 + 9 = 16** | 1.26 GB | 0.74 GB | **0.023** |
 | Day 182 | 7 + 9 = 16 | 3.40 GB | 2.88 GB | **0.063** |
 
-Steady state is **16 objects, reached at day 63**, bounded by count rather than
-age — which is why cost grows only with the database, not with elapsed time.
+The steady state is **nominally 16 objects, reached at day 63** — the set the
+policy intends to retain, bounded by count rather than age, which is why cost
+grows with the database rather than with elapsed time.
+
+**It is not an instantaneous inventory.** OSS lifecycle processing is
+asynchronous: objects past an expiry or transition boundary can persist for some
+time before the rule is applied, so a bucket listing may show more than 16
+objects, or objects still in Standard that the policy has already marked for
+Archive. The table above is therefore an **approximation from the intended
+policy**, accurate enough for a figure in the third decimal of a dollar and not
+intended as a billing prediction.
+
 The previous figure of "$0.056 for 15 objects" was arithmetic over a model that
-could not produce those objects; the corrected six-month figure is **$0.063**.
+could not produce those objects at all; the corrected six-month approximation is
+**$0.063**.
+
+The 60-day minimum billable duration for Archive was checked against this
+policy. A lifecycle-transitioned object counts that minimum from its
+last-modified time, and `weekly/` objects expire at day 63, so nothing is
+deleted inside its minimum term and no early-deletion charge arises.
 
 ##### The protected copy
 
@@ -512,15 +549,22 @@ Encrypt **client-side, before upload**, so the stored object is opaque to the
 storage account. Server-side encryption alone protects against disk theft at the
 provider, not against anything that can read the bucket.
 
-Use **asymmetric encryption**. The host holds only a **public** key and can
-therefore create backups it cannot read. The **private key never touches the
-production machine** — it lives with the operator, alongside the recovery
-runbook and away from the host it would be used to rebuild.
+Use **asymmetric encryption**. The host holds only a **public** key; the
+**private key never touches the production machine** and lives with the
+operator, away from the host it would be used to rebuild.
 
-A symmetric scheme is the obvious shortcut and is rejected deliberately: it
-requires the decryption secret to sit on the production host, so anything that
-compromises the host also gains every historical backup. The asymmetric design
-costs nothing extra and removes that entirely.
+**Be precise about what this does and does not protect.** The host can
+obviously read the live database — it runs the thing. What the asymmetric design
+buys is narrower and still worth having: **the host holds no private key, so its
+backup credentials and key material cannot decrypt previously stored backup
+objects.** An attacker who compromises the host gets today's plaintext, which
+they would have anyway from PostgreSQL. They do not thereby get a readable
+archive of every prior day.
+
+A symmetric scheme forfeits exactly that. It requires the decryption secret to
+sit on the production host, so one compromise yields the live data *and* the
+entire history. The asymmetric design costs nothing extra and removes the second
+half.
 
 Concretely: `age` with a recipient public key, or `openssl smime`/GPG with an
 RSA or ECC public key — any tool where encryption needs only the public half.
@@ -600,7 +644,7 @@ target already sits outside the account.
 | 0 — local dumps | hourly | 12 copies | existing script, automatic | $0.00 |
 | 1 — pre-resize snapshot | once | 7 days after validation | operator, explicit | ~$0.05 one-off |
 | 1 — pre-resize dump, **interim operator `scp`** | once | indefinite | never | $0.00 |
-| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | `daily/` 7 days; `weekly/` Archive at 7, expire 63 | **OSS lifecycle rules, server-side** | **0.023 → 0.063** as data grows |
+| 2 — daily encrypted push to OSS **(the DR tier)** | daily, unattended | `daily/` 7 days; `weekly/` Archive at 7, expire 63 (**nominal**) | **OSS lifecycle rules, server-side**, with versioning or WORM against overwrite | **~0.023 → ~0.063** as data grows |
 | 2c — `anchor/` protected copy | once | **no lifecycle rule** | explicit human action only | $0.0004/mo |
 | 2b — restore validation | monthly | n/a | n/a | $0.00 |
 | 3 — off-account copy | monthly, manual | 3 rolling | operator | $0.00 |
@@ -791,18 +835,27 @@ ordinary controls rather than compensation.
 Retention reworked: a single daily stream under one age rule cannot yield a
 daily set and a weekly set, which is what the previous draft claimed. Two
 prefixes now carry separate lifecycle rules — `daily/` expiring at 7 days,
-`weekly/` transitioned to Archive at 7 and expiring at 63 — giving a steady
-state of **16 objects at $0.023/month**, $0.063 at six months. Both rules run
-server-side; the host holds no delete permission.
+`weekly/` transitioned to Archive at 7 and expiring at 63 — giving a **nominal**
+steady state of 16 objects at ~$0.023/month, ~$0.063 at six months. Lifecycle
+processing is asynchronous, so that set is the policy's intent rather than an
+instantaneous count, and the costs are approximations. Both rules run
+server-side.
+
+Withholding delete permission was claimed to stop a compromised host destroying
+backups. It does not: `PutObject` overwrites an existing key by default.
+Versioning or a WORM retention policy is now required alongside it, with the
+uploader's RAM policy denying the calls that would disable either.
 
 The unenforceable "newest verified object is never deleted" is replaced by an
 `anchor/` prefix carrying no lifecycle rule, plus honest reliance on the 7-day
 window and the 30-hour alert for the rotating tiers.
 
-Encryption is **public-key**: the host holds only the public half and cannot
-read its own backups, so compromising the host does not surrender the archive.
-The private key stays with the operator, which also moves restore validation
-off the production machine — where it belonged anyway.
+Encryption is **public-key**, with the guarantee stated precisely: the host can
+read the live database because it runs it, but holds no private key, so its
+credentials cannot decrypt previously stored backup objects. A compromise yields
+today's plaintext, not the archive. The private key stays with the operator,
+which also moves restore validation off the production machine — where it
+belonged anyway.
 
 **v0.2 — 19 September 2026.** Corrected v0.1's overstated dry-run evidence,
 zero-balance executability, suspension-versus-deletion, snapshot limits and
