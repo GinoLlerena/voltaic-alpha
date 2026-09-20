@@ -274,18 +274,25 @@ not a high-availability design.
 
 ## 6. Prioritised: highest saving, lowest operational risk
 
-1. **Take one verified off-host dump and restore it into a scratch database.**
-   22.5 MB, ~$0.0004/month, no window, no funding, no decision required. It is
-   the only item here that reduces a risk which grows every day it is deferred.
+1. **Take one verified safety copy off the instance and restore it.** Manual
+   operator `scp`, 22.5 MB, $0.00, no window, no funding, no decision required.
+   This satisfies the **pre-resize gate** and nothing more: it is a one-time
+   artifact that ages from the moment it is taken, and it is **not** the 24-hour
+   RPO. Still first, because it is the only item that reduces a risk which grows
+   every day it is deferred.
 2. **Confirm the account carries no restriction** (§0) and refresh quotes.
    Minutes, not a project. Accrued balance alone does not block anything.
 3. **Validate eligibility and capacity, then trial 2c2g on PAYG** — potential
    **$12.99/month, 39%** base saving. Preserve the disk and EIP; record downtime.
 4. **Observe at least five consecutive trading sessions**, including a
    backup/restore overlap. Keep PAYG until §7 acceptance is met.
-5. **Add the daily off-host copy** — **$0.00** by operator pull, since OSS is
-   refused. It can follow the resize rather than gate it. Add the monthly
-   restore-validation check with it.
+5. **Stand up the recurring DR tier: an unattended daily push to a third-party
+   object store** — **$0.035–0.134/month**, with retention enforced at the
+   destination and object-age monitoring for failure detection. This, not
+   item 1, is what delivers the 24-hour RPO. It needs a destination and a
+   create-only credential, so it is a decision as much as a task. It can follow
+   the resize rather than gate it. Add the monthly restore validation with it.
+   Alibaba OSS becomes an alternative target only if `CIIP-I-BLK-001` lifts.
 6. **Convert to one-month subscription only after acceptance** — a further
    **$6.19/month** base saving. Record renewal owner, date and total quote.
 7. **Defer disk rebuild, scheduled stops and architecture migration.** The disk
@@ -486,11 +493,18 @@ production database or acquire the worker lease.
 
 #### Tier 3 — the single-account tail
 
-With OSS refused, the executable Tier 2 route (operator pull) **already lands
-outside the Alibaba account**, so it closes this tail as a side effect. If OSS
-later becomes available and is chosen for convenience, keep one monthly copy
-outside the account as well — $0.00, and it is the only thing standing between
-an account-level event and the evidence.
+Tier 2's recommended target is a **third-party object store**, which already
+sits outside the Alibaba account, so this tail closes as a side effect of
+choosing it. No separate provision is needed.
+
+It only reappears if OSS is later chosen as the Tier 2 target once
+`CIIP-I-BLK-001` lifts, because that puts every copy back inside one account. In
+that case keep one monthly copy outside it as well — that copy is then the only
+thing standing between an account-level event and the evidence.
+
+The one-time interim `scp` copy (Tier 1) also lands outside the account, but it
+is a single point-in-time artifact and ages from the moment it is taken. It does
+not stand in for this tier.
 
 #### Retention and deletion policy
 
@@ -498,10 +512,10 @@ an account-level event and the evidence.
 |---|---|---|---|---:|
 | 0 — local dumps | hourly | 12 copies | existing script, automatic | $0.00 |
 | 1 — pre-resize snapshot | once | 7 days after validation | operator, explicit | ~$0.05 one-off |
-| 1 — pre-resize dump | once | indefinite | never | $0.0004/mo |
-| 2 — daily off-host **(the DR tier)** | daily | 7 days hot, archive to 90 days | lifecycle rule if OSS; operator script otherwise | **$0.00** pulled, $0.10 on OSS |
+| 1 — pre-resize dump, **interim operator `scp`** | once | indefinite | never | $0.00 |
+| 2 — daily push **(the DR tier)** | daily, unattended | 7 daily + 8 weekly copies | lifecycle rule at the destination | **0.035–0.134** third-party; ~0.10 OSS |
 | 2b — restore validation | monthly | n/a | n/a | $0.00 |
-| 3 — operator copy | monthly | 3 copies, rolling | operator, manual | $0.00 |
+| 3 — extra off-account copy | monthly | 3 rolling | operator, manual | $0.00 — **only if** Tier 2 targets OSS |
 
 Two rules on deletion. Never expire the **newest verified copy**, whatever the
 policy says. And never apply retention to live evidence rows — this policy
@@ -510,21 +524,33 @@ records themselves are not a cost-cutting target.
 
 #### Effect on the cost analysis
 
-| Configuration | Base | + backup (executable today) | + backup (if OSS returns) |
+Costed against the **recurring DR tier**, which is the unattended third-party
+push. The one-time interim copy is not a recurring cost and is excluded.
+
+| Configuration | Base | + DR backup (third-party) | + DR backup (OSS, if it returns) |
 |---|---:|---:|---:|
-| Current (`e-c1m2.large`, PL1 40 GB, PAYG) | 33.38 | **33.38** | 33.48 |
-| C — validation stage (`e-c1m1.large`, PAYG) | 20.39 | **20.39** | 20.49 |
-| B — preferred (`e-c1m1.large`, subscription) | 14.20 | **14.20** | 14.30 |
+| Current (`e-c1m2.large`, PL1 40 GB, PAYG) | 33.38 | **33.51** | 33.48 |
+| C — validation stage (`e-c1m1.large`, PAYG) | 20.39 | **20.52** | 20.49 |
+| B — preferred (`e-c1m1.large`, subscription) | 14.20 | **14.33** | 14.30 |
 
-Because OSS is refused, the route that can run today — an operator-pulled dump —
-adds **$0.00** to the Alibaba bill. Even the OSS route would add **0.3–0.7%**.
-Backup changes no configuration decision either way, which is the point of
-pricing it: the recovery gap was never a cost question, and it is now less of
-one than v0.2 implied.
+Using the six-month figure of $0.134/month, the least favourable of the
+third-party rates; today it is under a cent. **$0.00 is not used here**, because
+the only $0.00 route is the manual pull, and that route does not deliver the
+recurring objective this row is paying for.
 
-**Exit gate:** one verified dump exists **off the instance** and has been
-restored into a throwaway PostgreSQL, before the resize. The recurring tier and
-its retention rule can follow the resize; they are not prerequisites for it.
+Either way backup is **0.4–0.9%** of the bill and changes no configuration
+decision, which is the point of pricing it: the recovery gap was never a cost
+question.
+
+**Exit gate for the resize:** one verified dump exists **off the instance** and
+has been restored into a throwaway PostgreSQL. The interim operator `scp` copy
+satisfies this — a single independent safety copy is all the resize requires.
+
+**This gate is not the 24-hour RPO.** They are separate objectives: the gate
+protects one planned change, the RPO is a standing property of the deployment.
+Passing the gate says nothing about the RPO, and the recurring push in Tier 2
+can be built after the resize without holding it up. Do not record the gate as
+evidence the recovery objective is met.
 
 ### 7.3 Validate the smaller memory envelope
 
