@@ -138,21 +138,36 @@ marker element, which round-trips intact. So `daily/` and `weekly/` each need
 **Applying a lifecycle configuration is not evidence it was stored.** Read it
 back and compare, every time.
 
-#### Finding 2 — the `aliyun` CLI cannot do forbid-overwrite
+#### Finding 2 — `x-oss-forbid-overwrite` is inert on a versioned bucket
 
-The embedded OSS client in `aliyun` 3.3.23 is ossutil 1.x-style: it has
-`lifecycle`, `bucket-versioning` and `restore`, but **no `api` subcommand**, so
-`ossutil api put-object` from §6.2 is unavailable through it.
+**Corrected 21 September 2026.** This was first recorded as "the `aliyun` CLI
+cannot do forbid-overwrite". The *observation* was sound; the *diagnosis* was
+wrong, and the correction matters more than the original finding did.
 
-The obvious substitute does not work either. `cp --meta
-x-oss-forbid-overwrite:true` **was accepted and the object was overwritten** —
-the header is not honoured on that path. Versioning retained the original, which
-is exactly the backstop it exists to be, but the first line of defence was
-absent.
+Observed: `cp --meta x-oss-forbid-overwrite:true` was accepted and the object
+was overwritten. The cause was not the client. The preflight scratch bucket had
+versioning **enabled** — row 1 of the table above — and Alibaba documents the
+header as having no effect in precisely that state:
 
-**Consequence for §6.2, unchanged in intent and now load-bearing:** a pinned
-**ossutil 2.x must be installed on the host**. The `aliyun` CLI already present
-elsewhere is not a substitute, and no `--meta` flag approximates it.
+> 当目标Bucket处于已开启或已暂停的版本控制状态时，x-oss-forbid-overwrite请求Header设置无效，即允许覆盖同名Object。
+
+("When the target Bucket has versioning enabled or suspended, the
+`x-oss-forbid-overwrite` header setting is invalid — overwriting a same-named
+Object is allowed.")
+
+OSS behaved exactly as documented. **No client can obtain forbid-overwrite
+semantics on this bucket — ossutil 2.x included — because §2 enables versioning
+and keeps it enabled.** The header is not a layer this design has available, and
+nothing below may claim it as one.
+
+Separately and still true: `aliyun` 3.3.23 has no `api` subcommand.
+
+**Consequence for §6.2, restated on a correct basis:** a pinned ossutil 2.x is
+still required, but for a plainer reason — the host carries **no OSS client at
+all** (no `ossutil`, no `aliyun`, no `oss2` in the venv, re-confirmed
+21 September), so an official client must be installed before anything can be
+uploaded. It is **not** required in order to obtain forbid-overwrite, which it
+cannot provide here.
 
 ---
 
@@ -334,11 +349,34 @@ caught at all.
 
 ### 6.2 Upload mechanism
 
-**`ossutil api put-object`, with forbid-overwrite enabled.** Two reasons beyond
-convenience: it keeps the required permission at exactly `oss:PutObject`, and it
-**fails safely if the dated key already exists** rather than silently replacing
-it — which is the same destructive path versioning exists to catch, refused one
-layer earlier.
+**`ossutil api put-object`.** It keeps the required permission at exactly
+`oss:PutObject`.
+
+**Overwrite protection here is unique keys plus versioning — not
+`x-oss-forbid-overwrite`.** An earlier draft of this section had
+`put-object` refuse a write to an existing key and treated that as the first
+line of defence. On a versioned bucket the header is silently ignored
+(§0.6, finding 2), so that refusal never happens and must not be relied on.
+What actually protects a stored backup is:
+
+1. **Unique, deterministic keys.** A key is `daily/YYYY-MM-DD.dump.age` or
+   `weekly/YYYY-MM-DD.dump.age`, derived from the date alone, so the key for a
+   given day is the same whichever run writes it and an ordinary run never
+   targets an existing key at all. The per-key listing check in §7.1 is what
+   makes that a check rather than an assumption; and
+2. **Versioning**, so if a same-key write does occur the previous object is
+   retained as a noncurrent version rather than destroyed; and
+3. **No `oss:DeleteObject` or `oss:DeleteObjectVersion` for the uploader**
+   (§4.1), so the host cannot remove what versioning preserved.
+
+**Versioning is not immutability, and this plan does not claim it is.** A
+retained noncurrent version lives only as long as §3 allows — **7 days** after
+becoming noncurrent under `daily/`, **63 days** under `weekly/` — after which it
+is deleted like any other expired version. Recovery from an accidental same-key
+write is therefore bounded by that window, not indefinite. The `anchor/` prefix
+carries no lifecycle rule at all and is the only object here with no expiry;
+that is precisely why the Tier 1 anchor is held separately and off-account
+(§9).
 
 Install a **pinned official ossutil 2.x** and **verify Alibaba's published
 SHA-256** during installation. The exact version is chosen and recorded at
@@ -352,11 +390,37 @@ that holds the broker credentials.
 Upload over the **internal endpoint**. The public endpoint appears nowhere in
 the service configuration.
 
-**The `aliyun` CLI is not a substitute, and this is now tested rather than
-assumed.** Its embedded OSS client has no `api` subcommand, and the closest
-alternative — `cp --meta x-oss-forbid-overwrite:true` — was accepted while the
-object was overwritten anyway (§0.6, finding 2). Installing pinned ossutil 2.x
-on the host is a prerequisite of this step, not a preference within it.
+**The `aliyun` CLI is not a substitute** — but note it is not disqualified by
+the overwrite behaviour, which was a property of the versioned bucket rather
+than of the client (§0.6, finding 2). It is disqualified because its embedded
+OSS client has no `api` subcommand, and, decisively, because **the host has no
+`aliyun` CLI installed at all**. Installing pinned ossutil 2.x on the host is a
+prerequisite of this step, not a preference within it.
+
+#### §6a completion record — client prerequisite, executed 21 September 2026
+
+Installation is split from activation. **§6a is the binary only**; configuration,
+encryption integration, the timer and any scheduled upload are **§6b** and remain
+blocked until §4 and §5 complete. Installing the client needs neither the RAM
+identities nor the `age` identity, so it was not held behind them.
+
+| Field | Value |
+|---|---|
+| Host | `i-t4n88bkfwsq0lhzmfjii` (`options-alpha-demo`), Ubuntu 24.04.4, x86_64 |
+| Version | **2.4.0** — exact, chosen at install time, never `latest` |
+| Source | `https://gosspublic.alicdn.com/ossutil/v2/2.4.0/ossutil-2.4.0-linux-amd64.zip` |
+| Archive SHA-256 | `85edf66b2fb7238f5c7e25cab820cf29312319fe4935b7c86a6b8485eb434f3c` |
+| Digest published by | Alibaba, `help.aliyun.com/zh/oss/developer-reference/install-ossutil2` |
+| Verification | Computed on the host and compared to the published value **before** installing; the install was gated on the match and would have removed the download otherwise |
+| Installed binary SHA-256 | `16df22628c78506deae0054e319396b38b19ddeb71d7a6db636c5c4729af7b9d` |
+| Path | `/usr/local/bin/ossutil`, `root:root`, `0755` |
+| Extraction | `python3` `zipfile` — `unzip` is not installed on the host and was not added |
+| State after §6a | Binary only. **No** ossutil config, **no** credentials, **no** service, **no** timer |
+
+The digest came from Alibaba's published table rather than from the artifact
+itself; verifying a download against a hash derived from that same download
+proves nothing, which is why the published value is recorded here with its
+source.
 
 ### 6.3 Weekly mechanics
 
@@ -415,8 +479,11 @@ mechanism reports success.
 | present | **missing** | upload `weekly/` only |
 | **missing** | **missing** | encrypt once, upload that ciphertext to both |
 
-An existing key is never touched, and forbid-overwrite (§6.2) is the backstop if
-a listing is stale.
+An existing key is never touched. If the listing is stale, the write is **not**
+refused — forbid-overwrite does not function on a versioned bucket (§0.6,
+finding 2) — and the protection is versioning: the previous object becomes a
+noncurrent version instead of being destroyed, and the uploader holds no delete
+permission to remove it.
 
 **Ciphertext is not expected to match across runs.** `age` encryption is
 randomised and the staged file is removed after every invocation, so a
@@ -431,8 +498,10 @@ maintain. A transient failure costs **at most 4 hours**, for either destination
 independently.
 
 `Persistent=true` covers the case where the host was down at the scheduled time.
-Forbid-overwrite (§6.2) remains the backstop: if the listing is stale or racy,
-the upload is refused rather than replacing a good object.
+If the listing is stale or racy the upload is **not** refused — see §0.6,
+finding 2. The good object survives as a noncurrent version under §3 retention,
+which is a weaker guarantee than refusal and is stated here as such rather than
+implied away.
 
 ### 7.2 The 30-hour age check
 
