@@ -6,7 +6,7 @@
 |---|---|
 | Version | v0.1 |
 | Date | 21 September 2026 |
-| Status | **Plan only. Nothing is implemented.** Section 0 must be verified before any step runs |
+| Status | **Plan only. Nothing is implemented.** §0.1 and §0.3 are resolved from documentation; §0.2, §0.4 and §0.5 remain to verify at execution |
 | Design | [Deployment Cost Analysis §7.2](../improvements/options_alpha_deployment_cost_analysis_v0_1.md) |
 | Unblocked by | `CIIP-I-BLK-001`, resolved 21 September — OSS activated in the console |
 | Delivers | A 24-hour off-host recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database |
@@ -30,47 +30,50 @@
 Each of these changes the plan if it turns out otherwise. None is assumed below
 without being listed here.
 
-### 0.1 Versioning changes what "expire" means — **highest impact**
+### 0.1 Versioning retention — **resolved from documentation**
 
-On a versioned bucket, a lifecycle `Expiration` rule does **not** free the data.
-It writes a **delete marker** and the object becomes noncurrent; the bytes
-persist until a `NoncurrentVersionExpiration` rule removes them.
+Confirmed, not open. On a versioned bucket a current-version `Expiration`
+**creates a delete marker** and makes the object noncurrent;
+`NoncurrentVersionExpiration` then counts **from that point**. Retention is the
+sum of the two rules, not the first of them.
 
-If that holds here, the retention described in the design is **nominal, and the
-real storage lifetime is the sum of both rules** — `daily/` would hold bytes for
-7 days current plus 7 days noncurrent, not 7 total, and the cost estimate is
-correspondingly low.
+| Prefix | Nominal | **Actual bytes retained** |
+|---|---|---|
+| `daily/` | 7 days | **~14 days** |
+| `weekly/` | 63 days | **~126 days** |
 
-**Verify:** enable versioning on a scratch bucket, write an object, apply an
-`Expiration: 1 day` rule, and observe whether the data is billed after the
-marker appears. **Then restate the retention table in terms of total lifetime,
-and reprice.** Do not carry the current figures forward unchecked.
+§3 and the cost figures below are restated accordingly. The scratch-bucket test
+survives as **execution validation** — confirming the rules were applied as
+intended — not as the gate on this decision.
 
 ### 0.2 Archive objects cannot be read without `RestoreObject`
 
 Retrieving an Archive-class object requires a `RestoreObject` call and a wait —
 minutes to hours — before a `GetObject` succeeds.
 
-This lands squarely on **§8 restore validation**: a drill that happens to select
-a `weekly/` object older than 7 days will fail unless it restores first. The
-drill must either target `daily/` deliberately, or include the restore step and
-its wait.
+This lands on **§8 restore validation**: a drill that selects a `weekly/` object
+older than 7 days fails unless it restores first. The drill targets `daily/`
+deliberately, and §6 gives the restore identity `RestoreObject` only if Archive
+retrieval is ever exercised.
 
-**Verify:** the restore latency tier available on this account, and whether
-`RestoreObject` incurs a separate retrieval charge at this volume.
+**Verify at execution:** the restore latency tier on this account, and whether
+retrieval carries a separate charge at this volume.
 
-### 0.3 RAM action names and resource scoping
+### 0.3 RAM permissions — **resolved from documentation**
 
-The design calls for an identity that may create objects and read metadata and
-nothing else. Confirm the exact action names — `oss:PutObject`, `oss:GetObject`,
-`oss:GetObjectMeta`, `oss:ListObjects` — and, more importantly, **whether a
-prefix-scoped list is expressible.** Some object stores can only scope listing at
-bucket granularity; if OSS is one of them, the monitor gets list rights over the
-whole bucket and that should be a recorded decision rather than an accident.
+Also confirmed rather than open:
 
-**Verify:** that a policy denying `oss:DeleteObject`, `oss:DeleteObjectVersion`,
-`oss:PutBucketVersioning`, `oss:PutBucketLifecycle` still permits the upload, by
-testing with the real identity against a scratch bucket before production use.
+- **`GetObjectMeta` is authorised by `oss:GetObject`.** There is no separate
+  `oss:GetObjectMeta` permission to grant.
+- **The monitor needs no object-read permission at all.** `ListObjectsV2`
+  returns `LastModified`, which is the only field §7 reads, and `oss:ListObjects`
+  can be constrained with an **`oss:Prefix` condition**.
+
+So the host identity gets `oss:PutObject` on `daily/*` and `weekly/*` plus
+prefix-scoped `oss:ListObjects`, and **no read of object contents whatsoever**.
+It also gets **no write to `anchor/`**: that prefix holds the one-time pre-resize
+copy, written once by an operator, and there is no demonstrated need for an
+automated identity to touch it.
 
 ### 0.4 Per-prefix noncurrent rules
 
@@ -117,40 +120,81 @@ defended against.
 
 ## 3. Lifecycle configuration
 
-**Subject to §0.1 and §0.4.** Written as intended; restate once those are known.
+Restated for versioned-bucket semantics (§0.1). The nominal column is what the
+rules say; the retained column is what is actually billed.
 
-| Prefix | Current version | Noncurrent versions | Purpose |
-|---|---|---|---|
-| `daily/` | expire at 7 days | expire 7 days after becoming noncurrent | Rolling recent history |
-| `weekly/` | transition to Archive at 7 days, expire at 63 | expire 63 days after becoming noncurrent | Cheap medium history |
-| `anchor/` | **no rule** | **no rule** | The pre-resize copy. Removed only by explicit human action |
+| Prefix | Current version | Noncurrent versions | Bytes retained | Purpose |
+|---|---|---|---|---|
+| `daily/` | expire at 7 days | expire 7 days after becoming noncurrent | **~14 days** | Rolling recent history |
+| `weekly/` | transition to Archive at 7 days, expire at 63 | expire 63 days after becoming noncurrent | **~126 days** | Cheap medium history |
+| `anchor/` | **no rule** | **no rule** | indefinite | The pre-resize copy. Removed only by explicit human action |
 
 `anchor/` must be excluded from every rule, not merely given a long one. A rule
 with a large number still deletes eventually; no rule never does.
 
-## 4. Least-privilege RAM identity
+### Corrected cost
 
-One RAM user, one access key, used only by the backup service.
+| Horizon | Objects | Standard | Archive | $/month |
+|---|---|---:|---:|---:|
+| Day 63 | 14 daily + 10 weekly = 24 | 2.25 GB | 0.76 GB | **0.040** |
+| **Day 126 — steady state** | **14 + 18 = 32** | 4.37 GB | 2.78 GB | **0.080** |
+| Day 182 | 14 + 18 = 32 | 6.26 GB | 4.92 GB | **0.116** |
 
-**Allow, scoped to this bucket and these prefixes:**
+The design document's figures — 16 objects, $0.023 at steady state, $0.063 at
+six months — were computed before the delete-marker behaviour was confirmed and
+are **low by roughly 1.8×**. The corrected numbers are still negligible against
+a $14–20 base, and the conclusion does not move; the arithmetic does, and the
+cost analysis should be updated to match when this plan is executed.
+
+Steady state arrives at **day 126**, not day 63, because `weekly/` noncurrent
+versions take that long to age out.
+
+## 4. Least-privilege RAM identities — **two of them**
+
+The host that writes backups and the operator who restores them need different
+rights, and combining them would put read access to the archive on the
+production box. Two identities, neither able to do the other's job.
+
+### 4.1 The uploader (on ECS)
+
+**Allow, scoped to this bucket:**
+
+| Action | Scope | Why |
+|---|---|---|
+| `oss:PutObject` | `daily/*` and `weekly/*` only | Writing the daily object is the whole job |
+| `oss:ListObjects` | constrained by an **`oss:Prefix` condition** | §7 reads `LastModified` from `ListObjectsV2`. That is the only field it needs |
+
+**No object-read permission at all.** `GetObjectMeta` is authorised by
+`oss:GetObject`, and the monitor does not need it — `ListObjectsV2` already
+returns the timestamp. Granting `oss:GetObject` to save a call would give the
+host the ability to fetch every stored backup, which is exactly what the
+encryption design is arranged to prevent.
+
+**No write to `anchor/`.** That prefix holds the one-time pre-resize copy,
+written once by an operator. No automated identity has a demonstrated need for
+it, so none gets it.
+
+**Denied:** `oss:DeleteObject`, `oss:DeleteObjectVersion`,
+`oss:PutBucketVersioning`, `oss:PutBucketLifecycle`, `oss:PutBucketWorm`,
+`oss:GetObject`, any access to other buckets, and bucket creation.
+
+Key in `/etc/options-alpha-backup.env`, mode `0600`, root-owned, referenced by
+`EnvironmentFile=`. **Not** in `/etc/options-alpha.env` — the backup identity
+and the broker identity should not share a blast radius.
+
+### 4.2 The restore identity (operator machine only)
+
+Used by §8 and by a real recovery. **Never installed on ECS.**
 
 | Action | Why |
 |---|---|
-| `oss:PutObject` | Writing the daily object is the whole job |
-| Minimum read for the monitor — `oss:GetObjectMeta`, and `oss:ListObjects` if metadata alone cannot find the newest key | §7 must read the newest object's timestamp |
+| `oss:GetObject` | Reading a backup to restore it |
+| `oss:ListObjects` | Finding the newest object |
+| `oss:RestoreObject` | **Only if** Archive retrieval is exercised — a `weekly/` object older than 7 days |
 
-**Deny everything else**, explicitly: `oss:DeleteObject`,
-`oss:DeleteObjectVersion`, `oss:PutBucketVersioning`, `oss:PutBucketLifecycle`,
-`oss:PutBucketWorm`, `oss:*` on any other bucket, and bucket creation.
-
-The uploader may create objects and read their metadata. It cannot remove
-history, disable the protection that retains it, or rewrite the rules that bound
-it. It also cannot read backup **contents** usefully, because it holds no `age`
-identity.
-
-Store the access key in `/etc/options-alpha-backup.env`, mode `0600`, root-owned,
-referenced by `EnvironmentFile=`. **Not** in `/etc/options-alpha.env` — the
-backup identity and the broker identity should not share a blast radius.
+These are precisely the permissions the uploader must not have. If a single
+identity ends up holding both sets, the separation is gone whether or not the
+key files are separate.
 
 ## 5. `age` encryption
 
@@ -180,21 +224,66 @@ to be generated on ECS and moved off. Generating off-host is the requirement.
 
 ## 6. Daily upload timer
 
-A new `options-alpha-backup-offsite.{service,timer}`, beside the existing
+A new `options-alpha-backup-offsite.{service,timer}`, **beside** the existing
 `options-alpha-backup.timer` rather than inside it — the local hourly job is
 proven and should not be made to depend on network reachability.
 
-- Runs once daily, after a local dump exists. `Persistent=true`, so a missed run
-  fires on boot.
-- Key format: `daily/YYYY-MM-DD.dump.age`. Weekly day additionally writes
-  `weekly/YYYY-MM-DD.dump.age` — the same bytes, a second key, no re-encryption.
-- Uploads via the **internal endpoint**.
+### 6.1 It consumes the verified dump; it does not make one
+
+The offsite service **must not run `pg_dump`**. A second dump would be
+unverified, would double the load, and would race the hourly job that may be
+writing at that moment.
+
+Instead it reads `/var/lib/options-alpha/backup.json`, which the existing
+verified backup already writes, and refuses to proceed unless:
+
+- `verified` is `true` — the dump was restored into a scratch database and
+  dropped, which is what makes it a backup rather than a file;
+- `at` is recent enough to be this cycle's dump rather than a stale record;
+- the file at `path` still exists and its size matches `bytes`.
+
+It then encrypts and uploads **that exact file**. The record also carries
+`alembic_revision`, `tables` and `rows_restored`, which are worth copying into
+the upload's metadata so a restorer knows what they have before decrypting.
+
+If any precondition fails, the service **fails loudly and uploads nothing**. A
+missing upload is caught by §7 within 30 hours; an unverified upload is not
+caught at all.
+
+### 6.2 Upload mechanism
+
+**`ossutil api put-object`, with forbid-overwrite enabled.** Two reasons beyond
+convenience: it keeps the required permission at exactly `oss:PutObject`, and it
+**fails safely if the dated key already exists** rather than silently replacing
+it — which is the same destructive path versioning exists to catch, refused one
+layer earlier.
+
+Install a **pinned official ossutil 2.x** and **verify Alibaba's published
+SHA-256** during installation. Not an unpinned installer script: a backup path
+that fetches and executes whatever is current is a supply chain into the host
+that holds the broker credentials.
+
+Upload over the **internal endpoint**. The public endpoint appears nowhere in
+the service configuration.
+
+### 6.3 Weekly mechanics
+
+On the weekly day the same artifact goes to both prefixes. **Encrypt once,
+upload the same ciphertext twice:**
+
+1. Stage the ciphertext once, in a **root-only** runtime location —
+   `/run/options-alpha/` via `RuntimeDirectory=`, mode `0700`.
+2. `put-object` it to `daily/YYYY-MM-DD.dump.age`.
+3. `put-object` the **same file** to `weekly/YYYY-MM-DD.dump.age`.
+4. Remove it in a `trap`, so it goes even on failure.
+
+No second `pg_dump`, no second encryption pass, and **no plaintext written
+anywhere outside the existing backup directory**. Staging under `/run` keeps
+the ciphertext off persistent storage entirely.
+
+- Runs once daily, `Persistent=true`, so a missed run fires on boot.
 - Records the outcome to `worker_events` as a durable fact, per §7.
 - Never deletes anything, locally or remotely.
-
-A client must be installed: **`ossutil`** is preferred over adding `oss2` to the
-application venv, which would change the application's dependency set and the
-freeze manifest for a concern unrelated to the application.
 
 ## 7. Monitoring: 30-hour object age
 
@@ -207,10 +296,16 @@ The mechanism that makes 24 hours a property rather than an intention.
    succeeds; `UserDisable` was exactly that shape. Record any non-2xx as a fault
    event in `worker_events`, so it survives a log rotation and is visible on the
    dashboard rather than only in the journal.
-3. **A dead host cannot report itself.** The age check catches "uploads stopped
-   while the host lives", which is the failure this design makes likely. Host
-   loss is already visible through the stale worker lease. Neither check
-   subsumes the other, and neither should be described as covering both.
+3. **A dead host cannot report itself, and this task does not fix that.** The
+   age check runs on the host, so it covers exactly one failure: **uploads
+   stopped while the host is alive.** That is the failure this design makes
+   likely, and it is worth covering.
+
+   An earlier draft claimed host loss was "already visible through the stale
+   worker lease on the dashboard". That was circular — **the dashboard runs on
+   the same ECS host**, so a dead host cannot surface its own death through it.
+   External availability monitoring is a real gap, a separate concern, and
+   explicitly **out of scope here**. It should not be described as covered.
 
 ## 8. Monthly restore validation
 
@@ -218,8 +313,11 @@ The mechanism that makes 24 hours a property rather than an intention.
 private identity, and a drill performed where a real recovery would happen is
 worth more than one performed on the box being recovered from.
 
-1. Download the newest `daily/` object. **Prefer `daily/`**: a `weekly/` object
-   older than 7 days is in Archive and needs `RestoreObject` first (§0.2).
+1. Download the newest `daily/` object, using the **restore identity** from
+   §4.2 — never the uploader's key. **Prefer `daily/`**: a `weekly/` object
+   older than 7 days is in Archive and needs `RestoreObject` and a wait first
+   (§0.2). Exercise that path deliberately at least once, so the latency is
+   measured before a real recovery depends on it.
 2. `age -d -i <identity>` → `pg_restore` into a throwaway PostgreSQL.
 3. Verify: `pg_restore --list` enumerates; `alembic_version` matches
    expectation; row counts for `decisions`, `market_snapshots` and
@@ -239,10 +337,15 @@ worth more than one performed on the box being recovered from.
 | Bucket | `ossutil stat oss://<bucket>` | exists, private ACL |
 | Versioning | `ossutil bucket-versioning --method get oss://<bucket>` | `Enabled` |
 | Lifecycle | `ossutil lifecycle --method get oss://<bucket>` | three prefixes as §3; `anchor/` absent from all rules |
-| RAM | upload as the backup identity; then attempt `rm` and a lifecycle write | upload succeeds, **both others denied** |
+| RAM uploader | upload as the backup identity; then attempt `rm`, a lifecycle write, a `GetObject`, and a write to `anchor/` | upload succeeds, **all four denied** |
+| RAM restore | `GetObject` as the restore identity | succeeds, and that identity is absent from ECS |
+| Forbid-overwrite | `put-object` the same dated key twice | second attempt **refused**, not silently replaced |
+| ossutil | compare the installed binary against Alibaba's published SHA-256 | matches the pinned 2.x release |
 | `age` | `age -r <pub> </dev/null \| age -d -i <identity>` on the operator machine | round-trips |
 | Timer | `systemctl list-timers options-alpha-backup-offsite` | scheduled, next run shown |
+| Source dump | run with `verified:false` in `backup.json` | service **refuses** and uploads nothing |
 | End to end | run the service once; list `daily/` | one object, size ≈ dump, **not** plaintext |
+| Weekly path | run on the weekly day | two keys, **identical ciphertext**, `/run` staging removed afterwards |
 | Encryption | `ossutil cat` the first bytes | `age-encryption.org/v1`, never SQL |
 | Monitor | set the threshold to 0 temporarily | fault event appears in `worker_events` |
 
