@@ -1008,7 +1008,7 @@ produced and restore-checked — encrypted with `age` and pushed to OSS.
 | Overwrite protection | **Bucket versioning** (required), delete-marker cleanup on the rotating prefixes. WORM is optional and cannot express three horizons in one bucket |
 | Identities | **Two.** Uploader on ECS: `PutObject` on `daily/*` and `weekly/*`, prefix-scoped `ListObjects`, **no object read, no `anchor/` write**. Restore identity: operator machine only |
 | Encryption | `age`, identity generated **off-host**, two protected private copies, only the recipient key on ECS |
-| Upload | `ossutil api put-object` with **forbid-overwrite**, pinned 2.x, SHA-256 verified |
+| Upload | `ossutil api put-object`, pinned 2.x, SHA-256 verified. **Not** forbid-overwrite: the header is inert on a versioned bucket, so overwrite protection is the versioning row above plus unique dated keys |
 | Cadence | Timer every 4 hours, idempotent, **each destination key checked independently**; uploads at most once a day |
 | Monitoring | 30-hour newest-object age check, durable fault events in `worker_events` |
 | Restore drill | Monthly, **on the operator's machine**, since only it holds the private key |
