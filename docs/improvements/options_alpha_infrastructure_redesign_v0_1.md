@@ -971,3 +971,83 @@ route, which changes no configuration decision.
 The analysis also records what it could not measure, and where v0.1 overstated
 its evidence — most importantly that a failed dry run is not proof a resize
 target is valid.
+
+## 18. Stopping point — 21 September 2026
+
+State at stop, measured rather than remembered.
+
+| | |
+|---|---|
+| `main` | **`c45e122175299abe3ef44be098d951c01a51a604`**, CI green on all three jobs, no open pull requests, working tree clean |
+| Host | `options-alpha-demo`, `ecs.e-c1m2.large`, Running — **unchanged** |
+| OSS | Service active; **account holds zero buckets.** Nothing was provisioned |
+| Implementation | **Not started.** Today produced plans and one resolved blocker |
+
+### Shipped today
+
+Three pull requests, each CI-green before merge: `#28` the deployment cost
+analysis, `#29` the OSS backup design, `#30` the implementation plan.
+
+`CIIP-I-BLK-001` is **resolved**. `CreateBucket` refused with `UserDisable` at
+20 Sep 21:16Z and succeeded at 22:03Z, 23:05Z and 21 Sep 01:05Z after OSS was
+activated in the console, with the balance at $0.00 throughout — activation, not
+settlement. The original 10 September diagnosis, which blamed the balance, was
+wrong and is preserved beneath the resolution rather than rewritten.
+
+### The approved architecture
+
+One daily **verified** dump — the one `options-alpha-backup.service` already
+produced and restore-checked — encrypted with `age` and pushed to OSS.
+
+| | |
+|---|---|
+| Bucket | One, `ap-southeast-1`, reached over the **internal endpoint** so there is no public egress charge |
+| Prefixes | `daily/` (7 days), `weekly/` (Archive at 7, expire 63), `anchor/` (**no rule at all**) |
+| Retained bytes | ~14 days daily, ~126 weekly — delete markers plus noncurrent expiry, not the nominal numbers |
+| Steady state | **32 objects, $0.080/month**, reached day 126; $0.116 at six months |
+| Overwrite protection | **Bucket versioning** (required), delete-marker cleanup on the rotating prefixes. WORM is optional and cannot express three horizons in one bucket |
+| Identities | **Two.** Uploader on ECS: `PutObject` on `daily/*` and `weekly/*`, prefix-scoped `ListObjects`, **no object read, no `anchor/` write**. Restore identity: operator machine only |
+| Encryption | `age`, identity generated **off-host**, two protected private copies, only the recipient key on ECS |
+| Upload | `ossutil api put-object` with **forbid-overwrite**, pinned 2.x, SHA-256 verified |
+| Cadence | Timer every 4 hours, idempotent, **each destination key checked independently**; uploads at most once a day |
+| Monitoring | 30-hour newest-object age check, durable fault events in `worker_events` |
+| Restore drill | Monthly, **on the operator's machine**, since only it holds the private key |
+
+### Still to validate at execution
+
+`§0.2` — Archive objects need `RestoreObject` and a wait before they can be
+read; confirm the latency tier and whether retrieval carries a separate charge.
+`§0.5` — the 60-day Archive minimum, confirmed against a real invoice rather
+than the documentation.
+
+Everything else in `§0` is resolved from documentation. The scratch-bucket
+exercise survives as execution validation, not as a decision gate.
+
+### Tomorrow's first task
+
+**The preflight validations in plan `§0`, before any infrastructure change.**
+A scratch bucket, versioning enabled, a lifecycle rule applied, and the
+behaviour observed — then delete it. No production bucket, no RAM identity, no
+timer until that returns what the documentation says it will.
+
+### Decisions not to revisit
+
+- **Billing is not a blocker.** Month-to-date accrual with a $0.00 prepaid
+  balance is ordinary postpaid billing. Only an actual restriction blocks
+  anything, and none was found.
+- **`CIIP-I-BLK-001` is closed**, and for the reason recorded. Re-test
+  `CreateBucket`, never `ListBuckets`, if it is ever questioned again: the
+  latter answered throughout while the former refused.
+- **The resize is in place.** No second host, nothing copied between machines,
+  no original server to decommission. The only deliberate deletion in the whole
+  exercise is the pre-resize snapshot, seven days after validation.
+- **The 24-hour figure is a target, not a guarantee.** Retry absorbs transient
+  failures; the alarm surfaces sustained ones within 30 hours. Nothing prevents
+  a two-day gap if OSS is unreachable for two days.
+- **`age` ciphertext is randomised.** A repaired `weekly/` object will not match
+  its `daily/` sibling byte for byte, and must not be expected to.
+- **Losing the `age` private key makes every stored backup permanently
+  unreadable.** It is not part of any rollback.
+- **The rightsizing is still unexecuted**: `2c4g → 2c2g` remains worth
+  $12.99/month, and `$14.20/month` with a subscription. Backup is ~0.5% of the
+  bill and changes no configuration decision.
