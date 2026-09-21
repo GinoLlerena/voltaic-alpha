@@ -9,7 +9,8 @@
 | Status | **Plan only. Nothing is implemented.** §0 preflight executed 21 September against a scratch bucket, since deleted — results in §0.6. Only §0.5 remains open |
 | Design | [Deployment Cost Analysis §7.2](../improvements/options_alpha_deployment_cost_analysis_v0_1.md) |
 | Unblocked by | `CIIP-I-BLK-001`, resolved 21 September — OSS activated in the console |
-| Targets | A 24-hour off-host recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database. **Targets**, not guarantees — see §7.4 |
+| Targets | A 24-hour **off-host** recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database. **Targets**, not guarantees — see §7.4 |
+| Also targets | A ~1-month **off-account** recovery point (§9). Everything in §1–§8 lives inside one Alibaba account and none of it survives that account being lost |
 | Does **not** deliver | `CIIP-I-002`'s 30-day PITR, which needs WAL archiving rather than periodic dumps |
 
 ### Host facts, measured 21 September
@@ -493,8 +494,92 @@ worth more than one performed on the box being recovered from.
    observation rather than an aspiration.
 5. The restored instance must never reach the production database or acquire the
    worker lease.
+6. **Retain the downloaded ciphertext as the off-account copy (§9).** The drill
+   has just proven this exact file restores; discarding it and trusting a later,
+   unverified one is the weaker choice, and the transfer has already happened.
 
-## 9. Rollback, cleanup and verification
+## 9. Off-account copy — the account-loss tail
+
+### 9.1 What §1–§8 cannot do
+
+Every control in this plan lives **inside one Alibaba account**. Versioning,
+the four lifecycle rules, both RAM identities and the uploader's missing delete
+permission are all enforced by the same account that runs the ECS instance being
+protected. None of them survives that account failing.
+
+Two failure modes, neither addressed above:
+
+- **The account becomes inaccessible** — suspension, billing lock, closure,
+  lost root credentials. ECS and OSS go together, because they are the same
+  account. There is no partial outcome here.
+- **The account is compromised at root or RAM-admin level.** An attacker with
+  console access deletes object versions, strips the lifecycle rules, or deletes
+  the bucket. The uploader's denied `DeleteObject` protects against a compromised
+  **host**; it is irrelevant to a compromised **account**.
+
+Versioning is the answer to overwrite. It is not an answer to either of these.
+
+**Without §9, the recovery point against account loss is unbounded.** What
+survives today is the `age` private identity — which restores nothing on its own
+— and the one-time pre-resize dump, which is stale the day after it is taken.
+
+### 9.2 The mechanism: retain what the drill already downloads
+
+The monthly restore validation in §8 **already pulls the newest `daily/`
+ciphertext to the operator's machine and proves it decrypts and restores.**
+Retaining that file is the off-account copy. No additional transfer, no second
+provider's credentials, no new automation.
+
+1. After the §8 drill passes, **keep** the downloaded ciphertext rather than
+   discarding it.
+2. Store it on **operator-controlled storage outside the Alibaba account**.
+3. **Keep three rolling copies.** Delete the fourth-oldest only after the newest
+   has passed a drill.
+4. **At least one copy must not live on the same device as the `age` private
+   identity.** Ciphertext stored beside the key that opens it is plaintext with
+   extra steps, and a single stolen laptop should not yield the archive.
+
+A copy that has not been restored from is an assumption. §9 retains the one that
+was **just proven**, which is why it is attached to the drill and not scheduled
+separately.
+
+### 9.3 Why it stays manual
+
+Automating it needs either another always-on machine — which this design
+refuses on cost grounds — or credentials for a second provider **on the
+production host**, which reintroduces on ECS exactly the blast radius §4 and §5
+are arranged to contain. A monthly manual action attached to an existing monthly
+task is the proportionate answer to a tail risk.
+
+**Nothing automated can detect a missed Tier 3 copy.** Anything that could would
+have to run inside the account it exists to survive, or on a second always-on
+machine. Its detection is the drill record in §8: the copy and the drill fail
+together, visibly, in the same checklist entry.
+
+### 9.4 What this buys, stated honestly
+
+**A recovery point of roughly one month against account-level loss** — not the
+24 hours §7 targets for host loss. The two numbers are different because the
+mechanisms are different, and quoting the smaller one against the larger risk
+would be false.
+
+It is **$0.00 recurring.** The ~50 MB egress is the drill's download, already
+counted in §8 and unpriced until the first invoice.
+
+**When it can be retired:** if the Tier 2 target ever moves to a store outside
+this account, that target already satisfies §9 and this section becomes
+redundant. Until then it is required, not optional.
+
+### 9.5 Scope
+
+**§9 provisions nothing in Alibaba.** It creates no bucket, no identity, no
+rule, and grants no permission. It is an operator procedure and a retention
+decision, and it is listed here because leaving it in the design document is
+what caused it to be absent from the implementation.
+
+---
+
+## 10. Rollback, cleanup and verification
 
 ### Verification after each step
 
@@ -518,6 +603,8 @@ worth more than one performed on the box being recovered from.
 | Monitor | set the threshold to 0 temporarily | fault event appears in `worker_events` |
 | Retry idempotence | run the service twice in one day | second run exits 0, uploads nothing, creates no second object |
 | Delete markers | after a `daily/` object expires and its noncurrent copy ages out | no marker accumulates; `anchor/` unaffected |
+| **Off-account copy (§9)** | after each monthly drill | the **just-verified** ciphertext is retained outside the Alibaba account; **three** rolling copies present; the fourth-oldest removed only after the newest passed a drill; **at least one copy on a device that does not hold the `age` private identity** |
+| **Account-loss rehearsal (§9)** | once, before this plan is called complete | restore end to end from **an off-account copy and the private identity alone, with every Alibaba credential made unavailable for the duration**. If it needs any account access, §9 does not work and the gap is still open |
 
 ### Rollback
 
@@ -540,3 +627,9 @@ database or trading authority:
 The `anchor/` object and the pre-resize snapshot are deliberate artifacts with
 their own lifetimes, recorded in the design. Do not remove them as part of
 unwinding this work.
+
+**Nor the off-account copies (§9).** They are the only artifacts here that
+survive the account, so unwinding work *inside* the account is precisely the
+moment they matter most. Rolling this plan back does not make them obsolete —
+it leaves them as the last remaining recovery path, and they should be kept
+until something equivalent replaces them.
