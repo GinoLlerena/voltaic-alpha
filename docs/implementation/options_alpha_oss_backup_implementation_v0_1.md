@@ -6,7 +6,7 @@
 |---|---|
 | Version | v0.1 |
 | Date | 21 September 2026 |
-| Status | **Plan only. Nothing is implemented.** §0.1, §0.3 and §0.4 are resolved from documentation; §0.2 and §0.5 remain to verify at execution |
+| Status | **Plan only. Nothing is implemented.** §0 preflight executed 21 September against a scratch bucket, since deleted — results in §0.6. Only §0.5 remains open |
 | Design | [Deployment Cost Analysis §7.2](../improvements/options_alpha_deployment_cost_analysis_v0_1.md) |
 | Unblocked by | `CIIP-I-BLK-001`, resolved 21 September — OSS activated in the console |
 | Targets | A 24-hour off-host recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database. **Targets**, not guarantees — see §7.4 |
@@ -30,7 +30,7 @@
 Each of these changes the plan if it turns out otherwise. None is assumed below
 without being listed here.
 
-### 0.1 Versioning retention — **resolved from documentation**
+### 0.1 Versioning retention — **resolved from documentation, confirmed by preflight (§0.6)**
 
 Confirmed, not open. On a versioned bucket a current-version `Expiration`
 **creates a delete marker** and makes the object noncurrent;
@@ -46,10 +46,12 @@ sum of the two rules, not the first of them.
 survives as **execution validation** — confirming the rules were applied as
 intended — not as the gate on this decision.
 
-### 0.2 Archive objects cannot be read without `RestoreObject`
+### 0.2 Archive objects cannot be read without `RestoreObject` — **measured in preflight (§0.6)**
 
-Retrieving an Archive-class object requires a `RestoreObject` call and a wait —
-minutes to hours — before a `GetObject` succeeds.
+Retrieving an Archive-class object requires a `RestoreObject` call and a wait
+before a `GetObject` succeeds. **Measured 21 September: 49 seconds** for a small
+object in this region (§0.6). Reading before restore fails with
+`InvalidObjectState`.
 
 This lands on **§8 restore validation**: a drill that selects a `weekly/` object
 older than 7 days fails unless it restores first. The drill targets `daily/`
@@ -75,7 +77,7 @@ It also gets **no write to `anchor/`**: that prefix holds the one-time pre-resiz
 copy, written once by an operator, and there is no demonstrated need for an
 automated identity to touch it.
 
-### 0.4 Per-prefix noncurrent rules — **resolved from documentation**
+### 0.4 Per-prefix noncurrent rules — **resolved from documentation, confirmed by preflight (§0.6)**
 
 `NoncurrentVersionExpiration` is an element of a lifecycle rule, and a rule
 carries a prefix. The one-bucket layout with separate `daily/`, `weekly/` and
@@ -86,11 +88,58 @@ No three-bucket fallback is needed, and §1 stands. The scratch-bucket exercise
 remains **execution validation** — confirming the rules were applied as written
 — not an architectural decision gate.
 
-### 0.5 Archive minimum duration — already reasoned, still worth confirming
+### 0.5 Archive minimum duration — **the one item still open**; needs a real invoice
 
 A lifecycle-transitioned object counts the 60-day Archive minimum from its
 last-modified time, and `weekly/` expires at day 63, so no early-deletion charge
 should arise. Confirm against the first real invoice rather than the docs.
+
+### 0.6 Preflight results — executed 21 September 2026
+
+Run against a scratch bucket in `ap-southeast-1`, **deleted afterwards**; the
+account holds zero buckets. Every §0 question except §0.5 now has a measured
+answer, and all four came back as the plan assumed. The exercise also turned up
+**two things the plan had wrong**, neither of which §0 had thought to ask about;
+they are the reason preflight was worth running.
+
+| Check | Result |
+|---|---|
+| `CreateBucket`, versioning | Both succeed; `bucket-versioning --method get` returns `Enabled` |
+| **§0.4** per-prefix rules | **Confirmed.** Prefix-scoped `Transition`, `Expiration` and `NoncurrentVersionExpiration` all accepted and read back intact. One bucket, three prefixes stands |
+| **§0.1** delete markers | **Confirmed by observation.** After `DeleteObject` with no version id: a 0-byte delete marker becomes current, the original stays as a noncurrent version at its full size, and the key is unreadable without a version id. Expiry does not free bytes |
+| **§0.2** Archive retrieval | **Measured: 49 seconds** from `RestoreObject` to readable, for a small object. Reading before restore fails with `InvalidObjectState`. Materially better than the "minutes to hours" the plan assumed |
+| §0.5 Archive 60-day minimum | **Still open** — needs a real invoice |
+
+#### Finding 1 — `ExpiredObjectDeleteMarker` is silently dropped
+
+A rule carrying both `<Expiration><Days>7</Days></Expiration>` and
+`<Expiration><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>`
+was **accepted without error**, and the marker element was **silently discarded**.
+Reading the configuration back showed only the `Days` form. Nothing failed; the
+cleanup simply would not have existed.
+
+**The working form is a second rule on the same prefix** carrying only the
+marker element, which round-trips intact. So `daily/` and `weekly/` each need
+**two rules**, not one — four in total, plus none for `anchor/`.
+
+**Applying a lifecycle configuration is not evidence it was stored.** Read it
+back and compare, every time.
+
+#### Finding 2 — the `aliyun` CLI cannot do forbid-overwrite
+
+The embedded OSS client in `aliyun` 3.3.23 is ossutil 1.x-style: it has
+`lifecycle`, `bucket-versioning` and `restore`, but **no `api` subcommand**, so
+`ossutil api put-object` from §6.2 is unavailable through it.
+
+The obvious substitute does not work either. `cp --meta
+x-oss-forbid-overwrite:true` **was accepted and the object was overwritten** —
+the header is not honoured on that path. Versioning retained the original, which
+is exactly the backstop it exists to be, but the first line of defence was
+absent.
+
+**Consequence for §6.2, unchanged in intent and now load-bearing:** a pinned
+**ossutil 2.x must be installed on the host**. The `aliyun` CLI already present
+elsewhere is not a substitute, and no `--meta` flag approximates it.
 
 ---
 
@@ -137,8 +186,13 @@ rules say; the retained column is what is actually billed.
 current version on a versioned bucket creates a delete marker, and once the
 noncurrent bytes below it are gone the marker remains — one per expired object,
 forever, at roughly one per day and one per week. They are tiny, but they
-accumulate without limit and clutter every listing the monitor makes. Set
-`ExpiredObjectDeleteMarker` on `daily/` and `weekly/`.
+accumulate without limit and clutter every listing the monitor makes.
+
+**Each rotating prefix needs two rules**, not one: `ExpiredObjectDeleteMarker`
+cannot share an `Expiration` element with `Days`, and a rule combining them is
+accepted while the marker element is silently discarded (§0.6, finding 1). Four
+rules in total — rotation and marker cleanup for `daily/` and for `weekly/` —
+and none for `anchor/`.
 
 **`anchor/` is excluded from every rule**, including marker cleanup. It has no
 expiration, so it produces no markers, and the correct configuration for it is
@@ -280,6 +334,12 @@ that holds the broker credentials.
 
 Upload over the **internal endpoint**. The public endpoint appears nowhere in
 the service configuration.
+
+**The `aliyun` CLI is not a substitute, and this is now tested rather than
+assumed.** Its embedded OSS client has no `api` subcommand, and the closest
+alternative — `cp --meta x-oss-forbid-overwrite:true` — was accepted while the
+object was overwritten anyway (§0.6, finding 2). Installing pinned ossutil 2.x
+on the host is a prerequisite of this step, not a preference within it.
 
 ### 6.3 Weekly mechanics
 
@@ -426,7 +486,7 @@ worth more than one performed on the box being recovered from.
 |---|---|---|
 | Bucket | `ossutil stat oss://<bucket>` | exists, private ACL |
 | Versioning | `ossutil bucket-versioning --method get oss://<bucket>` | `Enabled` |
-| Lifecycle | `ossutil lifecycle --method get oss://<bucket>` | three prefixes as §3; `anchor/` absent from all rules |
+| Lifecycle | `ossutil lifecycle --method get oss://<bucket>` | **four rules** as §3 — rotation and marker cleanup for `daily/` and `weekly/`; `ExpiredObjectDeleteMarker` present in the read-back, not just in the request (§0.6); `anchor/` absent from all rules |
 | RAM uploader | upload as the backup identity; then attempt `rm`, a lifecycle write, a `GetObject`, and a write to `anchor/` | upload succeeds, **all four denied** |
 | RAM restore | `GetObject` as the restore identity | succeeds, and that identity is absent from ECS |
 | Forbid-overwrite | `put-object` the same dated key twice | second attempt **refused**, not silently replaced |
