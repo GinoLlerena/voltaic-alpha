@@ -40,3 +40,4 @@ and the [video script](../options_alpha_video_script_v0_1.md).
 | [Reuse ledger](options_alpha_reuse_ledger.md) | Pre-existing code and its provenance |
 | [Winner analysis (`WA-`)](options_alpha_winner_analysis_v0_1.md) | Forensic analysis of the winning hackathon entry, ALPHA HUNTER, and what to learn from it |
 | [Runner-up analysis (`RA-`)](options_alpha_runnerup_analysis_v0_1.md) | Forensic analysis of the second-place entry, TradePilot AI, and why its packaging beat ours |
+| [OSS backup implementation plan](options_alpha_oss_backup_implementation_v0_1.md) | Bucket, versioning, lifecycle, least-privilege RAM, `age` encryption, daily timer, 30-hour monitoring and restore drill — plan only, with the Alibaba behaviours that must be verified first |
