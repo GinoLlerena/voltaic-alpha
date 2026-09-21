@@ -226,7 +226,10 @@ No third-party repository, no pinned binary, no build step.
    `/etc/options-alpha-backup.pub`, world-readable is acceptable — it is public.
 4. The private identity **never** touches ECS, in any form, at any point.
 
-**Pipeline:** `pg_dump -Fc` → `age -r <recipient>` → upload. Plaintext is never
+**Pipeline:** **existing verified dump** → `age -r <recipient>` → OSS upload.
+The offsite service does **not** run `pg_dump`; it encrypts the dump that
+`options-alpha-backup.service` already produced and verified, selected from
+`/var/lib/options-alpha/backup.json` as §6.1 specifies. Plaintext is never
 written to OSS, and preferably never to disk: prefer a pipeline to a staged
 temporary file, and if a temporary file is unavoidable, place it under a
 root-only directory and remove it in a `trap`.
@@ -280,18 +283,29 @@ the service configuration.
 
 ### 6.3 Weekly mechanics
 
-On the weekly day the same artifact goes to both prefixes. **Encrypt once,
-upload the same ciphertext twice:**
+On the weekly day the dump belongs under both prefixes. **When both keys are
+missing — the ordinary case — encrypt once and upload that ciphertext twice:**
 
-1. Stage the ciphertext once, in a **root-only** runtime location —
-   `/run/options-alpha/` via `RuntimeDirectory=`, mode `0700`.
+1. Stage the ciphertext in a **root-only** runtime location **of its own** —
+   `RuntimeDirectory=options-alpha-backup-offsite`, giving
+   `/run/options-alpha-backup-offsite/`, mode `0700`.
+
+   **Not** `/run/options-alpha/`: that is the worker's existing
+   `RuntimeDirectory` and the repository treats its lifecycle as worker-owned.
+   Two units sharing one runtime directory means either can clear the other's
+   files on restart, and `health.json` already lives there.
 2. `put-object` it to `daily/YYYY-MM-DD.dump.age`.
 3. `put-object` the **same file** to `weekly/YYYY-MM-DD.dump.age`.
 4. Remove it in a `trap`, so it goes even on failure.
 
 No second `pg_dump`, no second encryption pass, and **no plaintext written
-anywhere outside the existing backup directory**. Staging under `/run` keeps
-the ciphertext off persistent storage entirely.
+anywhere outside the existing backup directory**. Staging under `/run` keeps the
+ciphertext off persistent storage entirely.
+
+**When only one key is missing**, because a previous run half-failed, the
+service encrypts and uploads that one alone and leaves the other untouched
+(§7.1). The repaired object will not match its sibling byte-for-byte — `age` is
+randomised — and does not need to.
 
 - Fires **every 4 hours** with `Persistent=true`, uploading **at most once per
   day** because the service is idempotent (§7.1). The cadence is the retry
@@ -308,15 +322,36 @@ would otherwise leave the recovery point 24 hours stale until the next run. That
 is a long time to lose to something that would have worked twenty minutes later.
 
 **Run the timer every 4 hours and make the service idempotent.** On each firing
-it lists `daily/` for today's key, using the prefix-scoped `oss:ListObjects`
-permission §4.1 already grants:
+it lists today's keys, using the prefix-scoped `oss:ListObjects` permission
+§4.1 already grants.
 
-- today's object present → **exit 0, upload nothing**;
-- absent → encrypt and upload.
+**Each destination key is checked independently.** An earlier draft checked only
+`daily/`, which has a hole on weekly days: if `daily/` uploads and `weekly/`
+fails, the next run sees `daily/` present, exits, and **`weekly/` is never
+retried** — the copy that carries 126 days of history silently missing while the
+mechanism reports success.
+
+| `daily/` | `weekly/` (weekly days only) | Action |
+|---|---|---|
+| present | present | exit 0, upload nothing |
+| **missing** | present | upload `daily/` only |
+| present | **missing** | upload `weekly/` only |
+| **missing** | **missing** | encrypt once, upload that ciphertext to both |
+
+An existing key is never touched, and forbid-overwrite (§6.2) is the backstop if
+a listing is stale.
+
+**Ciphertext is not expected to match across runs.** `age` encryption is
+randomised and the staged file is removed after every invocation, so a
+`weekly/` object repaired on a later run will differ byte-for-byte from the
+`daily/` object of the same date. That is correct and expected. What matters is
+that it is a **valid encrypted copy of the dump recorded for that date** —
+provenance, not byte equality. Only when both are written in one run do they
+share ciphertext, and nothing should depend on that.
 
 No extra permission, no lock file, no retry counter, and no second mechanism to
-maintain. A transient failure costs **at most 4 hours**, and the weekly upload
-inherits the same property.
+maintain. A transient failure costs **at most 4 hours**, for either destination
+independently.
 
 `Persistent=true` covers the case where the host was down at the scheduled time.
 Forbid-overwrite (§6.2) remains the backstop: if the listing is stale or racy,
@@ -400,7 +435,9 @@ worth more than one performed on the box being recovered from.
 | Timer | `systemctl list-timers options-alpha-backup-offsite` | scheduled, next run shown |
 | Source dump | run with `verified:false` in `backup.json` | service **refuses** and uploads nothing |
 | End to end | run the service once; list `daily/` | one object, size ≈ dump, **not** plaintext |
-| Weekly path | run on the weekly day | two keys, **identical ciphertext**, `/run` staging removed afterwards |
+| Weekly path | run on the weekly day | two keys written, staging under `/run/options-alpha-backup-offsite/` removed afterwards |
+| **Weekly retry** | force `weekly/` to fail after `daily/` succeeds, then run again | second run creates `weekly/` and **leaves `daily/` untouched** — same size, same `LastModified` |
+| Staging isolation | restart `options-alpha-worker` mid-cycle | `/run/options-alpha/health.json` unaffected; offsite staging is in its own directory |
 | Encryption | `ossutil cat` the first bytes | `age-encryption.org/v1`, never SQL |
 | Monitor | set the threshold to 0 temporarily | fault event appears in `worker_events` |
 | Retry idempotence | run the service twice in one day | second run exits 0, uploads nothing, creates no second object |
