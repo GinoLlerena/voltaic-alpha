@@ -271,7 +271,34 @@ client-side. Any future check must assert page content, not status.
 
 ### Blocked, and on whom
 
-#### `CIIP-I-BLK-001` — OSS is disabled on the account
+#### `CIIP-I-BLK-001` — OSS is disabled on the account — **RESOLVED 21 September 2026**
+
+**Resolution.** OSS was **activated in the console**, and `CreateBucket` now
+succeeds. Probed four times across four hours on 20–21 September:
+
+| Time (UTC) | `CreateBucket` |
+|---|---|
+| 20 Sep 21:16Z | **refused** — `UserDisable` |
+| 20 Sep 22:03Z | succeeded, followed by a full round trip: put, list, get with **identical bytes**, delete object, delete bucket |
+| 20 Sep 23:05Z | succeeded |
+| 21 Sep 01:05Z | succeeded |
+
+Every probe bucket was deleted; the account holds none. The cause was activation,
+not the balance: `AvailableAmount` was $0.00 across all four probes, so the
+original diagnosis below — that the balance was what stopped OSS serving — was
+**wrong**, and is left in place as what was believed at the time.
+
+One lesson is worth carrying: `ListBuckets` answered throughout, including while
+`CreateBucket` refused. A service can be reachable and still refuse the operation
+you need, so probe the operation you depend on rather than a neighbouring one.
+
+This unblocks the off-host backup target. It does **not** by itself satisfy
+`CIIP-I-002`'s 30-day PITR requirement, which needs WAL archiving rather than
+periodic dumps, and that remains separately tracked.
+
+---
+
+*The original record, as written on 10 September 2026:*
 
 Creating the archive bucket fails with `StatusCode=403, ErrorCode=UserDisable`.
 The account shows **$0.00 available with $21.93 of September ECS accrued and
@@ -918,18 +945,20 @@ a suspension risk. Verified 20 September: reads answer normally, and
 *state* error, not `Forbidden`, `NotEnoughBalance` or an overdue code. Billing is
 a pre-flight check before a maintenance window, not a blocker.
 
-### `CIIP-I-BLK-001` is unaffected, and stands
+### `CIIP-I-BLK-001` is a separate finding, and is now resolved
 
-The billing correction does **not** release the OSS blocker, and the two should
-not be confused. Re-tested 20 September: `ListBuckets` answers, but
-**`CreateBucket` still returns `UserDisable`** — the same code §10 recorded. The
-probe bucket was deleted; nothing was provisioned. `ListBuckets` succeeding was
-never sufficient evidence, and the archive bucket remains impossible to create.
+The billing correction did not release the OSS blocker, and the two were
+repeatedly conflated. They resolved separately and for different reasons.
 
-The practical consequence is that the intended off-host backup target is
-unavailable, so the daily copy must go to a third-party object store — priced at
-$0.035–0.134/month at a six-month horizon — or, as an interim measure only, be
-pulled by an operator.
+Re-tested through 20–21 September: `CreateBucket` refused with `UserDisable` at
+21:16Z, then succeeded at 22:03Z, 23:05Z and 01:05Z after **OSS was activated in
+the console**. The balance was $0.00 throughout, so activation — not settlement —
+was the cause. Recorded in full at `CIIP-I-BLK-001` above.
+
+The practical consequence is that OSS is available as the off-host backup
+target, at roughly $0.023/month at steady state for the retention policy in the
+cost analysis — cheaper and simpler than the third-party store that would
+otherwise have been required.
 
 ### The cost finding
 

@@ -39,18 +39,17 @@ evidence says it is not:
 |---|---|
 | `DescribeInstanceStatus`, `DescribeSecurityGroups` | answer normally |
 | `ModifyInstanceSpec --DryRun` | `InvalidInstanceStatus.NotStopped` — a *state* error, not `Forbidden`, `NotEnoughBalance` or an overdue code |
-| `oss ListBuckets` | **answers** (0 buckets) — where `CIIP-I-BLK-001` recorded `403 UserDisable` |
+| `oss CreateBucket` | **succeeds** since activation — 3 of 4 probes across four hours; `CIIP-I-BLK-001` resolved |
 
-That last row moved twice in one evening, and the explanation is mundane:
-`CreateBucket` refused with `UserDisable` at 21:16Z and succeeded at 22:03Z
-because **OSS was activated in the console between the two tests**. The service
-was not enabled on the account; then it was. Delayed probes are running to
-confirm it stays enabled, after which `CIIP-I-BLK-001` can be recorded as
-resolved rather than merely quiet.
+That last row is now settled. `CreateBucket` refused with `UserDisable` at
+21:16Z on 20 September and succeeded at 22:03Z because **OSS was activated in
+the console** between the two tests. Confirmed by delayed probes at **23:05Z and
+01:05Z**, both successful, with `AvailableAmount` at $0.00 throughout — so the
+cause was activation, not the balance. **`CIIP-I-BLK-001` is resolved.**
 
-`ListBuckets` answering while `CreateBucket` refused was the tell, and it is
-worth keeping: a service can be reachable and still refuse the operation you
-need. §7.2 tests the operation it depends on, not a neighbouring one.
+`ListBuckets` answered the whole time, including while `CreateBucket` refused.
+That is the lesson worth keeping: a service can be reachable and still refuse
+the operation you need, so §7.2 probes the operation it depends on.
 
 **Treatment:** billing is not a gate. Confirm no restriction in the same hour as
 any maintenance window, because a host that stops and will not restart is the
@@ -510,12 +509,26 @@ invitation-only, so the design must not depend on it. If separate buckets are
 later used per horizon, or ObjectWorm is confirmed available on this account,
 WORM becomes available as an upgrade; until then, versioning is the mechanism.
 
-Alongside it, scope the uploader's RAM policy to the backup prefixes and deny
-`DeleteObject`, **`DeleteObjectVersion`** (so a specific version cannot be
-purged), `PutBucketVersioning` (so versioning cannot be suspended),
-`PutBucketLifecycle` and `PutBucketWorm`. The uploader may create objects and
-nothing else; it cannot remove history, disable the protection that retains it,
-or rewrite the rules that bound it.
+##### The uploader's permissions, for the implementation phase
+
+Grant the **minimum and nothing beyond it**. Written as an allow-list rather
+than a deny-list, because a deny-list silently grants whatever it forgot to
+name:
+
+| Allowed | Why |
+|---|---|
+| `oss:PutObject` on the backup prefixes only | Writing the daily object is the uploader's entire job |
+| The minimum read/list the object-age monitor needs — `oss:GetBucket`/`ListObjects` scoped to those prefixes, or `oss:GetObjectMeta` | The 30-hour age check must read the newest object's timestamp. Nothing more; it does not need to read backup contents, and cannot decrypt them anyway |
+
+Everything else is withheld: **no delete of any kind** (`DeleteObject`,
+`DeleteObjectVersion`), **no version management** (`PutBucketVersioning`), **no
+lifecycle management** (`PutBucketLifecycle`), **no WORM configuration**
+(`PutBucketWorm`), and **no broad OSS access** — not `oss:*`, not bucket
+creation, not access to any other bucket or prefix in the account.
+
+The uploader may create objects and read their metadata. It cannot remove
+history, disable the protection that retains it, or rewrite the rules that bound
+it.
 
 With versioning in place and that policy applied, the accurate claim is: **a
 compromised host can write new objects and can obscure the newest backup, but
@@ -849,6 +862,13 @@ quoted from today's data size.
 
 *Scope.* The recommended change is an in-place resize, so no second host is
 created and nothing is deleted afterwards.
+
+**v0.5 — 21 September 2026.** `CIIP-I-BLK-001` **resolved**: `CreateBucket`
+succeeded at 22:03Z, 23:05Z and 01:05Z after refusing at 21:16Z, with the
+balance at $0.00 throughout, so OSS activation was the cause. The uploader's
+permissions are specified as an allow-list for the implementation phase —
+`PutObject` on the backup prefixes plus the minimum read the age monitor needs,
+and nothing else.
 
 **v0.4 — 20 September 2026.** Backup design settled on OSS, which was
 **activated in the console** between a refused and a successful `CreateBucket` —
