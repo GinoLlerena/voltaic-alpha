@@ -510,8 +510,12 @@ protected. None of them survives that account failing.
 Two failure modes, neither addressed above:
 
 - **The account becomes inaccessible** — suspension, billing lock, closure,
-  lost root credentials. ECS and OSS go together, because they are the same
-  account. There is no partial outcome here.
+  lost root credentials. ECS and OSS sit in the **same Alibaba account and
+  therefore share an account-level failure domain**. How an individual event
+  lands on each service is not something this plan can predict, and it does not
+  need to: **the DR plan must not depend on either remaining available during an
+  account-loss event.** Planning around a partial outcome would be planning
+  around a guess.
 - **The account is compromised at root or RAM-admin level.** An attacker with
   console access deletes object versions, strips the lifecycle rules, or deletes
   the bucket. The uploader's denied `DeleteObject` protects against a compromised
@@ -551,10 +555,14 @@ production host**, which reintroduces on ECS exactly the blast radius §4 and §
 are arranged to contain. A monthly manual action attached to an existing monthly
 task is the proportionate answer to a tail risk.
 
-**Nothing automated can detect a missed Tier 3 copy.** Anything that could would
-have to run inside the account it exists to survive, or on a second always-on
-machine. Its detection is the drill record in §8: the copy and the drill fail
-together, visibly, in the same checklist entry.
+**This design intentionally does not add automated Tier 3 monitoring.** An
+external service could track completion, so this is a choice rather than a
+limit. Any such monitor is another external dependency — one more account,
+credential and failure mode — attached to a control whose entire purpose is
+reducing dependence on a single provider. **Completion is evidenced by the
+monthly drill and checklist record in §8**: the copy and the drill are recorded
+together, so a missed copy is visible in the same entry. We accept that
+operational tradeoff knowingly.
 
 ### 9.4 What this buys, stated honestly
 
