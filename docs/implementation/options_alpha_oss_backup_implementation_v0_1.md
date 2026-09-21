@@ -6,10 +6,10 @@
 |---|---|
 | Version | v0.1 |
 | Date | 21 September 2026 |
-| Status | **Plan only. Nothing is implemented.** §0.1 and §0.3 are resolved from documentation; §0.2, §0.4 and §0.5 remain to verify at execution |
+| Status | **Plan only. Nothing is implemented.** §0.1, §0.3 and §0.4 are resolved from documentation; §0.2 and §0.5 remain to verify at execution |
 | Design | [Deployment Cost Analysis §7.2](../improvements/options_alpha_deployment_cost_analysis_v0_1.md) |
 | Unblocked by | `CIIP-I-BLK-001`, resolved 21 September — OSS activated in the console |
-| Delivers | A 24-hour off-host recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database |
+| Targets | A 24-hour off-host recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database. **Targets**, not guarantees — see §7.4 |
 | Does **not** deliver | `CIIP-I-002`'s 30-day PITR, which needs WAL archiving rather than periodic dumps |
 
 ### Host facts, measured 21 September
@@ -75,12 +75,16 @@ It also gets **no write to `anchor/`**: that prefix holds the one-time pre-resiz
 copy, written once by an operator, and there is no demonstrated need for an
 automated identity to touch it.
 
-### 0.4 Per-prefix noncurrent rules
+### 0.4 Per-prefix noncurrent rules — **resolved from documentation**
 
-Confirm OSS lifecycle supports `NoncurrentVersionExpiration` **filtered by
-prefix**, so `daily/`, `weekly/` and `anchor/` can differ. If rules are
-bucket-wide only, the layout needs three buckets instead of three prefixes, and
-§1 changes.
+`NoncurrentVersionExpiration` is an element of a lifecycle rule, and a rule
+carries a prefix. The one-bucket layout with separate `daily/`, `weekly/` and
+`anchor/` prefixes is therefore supported as designed: three rules, three
+prefixes, different noncurrent behaviour in each.
+
+No three-bucket fallback is needed, and §1 stands. The scratch-bucket exercise
+remains **execution validation** — confirming the rules were applied as written
+— not an architectural decision gate.
 
 ### 0.5 Archive minimum duration — already reasoned, still worth confirming
 
@@ -123,14 +127,22 @@ defended against.
 Restated for versioned-bucket semantics (§0.1). The nominal column is what the
 rules say; the retained column is what is actually billed.
 
-| Prefix | Current version | Noncurrent versions | Bytes retained | Purpose |
+| Prefix | Current version | Noncurrent versions | Delete markers | Bytes retained |
 |---|---|---|---|---|
-| `daily/` | expire at 7 days | expire 7 days after becoming noncurrent | **~14 days** | Rolling recent history |
-| `weekly/` | transition to Archive at 7 days, expire at 63 | expire 63 days after becoming noncurrent | **~126 days** | Cheap medium history |
-| `anchor/` | **no rule** | **no rule** | indefinite | The pre-resize copy. Removed only by explicit human action |
+| `daily/` | expire at 7 days | expire 7 days after becoming noncurrent | **cleaned up** | ~14 days |
+| `weekly/` | transition to Archive at 7 days, expire at 63 | expire 63 days after becoming noncurrent | **cleaned up** | ~126 days |
+| `anchor/` | **no rule** | **no rule** | **untouched** | indefinite |
 
-`anchor/` must be excluded from every rule, not merely given a long one. A rule
-with a large number still deletes eventually; no rule never does.
+**Delete markers must be cleaned up on the rotating prefixes.** Expiring a
+current version on a versioned bucket creates a delete marker, and once the
+noncurrent bytes below it are gone the marker remains — one per expired object,
+forever, at roughly one per day and one per week. They are tiny, but they
+accumulate without limit and clutter every listing the monitor makes. Set
+`ExpiredObjectDeleteMarker` on `daily/` and `weekly/`.
+
+**`anchor/` is excluded from every rule**, including marker cleanup. It has no
+expiration, so it produces no markers, and the correct configuration for it is
+no rule at all — not a rule with a large number, which still deletes eventually.
 
 ### Corrected cost
 
@@ -281,31 +293,74 @@ No second `pg_dump`, no second encryption pass, and **no plaintext written
 anywhere outside the existing backup directory**. Staging under `/run` keeps
 the ciphertext off persistent storage entirely.
 
-- Runs once daily, `Persistent=true`, so a missed run fires on boot.
+- Fires **every 4 hours** with `Persistent=true`, uploading **at most once per
+  day** because the service is idempotent (§7.1). The cadence is the retry
+  mechanism, not a higher backup frequency.
 - Records the outcome to `worker_events` as a durable fact, per §7.
 - Never deletes anything, locally or remotely.
 
-## 7. Monitoring: 30-hour object age
+## 7. Retry and monitoring
 
-The mechanism that makes 24 hours a property rather than an intention.
+### 7.1 Automatic retry, so one bad afternoon does not cost a day
 
-1. **Age check.** Extend the existing watchdog to read the newest `daily/`
-   object's `LastModified` and fail when it exceeds **30 hours** — one cycle
-   plus margin.
-2. **Durable failure reporting.** An upload can fail while the API call
-   succeeds; `UserDisable` was exactly that shape. Record any non-2xx as a fault
-   event in `worker_events`, so it survives a log rotation and is visible on the
-   dashboard rather than only in the journal.
-3. **A dead host cannot report itself, and this task does not fix that.** The
-   age check runs on the host, so it covers exactly one failure: **uploads
-   stopped while the host is alive.** That is the failure this design makes
-   likely, and it is worth covering.
+A daily upload that fails transiently — a network blip, a brief API refusal —
+would otherwise leave the recovery point 24 hours stale until the next run. That
+is a long time to lose to something that would have worked twenty minutes later.
 
-   An earlier draft claimed host loss was "already visible through the stale
-   worker lease on the dashboard". That was circular — **the dashboard runs on
-   the same ECS host**, so a dead host cannot surface its own death through it.
-   External availability monitoring is a real gap, a separate concern, and
-   explicitly **out of scope here**. It should not be described as covered.
+**Run the timer every 4 hours and make the service idempotent.** On each firing
+it lists `daily/` for today's key, using the prefix-scoped `oss:ListObjects`
+permission §4.1 already grants:
+
+- today's object present → **exit 0, upload nothing**;
+- absent → encrypt and upload.
+
+No extra permission, no lock file, no retry counter, and no second mechanism to
+maintain. A transient failure costs **at most 4 hours**, and the weekly upload
+inherits the same property.
+
+`Persistent=true` covers the case where the host was down at the scheduled time.
+Forbid-overwrite (§6.2) remains the backstop: if the listing is stale or racy,
+the upload is refused rather than replacing a good object.
+
+### 7.2 The 30-hour age check
+
+The existing watchdog reads the newest `daily/` object's `LastModified` from
+`ListObjectsV2` and fails when it exceeds **30 hours** — one daily cycle plus
+margin, which with 4-hourly retries means roughly six attempts have failed
+before it fires.
+
+### 7.3 Durable failure reporting
+
+An upload can fail while the API call succeeds; `UserDisable` was exactly that
+shape. Record any non-2xx as a fault event in `worker_events`, so it survives a
+log rotation and is visible on the dashboard rather than only in the journal.
+
+### 7.4 What this does and does not guarantee
+
+Stated plainly, because "24-hour RPO" is easy to read as a promise:
+
+- A daily upload with 4-hourly retries **targets** a 24-hour recovery point.
+- The 30-hour alarm **detects a breach** of it.
+- **Neither guarantees it.** If OSS is unreachable for two days, the recovery
+  point is two days old. Monitoring does not prevent that; it ensures the gap is
+  *known* rather than discovered during a recovery.
+
+The honest claim is: **a 24-hour target, with transient failures absorbed by
+retry and sustained failures surfaced within 30 hours.** A guarantee would
+require a second independent target, which this design does not have and does
+not need at this value of data.
+
+### 7.5 A dead host cannot report itself, and this task does not fix that
+
+The age check runs on the host, so it covers exactly one failure: **uploads
+stopped while the host is alive.** That is the failure this design makes likely,
+and it is worth covering.
+
+An earlier draft claimed host loss was "already visible through the stale worker
+lease on the dashboard". That was circular — **the dashboard runs on the same
+ECS host**, so a dead host cannot surface its own death through it. External
+availability monitoring is a real gap, a separate concern, and explicitly **out
+of scope here**. It should not be described as covered.
 
 ## 8. Monthly restore validation
 
@@ -348,6 +403,8 @@ worth more than one performed on the box being recovered from.
 | Weekly path | run on the weekly day | two keys, **identical ciphertext**, `/run` staging removed afterwards |
 | Encryption | `ossutil cat` the first bytes | `age-encryption.org/v1`, never SQL |
 | Monitor | set the threshold to 0 temporarily | fault event appears in `worker_events` |
+| Retry idempotence | run the service twice in one day | second run exits 0, uploads nothing, creates no second object |
+| Delete markers | after a `daily/` object expires and its noncurrent copy ages out | no marker accumulates; `anchor/` unaffected |
 
 ### Rollback
 
