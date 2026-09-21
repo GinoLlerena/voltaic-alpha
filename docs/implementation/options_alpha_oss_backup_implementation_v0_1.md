@@ -49,9 +49,16 @@ intended — not as the gate on this decision.
 ### 0.2 Archive objects cannot be read without `RestoreObject` — **measured in preflight (§0.6)**
 
 Retrieving an Archive-class object requires a `RestoreObject` call and a wait
-before a `GetObject` succeeds. **Measured 21 September: 49 seconds** for a small
+before a `GetObject` succeeds. **Observed 21 September: 49 seconds** for a small
 object in this region (§0.6). Reading before restore fails with
 `InvalidObjectState`.
+
+**That 49 seconds is one measurement, not a recovery-time guarantee.** It is a
+single small object, in one region, on one day, with no documented service
+commitment behind it. Alibaba publishes no restore-latency SLA for Archive that
+this plan relies on. Treat the documented "minutes to hours" as the planning
+figure and the 49 seconds as evidence that the drill in §8 is practical to run —
+never as an input to an RTO promised to anyone.
 
 This lands on **§8 restore validation**: a drill that selects a `weekly/` object
 older than 7 days fails unless it restores first. The drill targets `daily/`
@@ -92,7 +99,12 @@ remains **execution validation** — confirming the rules were applied as writte
 
 A lifecycle-transitioned object counts the 60-day Archive minimum from its
 last-modified time, and `weekly/` expires at day 63, so no early-deletion charge
-should arise. Confirm against the first real invoice rather than the docs.
+should arise.
+
+**This stays open until a real invoice confirms it.** It cannot be closed by
+documentation or by a scratch-bucket exercise — only billing shows whether an
+early-deletion charge appears. The §3 cost figures are therefore **projections**
+until the first invoice covering a full `weekly/` rotation is read against them.
 
 ### 0.6 Preflight results — executed 21 September 2026
 
@@ -107,7 +119,7 @@ they are the reason preflight was worth running.
 | `CreateBucket`, versioning | Both succeed; `bucket-versioning --method get` returns `Enabled` |
 | **§0.4** per-prefix rules | **Confirmed.** Prefix-scoped `Transition`, `Expiration` and `NoncurrentVersionExpiration` all accepted and read back intact. One bucket, three prefixes stands |
 | **§0.1** delete markers | **Confirmed by observation.** After `DeleteObject` with no version id: a 0-byte delete marker becomes current, the original stays as a noncurrent version at its full size, and the key is unreadable without a version id. Expiry does not free bytes |
-| **§0.2** Archive retrieval | **Measured: 49 seconds** from `RestoreObject` to readable, for a small object. Reading before restore fails with `InvalidObjectState`. Materially better than the "minutes to hours" the plan assumed |
+| **§0.2** Archive retrieval | **Observed: 49 seconds** from `RestoreObject` to readable, for one small object on one day. Reading before restore fails with `InvalidObjectState`. Faster than the documented "minutes to hours" — but a single observation with no SLA behind it, so it stays an observation and **not** a recovery-time commitment (§0.2) |
 | §0.5 Archive 60-day minimum | **Still open** — needs a real invoice |
 
 #### Finding 1 — `ExpiredObjectDeleteMarker` is silently dropped
@@ -328,7 +340,11 @@ it — which is the same destructive path versioning exists to catch, refused on
 layer earlier.
 
 Install a **pinned official ossutil 2.x** and **verify Alibaba's published
-SHA-256** during installation. Not an unpinned installer script: a backup path
+SHA-256** during installation. The exact version is chosen and recorded at
+install time — it is not asserted here, because a version pinned in a document
+months earlier is a pin to something nobody checked. What this plan requires is
+that **some** exact version is pinned, its digest verified against Alibaba's
+published value, and both written into the completion record. Not an unpinned installer script: a backup path
 that fetches and executes whatever is current is a supply chain into the host
 that holds the broker credentials.
 
@@ -489,8 +505,8 @@ worth more than one performed on the box being recovered from.
 | Lifecycle | `ossutil lifecycle --method get oss://<bucket>` | **four rules** as §3 — rotation and marker cleanup for `daily/` and `weekly/`; `ExpiredObjectDeleteMarker` present in the read-back, not just in the request (§0.6); `anchor/` absent from all rules |
 | RAM uploader | upload as the backup identity; then attempt `rm`, a lifecycle write, a `GetObject`, and a write to `anchor/` | upload succeeds, **all four denied** |
 | RAM restore | `GetObject` as the restore identity | succeeds, and that identity is absent from ECS |
-| Forbid-overwrite | `put-object` the same dated key twice | second attempt **refused**, not silently replaced |
-| ossutil | compare the installed binary against Alibaba's published SHA-256 | matches the pinned 2.x release |
+| Forbid-overwrite | `put-object` the same dated key, twice, with **different content** the second time | second attempt **refused**; then `ossutil stat` and a `GetObject` show the key still carries the **first** object — same size, same ETag, same `LastModified` — and `--all-versions` shows **one** version, i.e. nothing was written and then superseded |
+| ossutil pin | `ossutil --version`, and the install script's recorded version and checksum | matches the exact 2.x version pinned in the installer and Alibaba's published SHA-256 for it. **Never `latest`, never an unpinned installer script.** The version and digest go in the completion record |
 | `age` | `age -r <pub> </dev/null \| age -d -i <identity>` on the operator machine | round-trips |
 | Timer | `systemctl list-timers options-alpha-backup-offsite` | scheduled, next run shown |
 | Source dump | run with `verified:false` in `backup.json` | service **refuses** and uploads nothing |
