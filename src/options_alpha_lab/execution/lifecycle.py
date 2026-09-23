@@ -861,6 +861,48 @@ class LifecycleStore:
                     position.lifecycle_status = PositionState.INCIDENT.value
         return incident_id
 
+    def resolve_incident(
+        self, incident_id: str, *, reason: str, now: datetime | None = None
+    ) -> bool:
+        """Close one open incident, and record why beside what happened.
+
+        Returns False when the id is unknown or already resolved: closing an
+        incident twice would overwrite the first resolution's record.
+
+        The reason is appended to `detail` rather than stored in a column of its
+        own, so no migration is needed; the original text is kept, and the
+        deduplication in `open_incident` only compares *open* rows, so changing a
+        row as it closes cannot disturb it. An empty reason is refused: an
+        incident closed without saying why is indistinguishable from one that
+        was simply made to go away.
+        """
+        why = reason.strip()
+        if not why:
+            raise ValueError("resolving an incident requires a reason")
+        stamp = now or datetime.now(UTC)
+        with self._session() as session:
+            row = session.get(Incident, incident_id)
+            if row is None or row.resolved_at is not None:
+                return False
+            row.resolved_at = stamp
+            row.detail = f"{row.detail}\n[resolved {stamp.isoformat(timespec='seconds')}: {why}]"
+            return True
+
+    def resolve_open(
+        self, *, kind: str, reason: str, now: datetime | None = None
+    ) -> list[str]:
+        """Close every open incident of one kind that belongs to no position.
+
+        For conditions that heal on their own and are re-observed every cycle,
+        such as broker reachability. Position-scoped incidents are never touched
+        here: those halt a specific position and need a decision, not a retry.
+        """
+        ids = [
+            record.incident_id for record in self.open_incidents()
+            if record.kind == kind and record.position_id is None
+        ]
+        return [i for i in ids if self.resolve_incident(i, reason=reason, now=now)]
+
     def open_incidents(self) -> list[IncidentRecord]:
         with self._session() as session:
             return [
