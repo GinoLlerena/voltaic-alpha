@@ -1,0 +1,13 @@
+[Unit]
+Description=Copy the newest verified dump off-host, retried every four hours
+
+[Timer]
+# Every four hours at :30, clear of the hourly dump at :00. The service uploads
+# at most once a day; the cadence is the retry, not a higher backup frequency,
+# so a transient failure costs at most four hours (plan §7.1).
+OnCalendar=*-*-* 00/4:30:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

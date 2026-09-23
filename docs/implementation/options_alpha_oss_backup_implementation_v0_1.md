@@ -6,7 +6,7 @@
 |---|---|
 | Version | v0.1 |
 | Date | 21 September 2026 |
-| Status | **Plan only. Nothing is implemented.** §0 preflight executed 21 September against a scratch bucket, since deleted — results in §0.6. Only §0.5 remains open |
+| Status | **§1–§7 implemented, 21–23 September 2026** — completion records inline. §8 and §9 are operator procedures, first run recorded in §8. §0.5 stays open until a real invoice |
 | Design | [Deployment Cost Analysis §7.2](../improvements/options_alpha_deployment_cost_analysis_v0_1.md) |
 | Unblocked by | `CIIP-I-BLK-001`, resolved 21 September — OSS activated in the console |
 | Targets | A 24-hour **off-host** recovery point for the one irrecoverable asset: a ~50 MB PostgreSQL database. **Targets**, not guarantees — see §7.4 |
@@ -272,9 +272,12 @@ it, so none gets it.
 `oss:PutBucketVersioning`, `oss:PutBucketLifecycle`, `oss:PutBucketWorm`,
 `oss:GetObject`, any access to other buckets, and bucket creation.
 
-Key in `/etc/options-alpha-backup.env`, mode `0600`, root-owned, referenced by
-`EnvironmentFile=`. **Not** in `/etc/options-alpha.env` — the backup identity
-and the broker identity should not share a blast radius.
+**As implemented, a role rather than a key (§4.3):** the ECS instance RAM role
+`oa-backup-uploader-role`. `/etc/options-alpha-backup.env` (mode `0600`,
+root-owned, referenced by `EnvironmentFile=`) carries only the bucket, region,
+endpoint and `OSS_MODE=EcsRamRole` — no credential. **Not** in
+`/etc/options-alpha.env` — the backup identity and the broker identity should
+not share a blast radius.
 
 ### 4.2 The restore identity (operator machine only)
 
@@ -289,6 +292,64 @@ Used by §8 and by a real recovery. **Never installed on ECS.**
 These are precisely the permissions the uploader must not have. If a single
 identity ends up holding both sets, the separation is gone whether or not the
 key files are separate.
+
+### 4.3 As implemented — roles, not AccessKeys (23 September 2026)
+
+The plan above assumed two RAM **users** with long-lived AccessKeys. Both
+identities were built as **RAM roles** instead, so no long-lived backup
+credential exists anywhere:
+
+| Identity | Mechanism | Policy | How it authenticates |
+|---|---|---|---|
+| Uploader | ECS **instance RAM role** `oa-backup-uploader-role`, trusted service ECS | `oa-backup-uploader` | Short-lived credentials from the instance metadata service; `ossutil --mode EcsRamRole` |
+| Restore | RAM role `oa-backup-restore-role`, trusted: the current account | `oa-backup-restore` | `sts:AssumeRole` from the operator machine for one hour at a time, via `~/.config/options-alpha/oa-restore`, which holds no secret |
+
+The operator user is allowed to assume the restore role by a third policy,
+`oa-assume-backup-restore`, naming that role's ARN alone. **`oss:RestoreObject`
+stays ungranted:** the §8 drill uses `daily/`; recovering an archived `weekly/`
+object grants it temporarily and revokes it afterwards.
+
+**Why roles.** A key had to be created per user, the account's operator user
+already held its limit of two, and a key on disk is a secret to protect for as
+long as it exists. A role's credentials expire on their own.
+
+**The trade-off, stated.** Any root process on the host can obtain the
+uploader role's credentials from the metadata service. The worker already runs
+as root and could have read a `0600` key file equally, so nothing is lost; what
+is gained is that there is no long-lived secret to leak. On the operator side,
+the restore role is reached *through* the operator's own key, so that key's
+safety bounds the restore path — acceptable, because it already has broader
+rights than the restore role grants.
+
+**Verified 23 September 2026**, as the identity itself, against the live bucket:
+
+| # | As | Operation | Expected | Result |
+|---|---|---|---|---|
+| U1 | uploader | `PutObject daily/` | allow | allowed |
+| U2 | uploader | `GetObject` | deny | 403 `AccessDenied`, EC `0003-00000201` (explicit Deny) |
+| U3 | uploader | `PutObject anchor/` | deny | 403, EC `0003-00000201` |
+| U4 | uploader | `DeleteObject` | deny | 403, EC `0003-00000201` |
+| U5 | uploader | `PutBucketVersioning` | deny | 403, EC `0003-00000201` |
+| U6 | uploader | `PutBucketLifecycle` | deny | 403, EC `0003-00000201` |
+| U7 | uploader | `PutBucketPolicy` | deny | 403, EC `0003-00000201` |
+| U8 | uploader | `ListObjects` prefix `daily/` | allow | allowed |
+| U9 | uploader | `ListObjects` prefix `anchor/` | deny | 403, EC `0003-00000001` (no Allow matched) |
+| U10 | uploader | `ListObjects`, no prefix | deny | 403, EC `0003-00000001` |
+| V1 | uploader | same key written twice, different content | accepted, first kept | **accepted**; two versions, the 12-byte original retained as noncurrent |
+| R1 | restore | `GetObject` of the uploader's object | allow | allowed; content SHA-256 identical |
+| R2–R3 | restore | `PutObject daily/`, `anchor/` | deny | 403, EC `0003-00000201` |
+| R4–R7 | restore | `DeleteObject`, versioning, lifecycle, policy | deny | 403, EC `0003-00000201` |
+| R8 | restore | `ListObjects` | allow | allowed |
+
+Negative tests sent payloads that change nothing if wrongly accepted:
+versioning `Enabled` (already so), the **exact current** lifecycle
+configuration, and a policy denying only bucket deletion. `NoSuchBucketPolicy`
+afterwards confirmed U7 created nothing. OSS words every RAM denial "Access
+denied by bucket policy"; there is no bucket policy. Every test object and
+version was removed through the operator path; the bucket was left at 0 objects.
+
+V1 is the measured form of §0.6 finding 2: on this versioned bucket a second
+write to a key is accepted, and versioning is what keeps the first.
 
 ## 5. `age` encryption
 
@@ -318,6 +379,19 @@ root-only directory and remove it in a `trap`.
 
 Symmetric encryption is not an acceptable substitute, and the private key is not
 to be generated on ECS and moved off. Generating off-host is the requirement.
+
+### 5.1 Completion record — 23 September 2026
+
+| | |
+|---|---|
+| Recipient (public) | `age1mu9zsr6h9yc5myzg5hh3hlydkx9fmellx4233jsc4d6yzml8w3eqjv8qn8` |
+| On the host | `/etc/options-alpha-backup.pub`, `root:root 0644`; `age` `1.1.1-1ubuntu0.24.04.3` from Ubuntu's archive |
+| Identity generated | on the operator Mac, `age-keygen` writing straight to the primary path — never on ECS, never in a temporary directory |
+| Primary copy | `~/.config/options-alpha/keys/age-backup.key`, file `0600`, directory `0700` |
+| Second copy | encrypted removable drive (APFS, FileVault on, GUID), `options-alpha-recovery/age-backup.key`, stored apart from the Mac. It was first presented as unencrypted HFS+ and reformatted before anything was written |
+| Identical | `cmp` byte-identical; both derive the same recipient |
+| Round trip | a message encrypted **on the host** decrypted with **each** copy separately; a random identity is refused |
+| On the host | zero `AGE-SECRET-KEY` files under `/etc`, `/root`, `/opt/options-alpha`, `/var/lib/options-alpha` |
 
 ## 6. Daily upload timer
 
@@ -543,6 +617,53 @@ ECS host**, so a dead host cannot surface its own death through it. External
 availability monitoring is a real gap, a separate concern, and explicitly **out
 of scope here**. It should not be described as covered.
 
+### 7.6 As implemented — 23 September 2026
+
+**The uploader is a Python module, `options_alpha_lab.offsite`**, not a shell
+script, so each rule above is a unit test: refusal of an unverified, stale or
+altered dump; one encryption uploaded to every missing key; per-key retry that
+leaves a present `daily/` untouched; a landed-size check after each upload; no
+credential on any command line. Units:
+`options-alpha-backup-offsite.{service,timer}`, installed by
+`deploy/install_units.sh`.
+
+Decisions this section did not make, recorded:
+
+- **The weekly day is Sunday (UTC).** The plan names none. Sunday's dump is
+  taken with the market closed and carries the whole trading week.
+- **Keys are `daily/YYYY-MM-DD.dump.age` and `weekly/YYYY-MM-DD.dump.age`,
+  dated by the dump, not by the upload,** so every retry targets the same key.
+- **Each object carries metadata** — `dump-at`, `dump-sha256` of the plaintext,
+  `alembic-revision`, `tables`, `rows-restored` — so a restorer knows what they
+  hold, and can check the decrypted file, before restoring it.
+
+**Two deviations from the wording above, both deliberate:**
+
+1. **Failures are recorded as watchdog incidents, not written into
+   `worker_events` by the uploader (§7.3).** Writing to the database would need
+   `DATABASE_URL` in the offsite unit, which §4.1 keeps out of it. The uploader
+   writes `/var/lib/options-alpha/offsite.json` after every run instead, and the
+   watchdog, which already holds database access, turns a failed or missing run
+   into the same durable, dashboard-visible incident as every other fault.
+2. **The watchdog lists `daily/` itself (§7.2) *and* reads the run record.**
+   The listing is the independent view; the record catches a failing run hours
+   before the 30-hour alarm could. Checks: `offsite_run` (last run succeeded
+   within 6 hours) and `offsite_fresh` (newest `daily/` object under 30 hours).
+
+**Verified on the host, 23 September 2026:**
+
+| §10 row | Result |
+|---|---|
+| Source dump refused | a copy of `backup.json` with `verified:false` → exit 1, reason recorded, `daily/` still empty |
+| End to end | through systemd: `daily/2026-09-23.dump.age`, 37,903,697 bytes from a 37,894,249-byte dump, 2 s over the internal endpoint |
+| Encryption | first bytes read back as the restore role: `age-encryption.org/v1`; no `PGDMP` signature |
+| Metadata | `dump-at`, `dump-sha256`, `alembic-revision` `0008_evaluation_runs`, `tables` 28, `rows-restored` 3,568 present on the object |
+| Retry idempotence | second run the same day: exit 0, "all destinations already hold this dump", one version in the bucket |
+| Staging isolation | `/run/options-alpha-backup-offsite/` absent after the run; the worker's `/run/options-alpha/` untouched and the worker `active` throughout |
+| Monitor | a failed run record made `offsite_run` fail — with the copy still fresh — and the watchdog exit 1. Run without `--record`, so the test wrote no production incident |
+| Timer | `options-alpha-backup-offsite.timer` enabled, next run scheduled |
+| Weekly path, weekly retry | covered by unit tests; the first live weekly write is Sunday 27 September. Not simulated on the live bucket: a fabricated Sunday upload would occupy the real key and make that day's genuine run skip it |
+
 ## 8. Monthly restore validation
 
 **Runs on the operator's machine, not on ECS** — only the operator holds the
@@ -566,6 +687,26 @@ worth more than one performed on the box being recovered from.
 6. **Retain the downloaded ciphertext as the off-account copy (§9).** The drill
    has just proven this exact file restores; discarding it and trusting a later,
    unverified one is the weaker choice, and the transfer has already happened.
+
+### 8.1 First drill — 23 September 2026
+
+On the operator Mac, as a real recovery would run, from `daily/2026-09-23.dump.age`:
+
+| Step | Result |
+|---|---|
+| Download as `oa-backup-restore-role` | 37,903,697 bytes, 10 s over the public endpoint |
+| `age -d` with the primary identity | ok, under 1 s |
+| Plaintext SHA-256 vs the object's `dump-sha256` | **identical** |
+| `pg_restore --list` | 28 `TABLE DATA` entries |
+| `pg_restore` into throwaway `postgres:16` | exit 0, no stderr, 16 s |
+| Tables / rows / `alembic_version` vs the object's metadata | 28 / 3,568 / `0008_evaluation_runs` — **exact** |
+| `decisions` / `market_snapshots` / `decision_outcomes` | 475 / 475 / 160 |
+| Orphaned `input_hash` / duplicate `decision_hash` | 0 / 0 |
+| Lineage | a sampled decision resolves to its market snapshot |
+| **Measured duration, download to verified restore** | **26 s** |
+
+The throwaway container had no network path to production and was removed;
+every decrypted plaintext file was deleted afterwards.
 
 ## 9. Off-account copy — the account-loss tail
 
@@ -654,6 +795,24 @@ rule, and grants no permission. It is an operator procedure and a retention
 decision, and it is listed here because leaving it in the design document is
 what caused it to be absent from the implementation.
 
+### 9.6 First retention and account-loss rehearsal — 23 September 2026
+
+The ciphertext the §8.1 drill proved is retained at
+`~/options-alpha-offsite/offaccount/2026-09-23/` on the operator Mac (directory
+`0700`, files `0600`), with its object metadata beside it. **One copy of three.**
+
+**Account-loss rehearsal: passed.** That retained copy was decrypted with the
+**recovery** identity on the encrypted drive — the copy that survives losing the
+Mac — inside an empty environment whose home directory did not exist, so no
+Alibaba credential or configuration was reachable, and restored: 28 tables,
+`0008_evaluation_runs`, 475 decisions. No account access was needed.
+
+**Still open — §9.2 rule 4.** The only ciphertext copy sits on the Mac, which
+also holds the `age` identity. At least one copy must live on storage that does
+**not** hold the identity — and the encrypted drive does not qualify either,
+since it holds the recovery copy of the identity. That needs a location the
+operator chooses; until then rule 4 is unmet.
+
 ---
 
 ## 10. Rollback, cleanup and verification
@@ -665,9 +824,9 @@ what caused it to be absent from the implementation.
 | Bucket | `ossutil stat oss://<bucket>` | exists, private ACL |
 | Versioning | `ossutil bucket-versioning --method get oss://<bucket>` | `Enabled` |
 | Lifecycle | `ossutil lifecycle --method get oss://<bucket>` | **four rules** as §3 — rotation and marker cleanup for `daily/` and `weekly/`; `ExpiredObjectDeleteMarker` present in the read-back, not just in the request (§0.6); `anchor/` absent from all rules |
-| RAM uploader | upload as the backup identity; then attempt `rm`, a lifecycle write, a `GetObject`, and a write to `anchor/` | upload succeeds, **all four denied** |
-| RAM restore | `GetObject` as the restore identity | succeeds, and that identity is absent from ECS |
-| Forbid-overwrite | `put-object` the same dated key, twice, with **different content** the second time | second attempt **refused**; then `ossutil stat` and a `GetObject` show the key still carries the **first** object — same size, same ETag, same `LastModified` — and `--all-versions` shows **one** version, i.e. nothing was written and then superseded |
+| RAM uploader | upload as the backup identity; then attempt `rm`, a lifecycle write, a `GetObject`, and a write to `anchor/` | upload succeeds, **all four denied** — done, §4.3 |
+| RAM restore | `GetObject` as the restore identity | succeeds, and that identity is absent from ECS — done, §4.3 |
+| Same-key write | `put-object` the same dated key, twice, with **different content** the second time | second attempt **accepted** — forbid-overwrite is inert on a versioned bucket (§0.6, finding 2) — and `--all-versions` shows **two** versions with the first retained as noncurrent. Done, §4.3 V1. *Corrected 23 September: this row previously expected a refusal*|
 | ossutil pin | `ossutil --version`, and the install script's recorded version and checksum | matches the exact 2.x version pinned in the installer and Alibaba's published SHA-256 for it. **Never `latest`, never an unpinned installer script.** The version and digest go in the completion record |
 | `age` | `age -r <pub> </dev/null \| age -d -i <identity>` on the operator machine | round-trips |
 | Timer | `systemctl list-timers options-alpha-backup-offsite` | scheduled, next run shown |

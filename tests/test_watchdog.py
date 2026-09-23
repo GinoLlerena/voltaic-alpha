@@ -17,6 +17,12 @@ from pathlib import Path
 from sqlalchemy import insert
 
 from options_alpha_lab.config import load_settings
+from options_alpha_lab.offsite import (
+    MAX_OFFSITE_AGE_SECONDS,
+    MAX_STATUS_AGE_SECONDS,
+    OffsiteError,
+    StoredObject,
+)
 from options_alpha_lab.persistence.models import Incident, WorkerLease
 from options_alpha_lab.persistence.repository import build_engine, create_schema
 from options_alpha_lab.watchdog import (
@@ -25,6 +31,7 @@ from options_alpha_lab.watchdog import (
     MAX_BACKUP_AGE_SECONDS,
     MAX_TICK_AGE_SECONDS,
     WATCHDOG_INCIDENT_KIND,
+    OffsiteProbe,
     WatchdogResult,
     _notify,
     _record,
@@ -324,6 +331,73 @@ class WebhookTests(WatchdogCase):
         check = _notify("http://127.0.0.1:1/hook", self.result())
         self.assertFalse(check.ok)
         self.assertIn("webhook failed", check.detail)
+
+
+class OffsiteTests(WatchdogCase):
+    """Plan §7: a stopped upload must become an incident within 30 hours."""
+
+    def offsite_status(self, **overrides: object) -> str:
+        body: dict[str, object] = {"checked_at": ago(3600), "ok": True, "detail": "uploaded"}
+        body.update(overrides)
+        path = self.dir / "offsite.json"
+        path.write_text(json.dumps(body))
+        return str(path)
+
+    def listing(self, *hours_old: float) -> list[StoredObject]:
+        return [StoredObject(f"daily/{i}", 10, NOW - timedelta(hours=h))
+                for i, h in enumerate(hours_old)]
+
+    def run_offsite_checks(self, status: str, lister: object) -> object:
+        return evaluate(
+            self.engine, health_file=self.health(), backup_file=self.backup(),
+            offsite=OffsiteProbe(status, lister),  # type: ignore[arg-type]
+            now=NOW,
+        )
+
+    def test_a_fresh_copy_and_a_clean_run_pass(self) -> None:
+        result = self.run_offsite_checks(self.offsite_status(), lambda: self.listing(3, 27))
+        self.assertTrue(result.ok, result.summary)  # type: ignore[attr-defined]
+
+    def test_no_offsite_probe_means_no_offsite_checks(self) -> None:
+        names = {c.name for c in self.run_checks().checks}  # type: ignore[attr-defined]
+        self.assertFalse(names & {"offsite_run", "offsite_fresh"})
+
+    def test_a_copy_older_than_thirty_hours_fails(self) -> None:
+        result = self.run_offsite_checks(self.offsite_status(), lambda: self.listing(31))
+        self.assertIn("offsite_fresh", self.failed(result))
+
+    def test_the_newest_copy_decides_not_the_oldest(self) -> None:
+        result = self.run_offsite_checks(self.offsite_status(), lambda: self.listing(160, 2))
+        self.assertNotIn("offsite_fresh", self.failed(result))
+
+    def test_an_empty_daily_prefix_fails(self) -> None:
+        result = self.run_offsite_checks(self.offsite_status(), lambda: [])
+        self.assertIn("offsite_fresh", self.failed(result))
+
+    def test_being_unable_to_list_is_a_failure_not_a_pass(self) -> None:
+        def unreachable() -> list[StoredObject]:
+            raise OffsiteError("listing daily/ failed: Http Status Code: 403")
+        result = self.run_offsite_checks(self.offsite_status(), unreachable)
+        self.assertIn("offsite_fresh", self.failed(result))
+
+    def test_a_failed_upload_run_fails_even_while_the_copy_is_fresh(self) -> None:
+        """The run's own record catches a failure before the 30-hour alarm could."""
+        status = self.offsite_status(ok=False, detail="upload of daily/x failed: 403")
+        result = self.run_offsite_checks(status, lambda: self.listing(3))
+        self.assertIn("offsite_run", self.failed(result))
+        self.assertIn("403", result.summary)  # type: ignore[attr-defined]
+
+    def test_a_job_that_stopped_running_fails(self) -> None:
+        stale = self.offsite_status(checked_at=ago(MAX_STATUS_AGE_SECONDS + 60))
+        result = self.run_offsite_checks(stale, lambda: self.listing(3))
+        self.assertIn("offsite_run", self.failed(result))
+
+    def test_a_missing_status_file_fails(self) -> None:
+        result = self.run_offsite_checks(str(self.dir / "never-ran.json"), lambda: self.listing(3))
+        self.assertIn("offsite_run", self.failed(result))
+
+    def test_the_thirty_hour_limit_is_the_planned_one(self) -> None:
+        self.assertEqual(MAX_OFFSITE_AGE_SECONDS, 30 * 3600)
 
 
 if __name__ == "__main__":  # pragma: no cover
