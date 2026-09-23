@@ -28,7 +28,7 @@ declare -A REQUIRES=(
 )
 
 #: Units with no environment of their own.
-UNCONDITIONAL=(options-alpha-port80.service)
+UNCONDITIONAL=(options-alpha-port80.service options-alpha-capacity.service)
 
 #: Timers are enabled, not started: `--now` on a timer for a job that has just
 #: run would run it again for no reason.

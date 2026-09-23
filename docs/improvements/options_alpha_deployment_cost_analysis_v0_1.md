@@ -771,6 +771,30 @@ the change, not provider guarantees):
 **Exit gate:** representative 2 GB checks pass and metrics/alerts can detect a
 regression. Otherwise retain 4 GB and consider its monthly subscription separately.
 
+**Baseline collection — started 23 September 2026, 15:49 UTC.**
+`options-alpha-capacity.service` runs `scripts/capacity_baseline.py` every 30 s
+at `Nice=10`, writing one JSON line per sample to
+`/var/lib/options-alpha/capacity/YYYY-MM-DD.jsonl` (about 2.4 MB a day). It
+records `MemAvailable`, swap-in/out and OOM-kill counters, CPU and I/O-wait
+jiffies, PSI pressure for memory, CPU and I/O, per-service cgroup
+`memory.current` and `memory.peak` (worker, dashboard, API, PostgreSQL, and the
+backup and offsite jobs while they run), database connections, lease heartbeat
+age, worker tick age and `management_batch_ms`, and loopback latency for the
+API and dashboard. It holds no credential and changes nothing. The hourly backup
+restores into a scratch database, so every hour includes the backup/restore
+overlap this section asks for. Summarise a session with, for example:
+
+```
+/opt/options-alpha/.venv/bin/python /opt/options-alpha/scripts/capacity_baseline.py \
+  --summarize --start 2026-09-24T13:30 --end 2026-09-24T20:00
+```
+
+First reading, idle and outside a full session: about 1.0 GiB of 3.5 GiB in
+use; worker 129 MiB, dashboard 112, API 65, PostgreSQL 166; no swap configured.
+One reading proves nothing about peaks — that is what the session is for. Leave
+the collector running through any 2 GB trial so a regression is visible against
+this baseline.
+
 ### 7.4 Resize in a controlled maintenance window
 
 1. Record the live commit, schema revision, effective units/drop-ins, worker mode,

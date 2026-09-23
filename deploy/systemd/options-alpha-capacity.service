@@ -1,0 +1,17 @@
+[Unit]
+Description=Sample host capacity every 30 s for the 2c2g resize baseline
+Documentation=file:///opt/options-alpha/docs/improvements/options_alpha_deployment_cost_analysis_v0_1.md
+After=postgresql.service
+
+[Service]
+Type=simple
+# Measurement only: reads /proc, cgroup files, the health file and two loopback
+# URLs, and counts database connections over local peer auth. No credential,
+# no env file. Nice'd so it does not distort what it measures (cost analysis §7.3).
+ExecStart=/opt/options-alpha/.venv/bin/python /opt/options-alpha/scripts/capacity_baseline.py
+Nice=10
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
