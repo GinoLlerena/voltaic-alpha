@@ -10,4 +10,8 @@ EnvironmentFile=/etc/options-alpha.env
 # it the watchdog detects and prints, and the durable incident record -- the
 # one every other integrity failure lands in -- never hears about it. The
 # deployed unit had lost the flag; restore_hosted_demo.sh always had it.
-ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.watchdog --record
+# --offsite-env adds the plan §7 checks: the last upload run succeeded, and the
+# newest daily/ object in OSS is under 30 hours old. It reads only bucket
+# settings from that file; the listing runs as the instance RAM role.
+ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.watchdog --record \
+  --offsite-env /etc/options-alpha-backup.env

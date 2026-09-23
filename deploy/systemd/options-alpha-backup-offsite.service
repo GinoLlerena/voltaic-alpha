@@ -1,0 +1,23 @@
+[Unit]
+Description=Encrypt the newest verified dump and copy it off-host to OSS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+WorkingDirectory=/opt/options-alpha
+# The backup identity's own settings, and nothing else. Never
+# /etc/options-alpha.env: this unit must not hold the broker credentials or the
+# database URL, so a fault here cannot reach either (plan §4.1). It holds no
+# OSS key either - it authenticates as the ECS instance RAM role.
+EnvironmentFile=/etc/options-alpha-backup.env
+# Its own staging directory, removed by systemd when the run ends. Never the
+# worker's /run/options-alpha, whose lifecycle belongs to the worker (§6.3).
+RuntimeDirectory=options-alpha-backup-offsite
+RuntimeDirectoryMode=0700
+# It reads the dump the hourly job already verified; it never runs pg_dump (§6.1).
+ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.offsite
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full

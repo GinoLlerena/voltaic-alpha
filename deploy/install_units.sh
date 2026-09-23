@@ -23,6 +23,8 @@ declare -A REQUIRES=(
   [options-alpha-api.service]=/etc/options-alpha-dashboard.env
   [options-alpha-watchdog.service]=/etc/options-alpha.env
   [options-alpha-backup.service]=/etc/options-alpha.env
+  # Its own env file, deliberately not the broker's (OSS plan §4.1).
+  [options-alpha-backup-offsite.service]=/etc/options-alpha-backup.env
 )
 
 #: Units with no environment of their own.
@@ -30,7 +32,7 @@ UNCONDITIONAL=(options-alpha-port80.service)
 
 #: Timers are enabled, not started: `--now` on a timer for a job that has just
 #: run would run it again for no reason.
-TIMERS=(options-alpha-backup.timer options-alpha-watchdog.timer)
+TIMERS=(options-alpha-backup.timer options-alpha-watchdog.timer options-alpha-backup-offsite.timer)
 
 ALL=(
   options-alpha-worker.service
@@ -38,6 +40,7 @@ ALL=(
   options-alpha-api.service
   options-alpha-watchdog.service
   options-alpha-backup.service
+  options-alpha-backup-offsite.service
   "${UNCONDITIONAL[@]}"
   "${TIMERS[@]}"
 )

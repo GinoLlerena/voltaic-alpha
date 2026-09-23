@@ -8,7 +8,8 @@ durable incident record that every other integrity failure lands in.
 It deliberately checks the *backup* as well as the worker. A dump job that
 silently stopped is precisely the failure nobody notices until they need the
 dump, so it is treated as a fault in its own right rather than as an operational
-detail outside the health story.
+detail outside the health story. With `--offsite-env` it also checks the
+off-host copy in OSS, because a local dump shares the fate of the disk it is on.
 
 Every check fails closed: anything it cannot read is a failure, never a pass.
 An unreachable database is reported as unhealthy rather than as "no incidents
@@ -19,6 +20,7 @@ no monitor at all.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +29,17 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
+from .offsite import (
+    DEFAULT_STATUS_FILE as DEFAULT_OFFSITE_STATUS_FILE,
+)
+from .offsite import (
+    MAX_OFFSITE_AGE_SECONDS,
+    MAX_STATUS_AGE_SECONDS,
+    Oss,
+    OssConfig,
+    StoredObject,
+    subprocess_runner,
+)
 from .persistence.models import Incident, WorkerLease
 
 # Imported rather than restated. The first version of this module carried its
@@ -160,6 +173,73 @@ def _check_backup(path: Path, now: datetime) -> list[Check]:
     )]
 
 
+@dataclass(frozen=True)
+class OffsiteProbe:
+    """Where to look for the off-host copy (plan §7).
+
+    Two independent views, on purpose. The status file is the uploader's own
+    account of its last run; the listing is what OSS actually holds. Trusting
+    only the first would let a bug in the uploader report success for uploads
+    that never landed.
+    """
+
+    status_file: str
+    list_daily: Callable[[], list[StoredObject]]
+
+
+def _check_offsite(probe: OffsiteProbe, now: datetime) -> list[Check]:
+    checks: list[Check] = []
+    status = _read_json(Path(probe.status_file))
+    if status is None:
+        checks.append(Check("offsite_run", False, f"{probe.status_file} is missing or unreadable"))
+    else:
+        raw = status.get("checked_at")
+        try:
+            age = _age_seconds(datetime.fromisoformat(str(raw)), now)
+        except ValueError:
+            checks.append(Check("offsite_run", False, f"unparseable checked_at {raw!r}"))
+        else:
+            if not status.get("ok"):
+                checks.append(Check(
+                    "offsite_run", False,
+                    f"last offsite run failed: {status.get('detail') or 'no detail'}",
+                ))
+            else:
+                checks.append(Check(
+                    "offsite_run", age <= MAX_STATUS_AGE_SECONDS,
+                    f"last offsite run {age / 3600:.1f}h ago "
+                    f"(limit {MAX_STATUS_AGE_SECONDS / 3600:.0f}h)",
+                ))
+
+    try:
+        objects = probe.list_daily()
+    except Exception as exc:  # noqa: BLE001 - failing to look is a failure, never a pass
+        checks.append(Check("offsite_fresh", False, f"cannot list daily/: {exc}"))
+        return checks
+    newest = max((o.last_modified for o in objects), default=None)
+    if newest is None:
+        checks.append(Check("offsite_fresh", False, "no daily/ object exists in OSS"))
+    else:
+        age = _age_seconds(newest, now)
+        checks.append(Check(
+            "offsite_fresh", age <= MAX_OFFSITE_AGE_SECONDS,
+            f"newest off-host copy {age / 3600:.1f}h old "
+            f"(limit {MAX_OFFSITE_AGE_SECONDS / 3600:.0f}h)",
+        ))
+    return checks
+
+
+def oss_daily_lister(env_file: str) -> Callable[[], list[StoredObject]]:
+    """List `daily/` as the instance role, reading bucket settings at call time.
+
+    Resolved lazily so an unreadable env file becomes a failed check rather
+    than a crash before any check has run.
+    """
+    def list_daily() -> list[StoredObject]:
+        return Oss(OssConfig.from_env_file(env_file), subprocess_runner).list("daily/")
+    return list_daily
+
+
 def _check_database(engine: Engine, now: datetime) -> list[Check]:
     try:
         with engine.connect() as connection:
@@ -200,6 +280,7 @@ def evaluate(
     *,
     health_file: str = DEFAULT_HEALTH_FILE,
     backup_file: str = DEFAULT_BACKUP_FILE,
+    offsite: OffsiteProbe | None = None,
     now: datetime | None = None,
 ) -> WatchdogResult:
     """Run every check. Nothing here raises; a failure to look is a failed check."""
@@ -207,6 +288,8 @@ def evaluate(
     checks: list[Check] = []
     checks += _check_health_file(Path(health_file), stamp)
     checks += _check_backup(Path(backup_file), stamp)
+    if offsite is not None:
+        checks += _check_offsite(offsite, stamp)
     if engine is None:
         checks.append(Check("database", False, "no database configured"))
     else:
@@ -260,6 +343,11 @@ def main(argv: list[str] | None = None) -> int:
         "--record", action="store_true",
         help="open a durable incident when unhealthy (deduplicated while it stays open)",
     )
+    parser.add_argument(
+        "--offsite-env", default=None,
+        help="also check the off-host copy, using the OSS settings in this env file",
+    )
+    parser.add_argument("--offsite-status-file", default=DEFAULT_OFFSITE_STATUS_FILE)
     args = parser.parse_args(argv)
 
     engine = None
@@ -272,8 +360,12 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:  # noqa: BLE001 - reported as an unreadable database below
             engine = None
 
+    offsite = None
+    if args.offsite_env:
+        offsite = OffsiteProbe(args.offsite_status_file, oss_daily_lister(args.offsite_env))
+
     result = evaluate(
-        engine, health_file=args.health_file, backup_file=args.backup_file
+        engine, health_file=args.health_file, backup_file=args.backup_file, offsite=offsite,
     )
 
     webhook = os.environ.get("WATCHDOG_WEBHOOK_URL")
