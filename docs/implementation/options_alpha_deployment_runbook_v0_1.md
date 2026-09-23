@@ -498,7 +498,11 @@ the broker's view of the world. The old database is renamed, never dropped.
 readable; the last tick is under 900 seconds old; the worker records no error;
 it has not lost its lease; the last backup is verified and under 2.2 hours old;
 the database is readable; the lease row is present, unreleased and unexpired;
-and nothing else has an unresolved incident.
+and nothing else has an unresolved incident. Since 23 September, with
+`--offsite-env /etc/options-alpha-backup.env`, two more: the last off-host
+upload run succeeded within six hours (`offsite_run`), and the newest `daily/`
+object in OSS - listed directly, not taken from the uploader's word - is under
+30 hours old (`offsite_fresh`). See the OSS backup plan, §7.6.
 
 Every check **fails closed**. Anything it cannot read is a failure, never a
 pass - a monitor that reports "no incidents found" when the database is
@@ -526,9 +530,40 @@ environment, and a `file:` scheme handed to `urlopen` would turn an alerting
 hook into an arbitrary-read primitive on the one host holding the broker
 credentials.
 
-Backups are local to the worker. Losing the instance loses them with it.
+~~Backups are local to the worker. Losing the instance loses them with it.~~
+**Superseded 23 September 2026:** the newest verified dump is encrypted and
+copied to OSS daily by `options-alpha-backup-offsite.timer`, and a restore from
+that copy has been drilled end to end. See
+`docs/implementation/options_alpha_oss_backup_implementation_v0_1.md`.
 
 Credential rotation is still undocumented, so precondition 7 is not wholly met.
+
+### 10.5 Closing an incident (added 23 September 2026)
+
+**A `broker_unreachable` incident closes itself.** The next reconciliation that
+reads positions and open orders successfully resolves it and appends the reason
+to its detail. The halt on new risk never depended on the incident - each
+reconciliation recomputes the execution state - so this only makes the record
+agree with what the system is already doing. Before this, one Alpaca timeout on
+23 September kept the watchdog red for about nine and a half hours after the
+broker had recovered (07:56 to 17:21 UTC).
+
+**Every other kind needs a person**, because it describes something that has to
+be decided rather than retried. On the host, with the worker's environment:
+
+```bash
+cd /opt/options-alpha && set -a && . /etc/options-alpha.env && set +a
+.venv/bin/python -m options_alpha_lab.incidents list
+.venv/bin/python -m options_alpha_lab.incidents resolve <id> --reason "what was checked and why it is closed"
+```
+
+It closes one incident, by exact id, only while it is open, and refuses a blank
+reason. The reason is appended to the incident's `detail` beside the original
+text, so the record says both what happened and why it was closed. Do not close
+incidents with SQL: that records neither.
+
+The watchdog's own `worker_unhealthy` incidents are resolved by the watchdog
+when its checks pass again; leave them to it.
 
 ## 11. The React surface, and what a cutover would take (17 September 2026)
 

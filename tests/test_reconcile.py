@@ -483,6 +483,71 @@ class IncidentHealingTests(ReconcileCase):
         self.assertIs(healed.state, PositionState.ABANDONED)
 
 
+class BrokerRecoveryTests(ReconcileCase):
+    """23 September 2026: three ticks timed out reading Alpaca, then 97 read it
+    cleanly - and the incident stayed open, keeping the watchdog red, until a
+    person closed it by hand. Reachability is re-proven every pass, so the pass
+    that proves it closes the record of losing it."""
+
+    TIMEOUT = RuntimeError('{"code":50410000,"message":"request timed out"}')
+
+    def test_a_successful_read_closes_the_outage_incident(self) -> None:
+        down = Reconciler(FakeBroker(raises=self.TIMEOUT), self.store).reconcile(now=NOW)
+        self.assertTrue(down.broker_unreachable)
+        self.assertEqual([r.kind for r in self.store.open_incidents()], ["broker_unreachable"])
+
+        up = Reconciler(FakeBroker(), self.store).reconcile(now=NOW + timedelta(minutes=20))
+        self.assertEqual(up.incidents_resolved, down.incidents)
+        self.assertEqual(self.store.open_incidents(), [])
+        self.assertEqual(up.execution_state, ExecutionState.NORMAL)
+
+    def test_the_closed_incident_keeps_its_cause_and_says_why_it_closed(self) -> None:
+        Reconciler(FakeBroker(raises=self.TIMEOUT), self.store).reconcile(now=NOW)
+        Reconciler(FakeBroker(), self.store).reconcile(now=NOW + timedelta(minutes=20))
+        (incident,) = self.incidents()
+        self.assertIsNotNone(incident.resolved_at)
+        self.assertIn("request timed out", incident.detail)
+        self.assertIn("broker reachable again", incident.detail)
+
+    def test_a_repeated_outage_stays_one_open_incident(self) -> None:
+        for minutes in (0, 8, 15):
+            Reconciler(FakeBroker(raises=self.TIMEOUT), self.store).reconcile(
+                now=NOW + timedelta(minutes=minutes))
+        self.assertEqual(len(self.store.open_incidents()), 1)
+
+    def test_recovery_closes_only_broker_reachability(self) -> None:
+        self.store.open_incident(
+            kind="unexpected_exposure", detail="SPY held at broker only", now=NOW)
+        Reconciler(FakeBroker(raises=self.TIMEOUT), self.store).reconcile(now=NOW)
+        Reconciler(FakeBroker(), self.store).reconcile(now=NOW + timedelta(minutes=20))
+        self.assertEqual([r.kind for r in self.store.open_incidents()], ["unexpected_exposure"])
+
+    def test_a_new_outage_after_recovery_opens_a_new_incident(self) -> None:
+        Reconciler(FakeBroker(raises=self.TIMEOUT), self.store).reconcile(now=NOW)
+        Reconciler(FakeBroker(), self.store).reconcile(now=NOW + timedelta(minutes=20))
+        again = Reconciler(FakeBroker(raises=self.TIMEOUT), self.store).reconcile(
+            now=NOW + timedelta(hours=2))
+        self.assertEqual(len(self.store.open_incidents()), 1)
+        self.assertEqual(len(self.incidents()), 2, "the first outage stays on record")
+        self.assertEqual(again.incidents, [self.store.open_incidents()[0].incident_id])
+
+
+class ResolveIncidentTests(ReconcileCase):
+    def test_an_unknown_or_closed_incident_is_not_resolved_twice(self) -> None:
+        incident_id = self.store.open_incident(kind="fault", detail="x", now=NOW)
+        self.assertTrue(self.store.resolve_incident(incident_id, reason="checked", now=NOW))
+        self.assertFalse(self.store.resolve_incident(incident_id, reason="again", now=NOW))
+        self.assertFalse(self.store.resolve_incident("no-such-id", reason="x", now=NOW))
+        (incident,) = self.incidents()
+        self.assertEqual(incident.detail.count("[resolved"), 1, "the first reason must survive")
+
+    def test_a_resolution_needs_a_reason(self) -> None:
+        incident_id = self.store.open_incident(kind="fault", detail="x", now=NOW)
+        with self.assertRaises(ValueError):
+            self.store.resolve_incident(incident_id, reason="   ", now=NOW)
+        self.assertEqual(len(self.store.open_incidents()), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
 

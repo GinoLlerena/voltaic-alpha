@@ -33,6 +33,8 @@ class ReconciliationReport:
     unexpected_symbols: list[str] = field(default_factory=list)
     execution_state: ExecutionState = ExecutionState.NORMAL
     broker_unreachable: bool = False
+    #: Incidents this pass closed because the condition behind them has healed.
+    incidents_resolved: list[str] = field(default_factory=list)
 
     @property
     def clean(self) -> bool:
@@ -188,6 +190,20 @@ class Reconciler:
                 )
             )
             return report
+
+        # Both reads succeeded, so the broker is reachable again. The halt on new
+        # risk already lifted - this report's execution_state is recomputed every
+        # pass - but the incident that recorded the outage would otherwise stay
+        # open forever, keep the watchdog red, and read as a live fault. Close it
+        # here, where reachability is proven. Anything the rest of this pass finds
+        # opens an incident of its own kind.
+        report.incidents_resolved.extend(
+            self._store.resolve_open(
+                kind="broker_unreachable",
+                reason="broker reachable again: reconciliation read positions and open orders",
+                now=stamp,
+            )
+        )
 
         held = _held_quantities(broker_positions)
         working_by_client_id = {
