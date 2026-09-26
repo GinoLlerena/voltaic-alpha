@@ -862,6 +862,134 @@ Store operational evidence in an access-controlled location; this repository is
 public. Link a redacted summary from this document when execution is complete.
 Do not publish credentials, database dumps or full account exports.
 
+### 7.7 2c2g trial record
+
+#### Decision — account owner, 23 September 2026
+
+**Run the reversible pay-as-you-go trial (§7.4–§7.5).** Memory is treated as
+passed on the representative evidence below. **Latency is explicitly unresolved**
+until measured on the real server; this is **not** a waiver of the 20% gate. No
+subscription is bought and the 2 GB size is not made permanent until the trial
+passes. The trial starts only after a complete production baseline, runs
+off-session, and is preceded by verification of the latest backup, the instance
+state, monitoring and the rollback procedure.
+
+#### Rollback criteria — any one returns the instance to `ecs.e-c1m2.large`
+
+1. p95 latency more than **20%** worse than the pre-registered baseline session,
+   for any of the three probes (`/api/v1/system/status`, `/api/v1/decisions`,
+   dashboard health).
+2. Any **OOM kill**.
+3. Memory pressure (PSI `some avg10`) above **1.0** in any sample, **or** present
+   in more than **1%** of samples.
+4. `MemAvailable` under **256 MiB for five minutes** (this section's own memory
+   criterion).
+5. Any API or dashboard probe failure, failed worker tick, stalled worker (tick
+   older than 900 s) or late lease heartbeat (over 120 s), or failed hourly
+   backup (which includes its restore) or off-host upload.
+6. Fewer than **90%** of the expected 780 session samples in either window, or a
+   missing latency series — insufficient or inconclusive measurement.
+
+**Revised 26 September 2026 (criterion 3).** The owner's first wording rolled
+back on *any* memory-pressure event. The 4 GB baseline itself showed PSI 0.12 in
+2 of 780 samples on 24 September — about 12 ms stalled in a 10 s window, with
+2.4 GB free — so that rule could not tell a healthy server from a struggling
+one. The owner approved the thresholds above: 1.0 is about eight times the worst
+baseline reading and still only 1% of the time stalled; 1% of samples is ten
+times the baseline rate. Criterion 4 was added at the same time.
+
+#### Representative 2 GB check — operator Mac, 23 September 2026
+
+The whole stack in **one** container — PostgreSQL 16, the API, the dashboard, the
+rehearsal loop (deterministic and model arms; the bounded memo served by a local
+stub at its 900-character maximum), the H0 replay, and a backup-and-restore cycle
+every minute — against a copy of production data, pinned to **2 CPUs**, with no
+swap. Load: four API clients and three real browser sessions throughout.
+
+| Pair | Order | Peak (4 GB / 1,500 MiB cap) | OOM | Pressure | Failures | API p95 | Dashboard p95 |
+|---|---|---|---|---|---|---|---|
+| 1 | baseline first | 961 / 1,036 MiB | 0 | 0.00 | 0 | contaminated¹ | contaminated¹ |
+| 2 | baseline first | 990 / 976 MiB | 0 | 0.00 | 0 | 142 → 208 ms (+46%) | 4.2 → 6.3 s (+50%) |
+| 3 | capped first | 1,021 / 993 MiB | 0 | 0.00 | 0 | 161 → 202 ms (+26%) | 5.4 → 6.6 s (+22%) |
+
+¹ The full test suite ran on the same machine during pair 1; its latencies are
+not evidence and are not used.
+
+**Memory passed firmly.** **Latency was not demonstrated:** the capped run was
+slower in both clean pairs, above the 20% limit, while memory pressure never left
+0.00 — so the cap is an unlikely cause, and a laptop cannot model the instance's
+CPU. That question is what the trial answers.
+
+The 1,500 MiB cap is the budget a 2 GiB instance leaves for the application:
+~1,707 MiB `MemTotal` after the image's 256 MiB crash-kernel reservation, less
+~170 MiB of non-application memory that cannot be reclaimed (agents 88,
+kernel 82). The Cloud Assistant agent's 741 MiB cgroup figure is 691 MiB of
+reclaimable file cache.
+
+#### Production baseline — 4 GB, collected by `options-alpha-capacity.service`
+
+| Session (13:30–20:00 UTC) | Samples | API status p95 | API decisions p95 | Dashboard p95 | Pressure | Min `MemAvailable` | Peak used | OOM | Failures |
+|---|---|---|---|---|---|---|---|---|---|
+| Thu 24 Sep | 780 / 780 | 38 ms | 29 ms | 5 ms | 0.12 in 2 samples | 2,410 MiB | 1,090 MiB | 0 | 0 |
+| **Fri 25 Sep** | **780 / 780** | **35 ms** | **29 ms** | **4 ms** | none | 2,487 MiB | 1,012 MiB | 0 | 0 |
+
+**Pre-registered baseline: Friday 25 September, 13:30–20:00 UTC** — the most
+recent full session and the stricter of the two. Fixed before the trial so it
+cannot be chosen after seeing the result.
+
+Peak use of 1,090 MiB leaves about 600 MiB free on a ~1,707 MiB instance — more
+than twice criterion 4's floor.
+
+**Control tests of the evaluator**, 4 GB against itself: Thursday as baseline
+and Friday as trial, and the reverse — **PASS both ways**, with day-to-day p95
+movement of −10% to +11%. Thursday's two pressure blips pass under the revised
+criterion 3; under the original wording they would have forced a rollback of a
+healthy server.
+
+#### Preflight — 23 September 2026, read-only
+
+Pay-as-you-go (`PostPaid`), zone `ap-southeast-1a`; **both** `ecs.e-c1m1.large`
+and `ecs.e-c1m2.large` available with stock; `ModifyInstanceSpec` dry run returned
+the state error `InvalidInstanceStatus.NotStopped` (permission present);
+`StopInstance` dry run returned `DryRunOperation`. The operator key cannot attach
+RAM roles (`PassRoleForbidden`) and does not need to for a resize. Stock is
+re-checked for both types immediately before stopping: rollback capacity is not
+guaranteed and the tooling will not stop a healthy instance for a change that
+cannot land.
+
+#### Procedure — `scripts/resize_trial.py`, run from the operator machine
+
+`preflight` (read-only) → `resize --to ecs.e-c1m1.large`, which records a
+checkpoint; takes a fresh verified dump, uploads it encrypted and copies it
+server-side into `anchor/`; takes a system-disk snapshot (optional per §7.2,
+deleted seven days after validation); quiesces timers, the worker, the API, the
+dashboard and PostgreSQL; stops in `KeepCharging` mode; requires a
+`DryRunOperation`; changes only the instance type; starts; and waits for
+`health` — every unit active, exactly one lease holder, a real API payload, the
+dashboard, a clean startup reconciliation, a first tick and a green watchdog.
+**Not healthy within the 30-minute abort threshold → automatic resize back to
+`ecs.e-c1m2.large`.** The rollback path is the same code; checkpoint and quiesce
+are best-effort there, so an unwell host cannot block its own rescue. Every
+`aliyun` call's stderr is captured and redacted.
+
+After the trial session, `evaluate --apply` compares the trial window with the
+pre-registered baseline and **resizes back automatically** on any criterion.
+
+#### Schedule
+
+| | UTC |
+|---|---|
+| First weekly off-host copy written and verified, on the unchanged server | Sun 27 Sep |
+| Maintenance window (owner reachable) | Sun 27 Sep — to be confirmed |
+| Trial session | Mon 28 Sep, 13:30–20:00 |
+| Evaluation, with automatic rollback on any criterion | Mon 28 Sep, after 20:00 |
+
+#### Results
+
+*To be recorded:* window start and end, actual downtime, the post-change health
+record and `MemTotal`, the trial session's samples, latencies and memory, the
+verdict and reasons, and the final instance type.
+
 ## 8. Revision history
 
 **v0.3 — 20 September 2026.** Re-verified live rather than reasoned from v0.1.
