@@ -75,6 +75,10 @@ ignore = ["S101"]
 # everywhere else in this repo. Pinning an absolute path would be less portable,
 # not more secure.
 "scripts/freeze_release.py" = ["S607"]
+# The resize trial runs on the operator's machine and calls the Alibaba Cloud CLI
+# by name: it is installed per machine (Homebrew on macOS), so no absolute path
+# is portable. Constant argv, no shell; stderr is captured and redacted.
+"scripts/resize_trial.py" = ["S607"]
 # Same reason: the packaging test shells out to uv by name.
 "tests/test_packaging.py" = ["S607"]
 # And again for the evaluation recorder, which asks git for the revision a
