@@ -23,6 +23,11 @@ samples; MemAvailable under 256 MiB for five minutes; any API, dashboard,
 worker, trading, backup or restore failure; or measurements that are
 insufficient or inconclusive.
 `evaluate --apply` returns the instance to ecs.e-c1m2.large on any of them.
+
+This runs on the operator's machine and cannot outlive it: the resize and any
+rollback are run under active supervision, with the console open on the manual
+rollback card in cost analysis §7.7. Launch it under `nohup caffeinate` so a
+closed session or a sleeping Mac cannot kill it mid-change.
 """
 
 from __future__ import annotations
@@ -67,21 +72,58 @@ def _redact(text: str) -> str:
     return re.sub(r"(LTAI|STS\.)[A-Za-z0-9]+", r"\1<redacted>", text)
 
 
+#: Error codes that describe the moment rather than the request. Anything else -
+#: DryRunOperation, a permission refusal, a state error - is an answer, and
+#: retrying an answer only delays acting on it.
+TRANSIENT_CODES = frozenset(
+    {
+        "Throttling",
+        "Throttling.User",
+        "Throttling.Api",
+        "ServiceUnavailable",
+        "InternalError",
+        "InternalError.Dispatch",
+        "UnknownError",
+        "OperationConflict",
+    }
+)
+#: Backoff between attempts, seconds: about 90 s in all before giving up.
+RETRY_BACKOFF = (5, 10, 15, 20, 20, 20)
+
+
 def aliyun(*args: str, check: bool = True) -> dict[str, Any]:
-    done = subprocess.run(  # noqa: S603 - fixed argv, no shell
-        ["aliyun", *args], capture_output=True, text=True, timeout=120, check=False
-    )
-    if done.returncode != 0:
-        code = re.search(r"ErrorCode: ([A-Za-z0-9.]+)", done.stderr)
+    """Call the Alibaba CLI, retrying what a network blip or throttling can cause.
+
+    A dropped connection mid-maintenance is the failure most likely to strand the
+    instance between stop and start, so a call is only allowed to fail once the
+    backoff is exhausted or the service has given a definite answer.
+    """
+    code = None
+    for delay in (*RETRY_BACKOFF, None):
+        try:
+            done = subprocess.run(  # noqa: S603 - fixed argv, no shell
+                ["aliyun", *args], capture_output=True, text=True, timeout=120, check=False
+            )
+        except subprocess.TimeoutExpired:
+            code, done = None, None
+        if done is not None and done.returncode == 0:
+            out = done.stdout
+            start, end = out.find("{"), out.rfind("}")
+            return json.loads(out[start : end + 1]) if start >= 0 else {}
+        found = re.search(r"ErrorCode: ([A-Za-z0-9.]+)", done.stderr) if done else None
+        code = found.group(1) if found else None
+        # No error code means the request never got a service answer: network.
+        if (code is not None and code not in TRANSIENT_CODES) or delay is None:
+            break
+        time.sleep(delay)
+    if done is not None and done.returncode != 0:
         if check:
             raise Stop(
                 f"aliyun {args[1] if len(args) > 1 else args[0]} failed: "
-                f"{code.group(1) if code else _redact(done.stderr)[:200]}"
+                f"{code or _redact(done.stderr)[:200]}"
             )
-        return {"_error": code.group(1) if code else "unknown"}
-    out = done.stdout
-    start, end = out.find("{"), out.rfind("}")
-    return json.loads(out[start : end + 1]) if start >= 0 else {}
+        return {"_error": code or "unknown"}
+    raise Stop(f"aliyun {args[1] if len(args) > 1 else args[0]} timed out on every attempt")
 
 
 def remote(script: str, timeout: int = 600) -> str:
@@ -304,13 +346,17 @@ def resize(args: argparse.Namespace) -> int:
                 copy = record["pre_resize_copy"]
                 src = f"oss://{copy['bucket']}/{copy['key']}"
                 dst = f"oss://{copy['bucket']}/anchor/{Path(copy['key']).name}"
-                done = subprocess.run(  # noqa: S603 - fixed argv, no shell
-                    ["aliyun", "oss", "cp", src, dst],
-                    capture_output=True,
-                    text=True,
-                    timeout=600,
-                    check=False,
-                )
+                for _ in range(3):
+                    done = subprocess.run(  # noqa: S603 - fixed argv, no shell
+                        ["aliyun", "oss", "cp", src, dst],
+                        capture_output=True,
+                        text=True,
+                        timeout=600,
+                        check=False,
+                    )
+                    if done.returncode == 0:
+                        break
+                    time.sleep(15)
                 if done.returncode != 0:
                     raise Stop("server-side copy to anchor/ failed")
                 record["anchor_object"] = dst
@@ -412,8 +458,21 @@ def resize(args: argparse.Namespace) -> int:
             return resize(argparse.Namespace(to=ROLLBACK_TYPE, dry_run=False)) or 1
         inst = instance()
         if inst["Status"] == "Stopped":
-            # Never leave production down: start it on whatever type it has.
-            aliyun("ecs", "StartInstance", "--InstanceId", INSTANCE)
+            # Never leave production down: start it on whatever type it has, and
+            # keep trying - each call already retries for ~90 s; this loops for ~10 min.
+            for attempt in range(6):
+                try:
+                    aliyun("ecs", "StartInstance", "--InstanceId", INSTANCE)
+                    break
+                except Stop as start_exc:
+                    log(
+                        record, "restart_attempt_failed", attempt=attempt + 1, reason=str(start_exc)
+                    )
+                    save()
+            else:
+                log(record, "RESTART_FAILED", action="start it from the console now")
+                save()
+                return 1
             log(
                 record,
                 "restarted_unchanged",

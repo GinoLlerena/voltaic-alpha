@@ -886,7 +886,9 @@ state, monitoring and the rollback procedure.
    criterion).
 5. Any API or dashboard probe failure, failed worker tick, stalled worker (tick
    older than 900 s) or late lease heartbeat (over 120 s), or failed hourly
-   backup (which includes its restore) or off-host upload.
+   backup (which includes its restore) or off-host upload — including the
+   **21:00 UTC post-close backup**, which falls outside the comparison window
+   and is checked separately.
 6. Fewer than **90%** of the expected 780 session samples in either window, or a
    missing latency series — insufficient or inconclusive measurement.
 
@@ -967,22 +969,55 @@ dashboard and PostgreSQL; stops in `KeepCharging` mode; requires a
 `DryRunOperation`; changes only the instance type; starts; and waits for
 `health` — every unit active, exactly one lease holder, a real API payload, the
 dashboard, a clean startup reconciliation, a first tick and a green watchdog.
-**Not healthy within the 30-minute abort threshold → automatic resize back to
-`ecs.e-c1m2.large`.** The rollback path is the same code; checkpoint and quiesce
+Not healthy within the 30-minute abort threshold → the script resizes back to
+`ecs.e-c1m2.large`. The rollback path is the same code; checkpoint and quiesce
 are best-effort there, so an unwell host cannot block its own rescue. Every
 `aliyun` call's stderr is captured and redacted.
 
-After the trial session, `evaluate --apply` compares the trial window with the
-pre-registered baseline and **resizes back automatically** on any criterion.
+**That script is a convenience, not the safeguard** (owner, 26 September). It
+runs on the operator's Mac: if the Mac sleeps, the session closes or the network
+drops between `StopInstance` and `StartInstance`, nothing else brings the
+instance back. Transient failures are now retried — about 90 seconds of backoff
+per call for network errors, timeouts and throttling, never for a definite answer
+such as `DryRunOperation` or a refusal — and a restart after a failed step keeps
+trying for about ten minutes. But **the resize and any rollback run only under
+active supervision**, with the owner reachable and the console open on the
+manual card below.
+
+Launch detached, so closing the session or the Mac sleeping cannot kill it:
+
+```
+nohup caffeinate -dimsu python3 scripts/resize_trial.py resize --to ecs.e-c1m1.large \
+  > ~/options-alpha-offsite/resize-trial/run.log 2>&1 &
+tail -f ~/options-alpha-offsite/resize-trial/run.log
+```
+
+**Manual rollback card — works with no Mac, no session and no script.** Alibaba
+Cloud console, ECS, region Singapore, instance `options-alpha-demo`:
+
+1. **Stopped on either type, and the script is not running:** click **Start**.
+   That alone restores service.
+2. **Running on 2 GB but unhealthy, or failing a criterion:** **Stop** (standard
+   mode, not economical) → wait for *Stopped* → **Change Instance Type** (under
+   **⋮ More**; the submenu name varies by console version) → `ecs.e-c1m2.large`
+   → confirm → **Start**. Rehearse finding it before the window.
+3. Check `http://<EIP>/` renders within about three minutes. The disk, the EIP
+   and all data are untouched by a type change.
+
+After the trial session, `evaluate` compares the trial window with the
+pre-registered baseline. **It is run without `--apply`**: the verdict is
+reported, and any rollback is performed under supervision before the next open.
+After the close there is no urgency — the market does not reopen until
+13:30 UTC.
 
 #### Schedule
 
 | | UTC |
 |---|---|
 | First weekly off-host copy written and verified, on the unchanged server | Sun 27 Sep |
-| Maintenance window (owner reachable) | Sun 27 Sep — to be confirmed |
+| Maintenance window (owner reachable, supervised) | Sun 27 Sep, 19:15–20:15 |
 | Trial session | Mon 28 Sep, 13:30–20:00 |
-| Evaluation, with automatic rollback on any criterion | Mon 28 Sep, after 20:00 |
+| Evaluation, after the 16:15 ET options close and the 21:00 post-close backup; rollback, if any, supervised before Tuesday's open | Mon 28 Sep, 21:12 |
 
 #### Results
 
