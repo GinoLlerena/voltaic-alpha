@@ -26,8 +26,9 @@ insufficient or inconclusive.
 
 This runs on the operator's machine and cannot outlive it: the resize and any
 rollback are run under active supervision, with the console open on the manual
-rollback card in cost analysis §7.7. Launch it under `nohup caffeinate` so a
-closed session or a sleeping Mac cannot kill it mid-change.
+rollback card in cost analysis §7.7. Launching it under `nohup caffeinate` is
+best-effort only - it survives the session closing and idle sleep, but not a
+closed lid, a power loss or a lost connection; the console card covers those.
 """
 
 from __future__ import annotations

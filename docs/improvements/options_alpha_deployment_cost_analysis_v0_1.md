@@ -984,7 +984,10 @@ trying for about ten minutes. But **the resize and any rollback run only under
 active supervision**, with the owner reachable and the console open on the
 manual card below.
 
-Launch detached, so closing the session or the Mac sleeping cannot kill it:
+Launch detached. This is **best-effort**: it survives the Claude session
+closing, and `caffeinate` holds off idle sleep, but **closing the lid, a power
+loss or a lost connection can still stop it mid-change** — and then the console
+recovery steps below are the way back:
 
 ```
 nohup caffeinate -dimsu python3 scripts/resize_trial.py resize --to ecs.e-c1m1.large \
