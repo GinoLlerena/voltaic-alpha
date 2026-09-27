@@ -641,23 +641,39 @@ local restore of `daily/2026-09-26` (654 decisions, `LIVE`).
 
 ### 11.2 The cutover procedure
 
-**Not before the 2c2g trial is evaluated (Monday 28 September).** The trial
-measures the current stack; changing it mid-trial voids the comparison.
+**Not before the 2c2g trial is evaluated (Monday 28 September, after 17:15 ET).**
+The trial measures the current stack; changing it mid-trial voids the comparison.
 
-1. Deploy code and a fresh `frontend/dist` (built on the Mac; the host needs
-   no Node). Remember `deploy_worker.sh` does not ship everything (the
-   deployment-hygiene follow-ups) — check `frontend/dist/index.html` exists.
-2. Drop-in for `options-alpha-api`: `PRESENTATION_API_HOST=0.0.0.0`,
-   `PRESENTATION_UI_DIR=/opt/options-alpha/frontend/dist`. Restart it.
-3. **Verification, owner's IP only:** add one SG ingress rule for 8600 from the
-   owner's /32. Run the live suite with
-   `LIVE_URL=http://47.236.50.157:8600`. Check it by hand in a browser.
-4. Cut over: in `options-alpha-port80.service`, change `--to-port 8501` to
-   `--to-port 8600` in both `ExecStart` and `ExecStop`; `daemon-reload`; apply
-   the iptables delete/add pair above. Rerun the live suite against
-   `http://47.236.50.157`.
-5. Remove the temporary 8600 SG rule; port 80 now reaches the API.
-6. Streamlit stays running on 8501 (still open in the SG) for one release as
-   the rollback, per the section above with `<new>` = 8600.
-7. Recheck memory and latency on the new stack (capacity collector and
-   evaluator), since the API process now also serves the UI.
+`scripts/deploy_react.py` does this end to end, from the operator's machine:
+
+    python3 scripts/deploy_react.py inspect          # read-only
+    python3 scripts/deploy_react.py deploy           # dry run: builds, changes nothing
+    python3 scripts/deploy_react.py deploy --apply
+    python3 scripts/deploy_react.py rollback [--full]
+
+What `deploy --apply` does:
+
+1. Refuses inside the trading day (08:30–17:15 ET on weekdays), if the
+   watchdog is red, a unit is down or an incident is open, and if any package
+   source other than `api/server.py` and `api/limits.py` differs on the host.
+   Inspected 27 September: those two modules are the only difference, so the
+   worker's code is untouched and neither the worker nor Streamlit restarts.
+2. Builds `frontend/dist` from a clean tree and ships it and the two modules
+   over Cloud Assistant in checksummed chunks (no SSH, no inbound port).
+3. Keeps the old modules under `/opt/options-alpha/.deploy-backup/<stamp>/`,
+   installs, and adds a drop-in to `options-alpha-api`
+   (`PRESENTATION_API_HOST=0.0.0.0`, `PRESENTATION_UI_DIR`). Restarts the API
+   only, then checks on the host: API 200, UI shell served, deep link 200,
+   unknown API path 404, Streamlit 200, worker active.
+4. Opens 8600 to the operator's /32 and runs the live suite against it.
+5. Cuts port 80 over with a drop-in on `options-alpha-port80` (the repo unit
+   is unchanged), then runs the live suite against port 80.
+6. Revokes the 8600 rule in all cases. Streamlit stays on 8501 as the rollback.
+
+A failure after the first change is reverted by the same run: port 80 back to
+8501, the drop-in removed, the old API module restored. That revert runs from
+the operator's machine; it is not a host-side safety net. `rollback` does the
+same by hand at any time and never stops the instance.
+
+After cutover: recheck memory and latency on the next full session against
+the 25 September baseline (`resize_trial.py evaluate` without `--apply`).
