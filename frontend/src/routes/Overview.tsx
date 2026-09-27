@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { DEFAULT_VIEW, type View } from "../api/views";
+import { ViewPicker } from "../components/ViewPicker";
 import type { Schemas } from "../api/client";
 import { api } from "../api/client";
 import { useResource } from "../api/useResource";
@@ -14,10 +16,16 @@ type Review = Schemas["ReviewOverviewOut"];
 type Scenes = Schemas["SceneOut"][];
 
 /** The ten-second read: what this is, where it came from, and what it decided. */
-export function Overview({ tourStep }: { tourStep: number | null }) {
+export function Overview({
+  tourStep,
+  view = DEFAULT_VIEW,
+}: {
+  tourStep: number | null;
+  view?: View;
+}) {
   const status = useResource<Status>(api.status());
   const tiles = useResource<Tiles>(api.proofTiles());
-  const listing = useResource<Listing>(api.groupedDecisions("Notable"));
+  const listing = useResource<Listing>(api.groupedDecisions(view));
   const review = useResource<Review>(api.reviewOverview());
   const scenes = useResource<Scenes>(api.tour());
 
@@ -96,6 +104,7 @@ export function Overview({ tourStep }: { tourStep: number | null }) {
                 : ""}
             </small>
           </h2>
+          <ViewPicker current={view} />
           <DecisionList entries={listing.envelope.data.entries} />
         </section>
       ) : null}

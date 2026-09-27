@@ -9,6 +9,7 @@ import {
   useSearch,
 } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
+import { asView, DEFAULT_VIEW, type View } from "./api/views";
 import { Activity } from "./routes/Activity";
 import { Decision } from "./routes/Decision";
 import { Overview } from "./routes/Overview";
@@ -40,7 +41,10 @@ const rootRoute = createRootRoute({
 });
 
 export interface TourSearch {
-  tour?: number;
+  // `| undefined` is deliberate: validation returns a rejected value as an
+  // explicit undefined so it overrides the raw search merged from the root.
+  tour?: number | undefined;
+  view?: View | undefined;
 }
 
 const indexRoute = createRoute({
@@ -48,12 +52,21 @@ const indexRoute = createRoute({
   path: "/",
   validateSearch: (search: Record<string, unknown>): TourSearch => {
     const raw = Number(search["tour"]);
-    // Clamped, never raised on: a hand-edited step is a typo, not an error.
-    return Number.isFinite(raw) && raw > 0 ? { tour: Math.floor(raw) } : {};
+    const view = asView(search["view"]);
+    // Clamped, never raised on: a hand-edited step or view is a typo, not an error.
+    // Both keys are always returned, even as undefined: the root route keeps the
+    // raw search and the router merges it underneath, so omitting a rejected
+    // value would let the raw one - `?view=Bogus` - show through.
+    return {
+      tour: Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : undefined,
+      view,
+    };
   },
   component: function IndexRoute() {
-    const { tour } = useSearch({ from: "/" });
-    return <Overview tourStep={tour ?? null} />;
+    const { tour, view } = useSearch({ from: "/" });
+    // Re-checked where it is used: a view the server rejects would turn a
+    // mistyped link into an error panel instead of the default list.
+    return <Overview tourStep={tour ?? null} view={asView(view) ?? DEFAULT_VIEW} />;
   },
 });
 

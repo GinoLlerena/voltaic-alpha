@@ -23,10 +23,12 @@ interface AxeResult {
  * `RUI-VAL-011` found 22 serious failures by hand — 16 of them one palette
  * token at 3.09:1, and 6 a spine that faded unreached stages with `opacity`,
  * unreadable and silent to a screen reader. Neither was visible to a test that
- * never applies CSS. This is that scan, run on every route and both widths.
+ * never applies CSS. This is that scan, run on every route at the release gate's
+ * widths (§16.4: 360, 736, 1024, 1440) plus the 1280 and 400 it began with.
  */
+const WIDTHS = [1440, 1280, 1024, 736, 400, 360];
 for (const [index, route] of routes.entries()) {
-  for (const width of [1280, 400]) {
+  for (const width of WIDTHS) {
     test(`${names[index]} at ${width}px has no accessibility violations`, async ({ page }) => {
       const missed = await replayApi(page);
       await page.setViewportSize({ width, height: 900 });
@@ -52,18 +54,21 @@ for (const [index, route] of routes.entries()) {
   }
 }
 
-test("the page does not overflow a phone", async ({ page }) => {
-  await replayApi(page);
-  await page.setViewportSize({ width: 400, height: 800 });
-  for (const route of routes) {
-    await page.goto(route);
-    await page.waitForLoadState("networkidle");
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow, `${route} overflows horizontally`).toBe(0);
-  }
-});
+// §16.4: no essential horizontal scroll on mobile - down to the gate's 360 px.
+for (const width of [360, 400, 736]) {
+  test(`the page does not overflow at ${width}px`, async ({ page }) => {
+    await replayApi(page);
+    await page.setViewportSize({ width, height: 800 });
+    for (const route of routes) {
+      await page.goto(route);
+      await page.waitForLoadState("networkidle");
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `${route} overflows horizontally at ${width}px`).toBe(0);
+    }
+  });
+}
 
 test("every decision is reachable and openable from the keyboard alone", async ({ page }) => {
   await replayApi(page);

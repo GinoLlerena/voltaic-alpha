@@ -2,6 +2,8 @@ import { createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { VIEWS } from "../api/views";
 import { App } from "../router";
 
 const DIGEST = "a".repeat(64);
@@ -599,5 +601,63 @@ describe("the guided path", () => {
     vi.stubGlobal("fetch", respond());
     render(at("/?tour=99"));
     expect(await screen.findByTestId("tour-card")).toBeInTheDocument();
+  });
+});
+
+describe("the decision views", () => {
+  const requested = (fetchMock: ReturnType<typeof respond>) =>
+    fetchMock.mock.calls.map(([input]) => String(input)).filter((u) => u.includes("/decisions/grouped"));
+
+  it("asks for the Notable view by default", async () => {
+    const fetchMock = respond();
+    vi.stubGlobal("fetch", fetchMock);
+    render(at("/"));
+    await screen.findByTestId("decision-list");
+    expect(requested(fetchMock)).toEqual(["/api/v1/decisions/grouped?view=Notable"]);
+  });
+
+  it("asks for the view in the URL, and marks it current", async () => {
+    const fetchMock = respond();
+    vi.stubGlobal("fetch", fetchMock);
+    render(at("/?view=Refusals"));
+    await screen.findByTestId("decision-list");
+    expect(requested(fetchMock)).toEqual(["/api/v1/decisions/grouped?view=Refusals"]);
+    const nav = screen.getByRole("navigation", { name: "Decision views" });
+    const current = nav.querySelector('[aria-current="page"]');
+    expect(current).toHaveTextContent("Refusals");
+  });
+
+  it("treats an unknown view as the default rather than sending it", async () => {
+    const fetchMock = respond();
+    vi.stubGlobal("fetch", fetchMock);
+    render(at("/?view=Bogus"));
+    await screen.findByTestId("decision-list");
+    expect(requested(fetchMock)).toEqual(["/api/v1/decisions/grouped?view=Notable"]);
+  });
+
+  it("offers every view as a shareable link", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const nav = await screen.findByRole("navigation", { name: "Decision views" });
+    const links = [...nav.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
+    expect(links).toEqual([
+      ["Notable", "/"],
+      ["Positions", "/?view=Positions"],
+      ["Refusals", "/?view=Refusals"],
+      ["Everything", "/?view=Everything"],
+    ]);
+  });
+
+  it("offers exactly the views the server accepts", () => {
+    interface Spec {
+      paths: Record<string, { get: { parameters: { name: string; schema: { pattern?: string } }[] } }>;
+    }
+    // jsdom gives import.meta.url an http: scheme; the suite runs from frontend/.
+    const spec = JSON.parse(readFileSync(`${process.cwd()}/openapi.json`, "utf8")) as Spec;
+    const param = spec.paths["/api/v1/decisions/grouped"]?.get.parameters.find((p) => p.name === "view");
+    const pattern = param?.schema.pattern ?? "";
+    const server = /^\^\((.*)\)\$$/.exec(pattern)?.[1]?.split("|");
+    expect(server, "the view parameter must carry an enumerating pattern").toBeDefined();
+    expect([...VIEWS]).toEqual(server);
   });
 });
