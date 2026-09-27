@@ -404,8 +404,10 @@ For the resize only:
    22.5 MB. With OSS refused this is an operator `scp` pull, at **$0.00**. It
    must leave the instance: a copy that stays on `/dev/vda3` protects against
    nothing the resize could do.
-2. Optionally one ECS snapshot of the system disk (4.1 GB used) —
-   **~$0.20/month while retained**, at an assumed $0.05/GB-month.
+2. One ECS snapshot of the system disk (4.1 GB used) —
+   **~$0.20/month while retained**, at an assumed $0.05/GB-month. Optional in
+   the first draft; **required** since 27 September 2026 (owner): the tool
+   does not stop the instance without a verified one.
 
 **Deletion:** delete the snapshot **7 days after the resize passes validation**.
 Keep the dump — at $0.0004/month it is cheaper to retain than to reason about,
@@ -963,14 +965,18 @@ cannot land.
 
 `preflight` (read-only) → `resize --to ecs.e-c1m1.large`, which records a
 checkpoint; takes a fresh verified dump, uploads it encrypted and copies it
-server-side into `anchor/`; takes a system-disk snapshot (optional per §7.2,
-deleted seven days after validation); quiesces timers, the worker, the API, the
+server-side into `anchor/`; takes a system-disk snapshot and waits until it is
+verified — `accomplished`, 100%, of this instance's disk — or stops the run
+before anything is quiesced (a required gate since 27 September; a rollback may
+use a verified snapshot from the last seven days instead of a new one; deleted
+seven days after validation); quiesces timers, the worker, the API, the
 dashboard and PostgreSQL; stops in `KeepCharging` mode; requires a
 `DryRunOperation`; changes only the instance type; starts; and waits for
 `health` — every unit active, exactly one lease holder, a real API payload, the
 dashboard, a clean startup reconciliation, a first tick and a green watchdog.
 Not healthy within the 30-minute abort threshold → the script resizes back to
-`ecs.e-c1m2.large`. The rollback path is the same code; checkpoint and quiesce
+`ecs.e-c1m2.large` — from the operator machine, so only while that run is
+alive; it is not a host-side safety net. The rollback path is the same code; checkpoint and quiesce
 are best-effort there, so an unwell host cannot block its own rescue. Every
 `aliyun` call's stderr is captured and redacted.
 
@@ -1018,15 +1024,44 @@ After the close there is no urgency — the market does not reopen until
 | | UTC |
 |---|---|
 | First weekly off-host copy written and verified, on the unchanged server | Sun 27 Sep |
-| Maintenance window (owner reachable, supervised) | Sun 27 Sep, 19:15–20:15 |
+| Maintenance window (unsupervised, monitored — owner, 27 Sep) | Sun 27 Sep, 19:15–20:15 |
 | Trial session | Mon 28 Sep, 13:30–20:00 |
-| Evaluation, after the 16:15 ET options close and the 21:00 post-close backup; rollback, if any, supervised before Tuesday's open | Mon 28 Sep, 21:12 |
+| Evaluation, after the 16:15 ET options close and the 21:00 post-close backup; rollback, if any, manual before Tuesday's open | Mon 28 Sep, 21:12 |
 
 #### Results
 
-*To be recorded:* window start and end, actual downtime, the post-change health
-record and `MemTotal`, the trial session's samples, latencies and memory, the
-verdict and reasons, and the final instance type.
+**Supervision changed, 27 September.** The owner first required supervision,
+then re-authorised the trial as unsupervised and monitored: a personal project
+in Paper/observe, where brief downtime or a delayed rollback is acceptable.
+Signals are recorded on the host (capacity collector, watchdog, backup and
+offsite status); alerts may be delayed and rollback is manual; the next change
+waits for a review of those signals. If the review cannot run, the server is
+left as it is.
+
+**Preconditions, 27 September.** Weekly copy `weekly/2026-09-27` byte-identical
+to the daily (same size, ETag and metadata); restore drill from it exact
+(sha256, 28 tables, 5,370 rows, `0008_evaluation_runs`; 0 orphans, 0 duplicate
+decision hashes; 28 s). Preflight PASS at 19:15, worker in `observe`. Because
+the tool then treated the snapshot as optional, a gate snapshot was taken by
+hand first (`s-t4n5nsivq3wpp84hnuxi`, 202 s, `accomplished`); the gate is now
+in the tool.
+
+**Resize, Sunday 27 September (UTC).**
+
+| | |
+|---|---|
+| Checkpoint | 654 decisions, 654 snapshots, 160 outcomes, `0008_evaluation_runs` |
+| Fresh verified copy | in `anchor/`, 52,242,332 B |
+| Tool snapshot | `s-t4n896icjhsdb4n1o73m`, `accomplished` |
+| Quiesced → stopped → modified → running | 19:22:22 → 19:22:41 (15 s) → 19:22:51 → 19:22:59 |
+| Health gate passed | 19:24:17 — **downtime 115 s** |
+| After | `ecs.e-c1m1.large`, `MemTotal` 1,651,680 kB, ~935 MiB available at idle, PSI 0 |
+| Post-checks | all units active, one lease, reconcile clean, first tick 19:23:35, watchdog green; row counts and revision unchanged; worker still `observe` (trading authority unchanged); a backup run verified (28 tables); offsite run ok (no upload: that day's copy already held) |
+| Data gap | capacity samples 19:21:51 → 19:23:30 (99 s, about 3 samples); worker ticks ~73 s; Sunday, market closed |
+
+*Still to be recorded:* the first daily copy produced on 2c2g
+(`daily/2026-09-28`), the trial session's samples, latencies and memory, the
+verdict and any criterion that tripped, and the final instance type.
 
 ## 8. Revision history
 

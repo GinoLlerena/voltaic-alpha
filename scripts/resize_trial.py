@@ -11,7 +11,9 @@ Subcommands:
 
   preflight          read-only: instance, stock for target AND rollback type,
                      backups fresh, watchdog green, no open incidents
-  resize --to TYPE   the change itself; the same path serves the rollback
+  resize --to TYPE   the change itself; the same path serves the rollback.
+                     Never stops the instance without a verified disk
+                     snapshot (owner precondition, 27 September 2026)
   health             post-start checks; exit 0 only when every one passes
   evaluate           the trial verdict against the baseline session
 
@@ -279,6 +281,93 @@ def preflight(args: argparse.Namespace) -> int:
     return 0 if not problems else 1
 
 
+#: How long a new snapshot may take to complete. The first full snapshot of the
+#: 40 GiB disk took 202 s on 27 September 2026; incremental ones are faster.
+SNAPSHOT_WAIT_SECONDS = 20 * 60
+#: A rollback may lean on the trial's own pre-resize snapshot instead of a new one.
+ROLLBACK_SNAPSHOT_MAX_AGE = timedelta(days=7)
+
+
+def system_disk() -> str:
+    disks = aliyun("ecs", "DescribeDisks", "--RegionId", REGION, "--InstanceId", INSTANCE)
+    return str(disks["Disks"]["Disk"][0]["DiskId"])
+
+
+def verified(snap: dict[str, Any], disk: str) -> bool:
+    """Complete, whole, and of this instance's disk - not merely created."""
+    return (
+        snap.get("Status") == "accomplished"
+        and str(snap.get("Progress", "")).rstrip("%") == "100"
+        and snap.get("SourceDiskId") == disk
+    )
+
+
+def summary(snap: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "snapshot_id": snap.get("SnapshotId"),
+        "status": snap.get("Status"),
+        "created": snap.get("CreationTime"),
+    }
+
+
+def take_snapshot(stamp: str, disk: str) -> dict[str, Any]:
+    """Create a snapshot and wait until it is verified; Stop otherwise."""
+    made = aliyun(
+        "ecs", "CreateSnapshot", "--RegionId", REGION, "--DiskId", disk,
+        "--SnapshotName", f"pre-resize-{stamp}", check=False,
+    )
+    sid = made.get("SnapshotId")
+    if not sid:
+        raise Stop(f"snapshot not created ({made.get('_error')}); the instance was not stopped")
+    deadline = time.time() + SNAPSHOT_WAIT_SECONDS
+    while True:
+        snap = dict(
+            aliyun(
+                "ecs", "DescribeSnapshots", "--RegionId", REGION,
+                "--SnapshotIds", json.dumps([sid]),
+            )["Snapshots"]["Snapshot"][0]
+        )
+        if verified(snap, disk):
+            return summary(snap)
+        if snap.get("Status") == "failed" or time.time() > deadline:
+            raise Stop(
+                f"snapshot {sid} not verified ({snap.get('Status')}, {snap.get('Progress')}); "
+                "the instance was not stopped"
+            )
+        time.sleep(10)
+
+
+def recent_snapshot(disk: str, now: datetime) -> dict[str, Any] | None:
+    """The newest verified snapshot of this disk within the rollback age, if any."""
+    snaps = aliyun(
+        "ecs", "DescribeSnapshots", "--RegionId", REGION, "--DiskId", disk,
+        "--Status", "accomplished",
+    )["Snapshots"]["Snapshot"]
+    fresh = [
+        s for s in snaps
+        if verified(s, disk)
+        and now - datetime.fromisoformat(s["CreationTime"].replace("Z", "+00:00"))
+        <= ROLLBACK_SNAPSHOT_MAX_AGE
+    ]
+    return summary(max(fresh, key=lambda s: s["CreationTime"])) if fresh else None
+
+
+def snapshot_gate(rollback: bool, stamp: str) -> dict[str, Any]:
+    """No stop without a verified snapshot of the system disk.
+
+    A resize takes a new one and waits for it. A rollback exists for an unwell
+    host, so it first accepts a verified snapshot from the last seven days - the
+    trial's own pre-resize one - rather than delay the way back; only with none
+    does it take a new one. Either way, no verified snapshot means no stop.
+    """
+    disk = system_disk()
+    if rollback:
+        found = recent_snapshot(disk, datetime.now(UTC))
+        if found:
+            return {**found, "source": "existing"}
+    return {**take_snapshot(stamp, disk), "source": "new"}
+
+
 FRESH_ANCHOR = "fresh_anchor.py"
 
 QUIESCE = r"""
@@ -362,43 +451,15 @@ def resize(args: argparse.Namespace) -> int:
                     raise Stop("server-side copy to anchor/ failed")
                 record["anchor_object"] = dst
                 log(record, "fresh_verified_copy", **record["pre_resize_copy"], anchor=dst)
-                disk = aliyun(
-                    "ecs", "DescribeDisks", "--RegionId", REGION, "--InstanceId", INSTANCE
-                )["Disks"]["Disk"][0]["DiskId"]
-                snap = aliyun(
-                    "ecs",
-                    "CreateSnapshot",
-                    "--RegionId",
-                    REGION,
-                    "--DiskId",
-                    disk,
-                    "--SnapshotName",
-                    f"pre-resize-{stamp}",
-                    check=False,
-                )
-                record["snapshot"] = (
-                    snap.get("SnapshotId")
-                    or f"not created ({snap.get('_error')}) - optional per plan"
-                )
-                log(record, "snapshot", result=record["snapshot"])
-                if snap.get("SnapshotId"):
-                    for _ in range(90):
-                        s = aliyun(
-                            "ecs",
-                            "DescribeSnapshots",
-                            "--RegionId",
-                            REGION,
-                            "--SnapshotIds",
-                            json.dumps([snap["SnapshotId"]]),
-                        )["Snapshots"]["Snapshot"][0]
-                        if s["Status"] == "accomplished":
-                            break
-                        time.sleep(10)
-                    log(record, "snapshot_done", status=s["Status"])
-            if args.dry_run:
-                log(record, "dry_run_stop_here", note="would quiesce, stop, resize and start")
-                save()
-                return 0
+        # A precondition the owner set on 27 September 2026: no stop without a
+        # verified disk snapshot. It runs in a dry run too, so a rehearsal proves it.
+        record["snapshot"] = snapshot_gate(rollback, stamp)
+        log(record, "snapshot_verified", **record["snapshot"])
+        if args.dry_run:
+            log(record, "dry_run_stop_here", note="would quiesce, stop, resize and start")
+            save()
+            return 0
+        if inst["Status"] == "Running":
             try:
                 log(record, "quiesce", out=remote(QUIESCE, timeout=180).strip())
             except Stop as exc:
@@ -606,12 +667,17 @@ def main() -> int:
     sub.add_parser("preflight")
     r = sub.add_parser("resize")
     r.add_argument("--to", required=True, choices=(TRIAL_TYPE, ROLLBACK_TYPE))
-    r.add_argument("--dry-run", action="store_true", help="checkpoint and stop before any change")
+    r.add_argument(
+        "--dry-run", action="store_true",
+        help="checkpoint and verified snapshot, then stop before any change",
+    )
     sub.add_parser("health")
     e = sub.add_parser("evaluate")
     for k in ("baseline-start", "baseline-end", "trial-start", "trial-end"):
         e.add_argument(f"--{k}", required=True, help="UTC ISO, e.g. 2026-09-24T13:30")
-    e.add_argument("--apply", action="store_true", help="roll back automatically on any criterion")
+    e.add_argument(
+        "--apply", action="store_true", help="roll back on any criterion, from this machine"
+    )
     args = parser.parse_args()
     return {"preflight": preflight, "resize": resize, "health": health, "evaluate": evaluate}[
         args.cmd
