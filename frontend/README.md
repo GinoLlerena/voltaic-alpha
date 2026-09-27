@@ -35,6 +35,21 @@ client that cannot express one cannot drift into attempting one. A test asserts
 this against the source with comments stripped, because a guard that cannot tell
 a call from prose explaining why we never make that call punishes documentation.
 
-This is the shell only: source banner, status strip, decision list, and one
-decision's identity. The workspaces are `RUI-3` onward. Storybook, axe and
-visual-regression checks are part of `RUI-2`'s exit and are not here yet.
+## How it is served
+
+In production the API serves the build from the same origin
+(`PRESENTATION_UI_DIR`, default `frontend/dist`), so there is no CORS and no
+separate file server. `/api/` is rate-limited; static files are not. See the
+deployment runbook, section 11.
+
+## Checks
+
+- `pnpm run test` — unit tests (vitest, jsdom).
+- `pnpm exec playwright test` — axe at 360–1440 px, no horizontal overflow on
+  phone widths, and visual baselines per platform (`e2e/__screenshots__/`).
+  Linux baselines come from the CI artifact.
+- `LIVE_URL=http://host:port pnpm exec playwright test -c playwright.live.config.ts`
+  — the main flows against a real, running stack (`e2e-live/`). Not in CI: it
+  needs data.
+
+The theme is dark-only for now; a light theme is deferred.

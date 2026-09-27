@@ -615,3 +615,49 @@ case is that the dashboard is serving again within one command.
 This is written before a cutover rather than after, so the procedure exists at
 the moment it would be needed rather than being reconstructed under pressure.
 It has not been rehearsed, because there is nothing yet to rehearse it against.
+
+### 11.1 Serving the UI from the API (26 September 2026)
+
+Owner decision: publish the API **at the UI's origin, rate-limited**, rather
+than add a separate file server. The API process now does both, which settles
+point 2 above:
+
+- `PRESENTATION_UI_DIR` (default `<repo>/frontend/dist`) is served at `/`;
+  any path that is not a real file returns `index.html` with
+  `Cache-Control: no-cache`, so deep links and reloads work. Paths are resolved
+  and must stay inside the build directory.
+- `/api/...` is never the app shell: an unknown API path is a 404.
+- `/api/` is limited per client address (token bucket, burst 60, 3/s
+  sustained, `limits.py`); a flood gets 429 with `Retry-After`. Static files
+  are not limited — they never reach PostgreSQL.
+- The contract is unchanged: every OpenAPI path is still under `/api/v1`, and
+  writes are still 405.
+
+Tests: `tests/test_api_public.py`. The live suite
+(`frontend/e2e-live/`, `LIVE_URL=... pnpm exec playwright test -c
+playwright.live.config.ts`) exercises the real flows against a running stack
+and fails on any API error response or console error. It passed 8/8 against a
+local restore of `daily/2026-09-26` (654 decisions, `LIVE`).
+
+### 11.2 The cutover procedure
+
+**Not before the 2c2g trial is evaluated (Monday 28 September).** The trial
+measures the current stack; changing it mid-trial voids the comparison.
+
+1. Deploy code and a fresh `frontend/dist` (built on the Mac; the host needs
+   no Node). Remember `deploy_worker.sh` does not ship everything (the
+   deployment-hygiene follow-ups) — check `frontend/dist/index.html` exists.
+2. Drop-in for `options-alpha-api`: `PRESENTATION_API_HOST=0.0.0.0`,
+   `PRESENTATION_UI_DIR=/opt/options-alpha/frontend/dist`. Restart it.
+3. **Verification, owner's IP only:** add one SG ingress rule for 8600 from the
+   owner's /32. Run the live suite with
+   `LIVE_URL=http://47.236.50.157:8600`. Check it by hand in a browser.
+4. Cut over: in `options-alpha-port80.service`, change `--to-port 8501` to
+   `--to-port 8600` in both `ExecStart` and `ExecStop`; `daemon-reload`; apply
+   the iptables delete/add pair above. Rerun the live suite against
+   `http://47.236.50.157`.
+5. Remove the temporary 8600 SG rule; port 80 now reaches the API.
+6. Streamlit stays running on 8501 (still open in the SG) for one release as
+   the rollback, per the section above with `<new>` = 8600.
+7. Recheck memory and latency on the new stack (capacity collector and
+   evaluator), since the API process now also serves the UI.

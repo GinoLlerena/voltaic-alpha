@@ -25,9 +25,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi import Path as PathParam
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from ..presentation import (
@@ -45,6 +46,7 @@ from ..presentation import (
 from ..presentation import copy as public_copy
 from ..presentation.source import Resolver, Source
 from . import dto, views
+from .limits import RateLimiter, retry_after_header
 
 ROOT = Path(__file__).resolve().parents[3]
 COMMITTED = ROOT / "demo" / "h0_demo.db"
@@ -74,6 +76,8 @@ def create_app(
     *,
     root: Path = ROOT,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ui_dir: Path | None = None,
+    limiter: RateLimiter | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Options Alpha presentation API",
@@ -413,7 +417,54 @@ def create_app(
         return envelope(db, dto.WorkerEventsOut(available=True, reason=None, items=out))
 
     app.include_router(api)
+
+    if limiter is not None:
+        # Only /api/ reaches the database; static assets are left alone.
+        @app.middleware("http")
+        async def rate_limit(request: Request, call_next: Callable[..., Any]) -> Any:
+            if request.url.path.startswith("/api/"):
+                client = request.client.host if request.client else "unknown"
+                wait = limiter.check(client)
+                if wait:
+                    return JSONResponse(
+                        {"detail": "rate limited"},
+                        status_code=429,
+                        headers={"Retry-After": retry_after_header(wait)},
+                    )
+            return await call_next(request)
+
+    if ui_dir is not None and (ui_dir / "index.html").is_file():
+        _serve_ui(app, ui_dir)
     return app
+
+
+def _serve_ui(app: FastAPI, ui_dir: Path) -> None:
+    """Serve the built React UI from the API's own origin.
+
+    One origin, so the browser's same-origin requests to /api/v1 need no CORS,
+    and one process, so publishing the UI adds nothing to run on a small host.
+    Kept out of the OpenAPI document: the contract clients generate from is the
+    API, and a catch-all route would only obscure it.
+    """
+    root = ui_dir.resolve()
+    index = root / "index.html"
+    assets = root / "assets"
+    if assets.is_dir():
+        # Hashed file names: safe to cache for as long as a browser likes.
+        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str) -> Response:
+        # An unknown API path is a 404, never the app shell: a client that
+        # mistypes a route must learn so, not receive HTML with a 200.
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404)
+        candidate = (root / path).resolve()
+        if path and candidate.is_file() and candidate.is_relative_to(root):
+            return FileResponse(candidate)
+        # Client-side routes (a decision, the tour) all load the shell. no-cache,
+        # so a deploy takes effect on the next load rather than after expiry.
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 def build_app() -> FastAPI:
@@ -423,4 +474,8 @@ def build_app() -> FastAPI:
     the dashboard uses, and never `DATABASE_URL`, which is the worker's.
     """
     live_url = os.environ.get("DASHBOARD_DATABASE_URL", "").strip()
-    return create_app(Resolver(live_url, COMMITTED))
+    # The built UI, when present. Absent in development and in CI's Python job,
+    # where the API is served alone.
+    ui = os.environ.get("PRESENTATION_UI_DIR", "").strip()
+    ui_dir = Path(ui) if ui else ROOT / "frontend" / "dist"
+    return create_app(Resolver(live_url, COMMITTED), ui_dir=ui_dir, limiter=RateLimiter())

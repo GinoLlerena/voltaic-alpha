@@ -230,3 +230,11 @@ nav a[data-status="active"], nav a.active { color: var(--cool); }
 .matrix tr[data-kind="fault"] td.role { color: var(--alarm); }
 [data-severity] .m { color: var(--warm); }
 [data-open="true"] .m { color: var(--alarm); }
+
+/* Decision views: a row of links, the current one marked for sight and for
+   assistive technology alike (aria-current), never by colour alone. */
+.views { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 .5rem; border-bottom: 1px solid var(--edge); }
+.views a { font-family: var(--mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); padding: .45rem .8rem; text-decoration: none; border-bottom: 2px solid transparent; }
+.views a:hover { color: var(--text); }
+.views a[aria-current="page"] { color: var(--cool); border-bottom-color: var(--cool); }
