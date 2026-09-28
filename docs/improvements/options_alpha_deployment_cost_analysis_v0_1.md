@@ -1059,9 +1059,39 @@ in the tool.
 | Post-checks | all units active, one lease, reconcile clean, first tick 19:23:35, watchdog green; row counts and revision unchanged; worker still `observe` (trading authority unchanged); a backup run verified (28 tables); offsite run ok (no upload: that day's copy already held) |
 | Data gap | capacity samples 19:21:51 → 19:23:30 (99 s, about 3 samples); worker ticks ~73 s; Sunday, market closed |
 
-*Still to be recorded:* the first daily copy produced on 2c2g
-(`daily/2026-09-28`), the trial session's samples, latencies and memory, the
-verdict and any criterion that tripped, and the final instance type.
+**Trial session, Monday 28 September — verdict PASS (owner, on the rule's
+wording).** Reviewed at 22:56 UTC. The scheduled in-session checks did not run
+(the operator session was inactive), so nothing watched live; the host recorded
+the whole session.
+
+*Backups from 2c2g.* `daily/2026-09-28` was dumped at 00:01:28 UTC — after the
+resize — and uploaded at 00:30:07 (52,242,697 B, 28 tables,
+`0008_evaluation_runs`); it decrypts to the recorded sha256. The 22:01 UTC
+hourly backup verified.
+
+| 13:30–20:00 UTC, 780 samples each | Baseline, 4 GB (25 Sep) | Trial, 2 GB (28 Sep) | Limit |
+|---|---|---|---|
+| p95 `api_status` | 34.9 ms | 37.0 ms (+6.0%) | more than +20% |
+| p95 `api_decisions` | 28.7 ms | 29.3 ms (+2.1%) | more than +20% |
+| p95 dashboard | 4.5 ms | 5.4 ms (**+20.0%**) | more than +20% |
+| OOM kills | 0 | 0 | any |
+| PSI memory `some` avg10, max / non-zero samples | 0.0 / 0 | 0.0 / 0 | > 1.0 / > 1% |
+| Minimum MemAvailable | 2,487 MiB | 735 MiB | < 256 MiB for 5 min |
+| Probe, backup, offsite failures; failed ticks | 0 | 0 | any |
+| Longest tick gap / lease heartbeat age | 313 s / 26 s | 311 s / 25 s | 900 s / 120 s |
+
+The tool first returned ROLLBACK on the dashboard row alone. The samples are
+0.1 ms resolution, so 4.5 → 5.4 ms is exactly +20%, which the rule ("more than
+20%") does not cover; the trip came from binary floating point, where
+(5.4 − 4.5) / 4.5 is 0.20000000000000007. The owner ruled it a pass on the
+rule's wording, the comparison now uses exact decimal arithmetic
+(`p95_regressed`, with tests), and the corrected evaluation returns PASS with no
+reasons. For context, dashboard p50 2.5 → 2.6 ms and p99 6.9 → 7.5 ms: a local
+Streamlit probe, not user-visible latency.
+
+**Result:** `ecs.e-c1m1.large`, pay-as-you-go (no subscription). Next: the React
+deploy, then a recheck of the new stack on the next full session against the
+same baseline.
 
 ## 8. Revision history
 

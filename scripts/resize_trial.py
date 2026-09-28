@@ -43,6 +43,7 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -56,6 +57,18 @@ ABORT_SECONDS = 30 * 60
 SESSION_SAMPLES = 780
 MIN_SAMPLE_FRACTION = 0.9
 MAX_P95_REGRESSION = 0.20
+
+
+def p95_regressed(baseline_ms: float, trial_ms: float) -> bool:
+    """True when the trial p95 is MORE than 20% worse, compared exactly.
+
+    In binary floating point (5.4 - 4.5) / 4.5 is 0.20000000000000007, so a float
+    comparison tripped the 28 September evaluation at exactly +20.0% - which the
+    registered rule ("more than 20%") does not cover. The samples are decimal
+    milliseconds, so the comparison is made in decimal.
+    """
+    b, t = Decimal(str(baseline_ms)), Decimal(str(trial_ms))
+    return t - b > b * Decimal(str(MAX_P95_REGRESSION))
 #: Memory rollback thresholds, agreed 26 September 2026 (see evaluate()).
 MAX_PSI_SOME = 1.0  # any sample: >1% of a 10 s window stalled on memory
 MAX_PSI_SHARE = 0.01  # pressure present in more than 1% of samples
@@ -612,8 +625,8 @@ def evaluate(args: argparse.Namespace) -> int:
             reasons.append(f"inconclusive: no {probe} latency in one window")
             continue
         change = (t - b) / b
-        print(f"p95 {probe}: baseline {b:.0f} ms -> trial {t:.0f} ms ({change:+.1%})")
-        if change > MAX_P95_REGRESSION:
+        print(f"p95 {probe}: baseline {b:.1f} ms -> trial {t:.1f} ms ({change:+.1%})")
+        if p95_regressed(b, t):
             reasons.append(f"p95 {probe} {change:+.1%} worse than baseline (limit +20%)")
     if trial["oom_kills"]:
         reasons.append(f"{trial['oom_kills']} OOM kill(s)")
