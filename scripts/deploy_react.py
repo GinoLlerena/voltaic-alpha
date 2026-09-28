@@ -278,13 +278,23 @@ fi
 # --- the operator side ------------------------------------------------------------
 
 
-def operator_cidr() -> str:
-    with urllib.request.urlopen("https://api.ipify.org", timeout=15) as r:  # noqa: S310
-        ip = r.read().decode().strip()
+def as_cidr(ip: str) -> str:
+    """A single IPv4 address as a /32, or Stop: never open a port to a guess."""
+    ip = ip.strip()
     parts = ip.split(".")
     if len(parts) != 4 or not all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
         raise rt.Stop("could not determine the operator's IPv4 address")
     return f"{ip}/32"
+
+
+def operator_cidr() -> str:
+    # curl rather than urllib: python.org's macOS build ships without a CA bundle,
+    # and the first --apply on 28 September stopped here on certificate
+    # verification. curl uses the system trust store, as deploy_worker.sh does.
+    done = run(["curl", "-fsS", "--max-time", "15", "https://api.ipify.org"], check=False)
+    if done.returncode != 0:
+        raise rt.Stop(f"could not look up the operator's address (curl exit {done.returncode})")
+    return as_cidr(done.stdout)
 
 
 def sg_rule(action: str, cidr: str) -> None:
