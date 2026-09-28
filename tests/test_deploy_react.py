@@ -119,5 +119,16 @@ class HostScriptSyntaxTests(unittest.TestCase):
                 self.assertEqual(done.returncode, 0, done.stderr)
 
 
+class OperatorAddressTests(unittest.TestCase):
+    def test_an_address_becomes_a_single_host(self) -> None:
+        self.assertEqual(dr.as_cidr("203.0.113.7\n"), "203.0.113.7/32")
+
+    def test_anything_else_is_refused(self) -> None:
+        for bad in ("", "203.0.113", "203.0.113.256", "<html>", "2001:db8::1"):
+            with self.subTest(bad):
+                with self.assertRaises(dr.rt.Stop):
+                    dr.as_cidr(bad)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
