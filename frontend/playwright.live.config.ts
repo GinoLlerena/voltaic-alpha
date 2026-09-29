@@ -15,7 +15,10 @@ if (!baseURL) throw new Error("set LIVE_URL to the deployment under test");
 export default defineConfig({
   testDir: "./e2e-live",
   fullyParallel: false,
-  retries: 0,
+  // One retry: the operator machine reaches the host through Cloudflare WARP,
+  // which dropped some connections on 28 September 2026. A real defect fails
+  // twice - the 10.8 MB list did - and a retried pass is reported as flaky.
+  retries: 1,
   reporter: [["list"]],
   use: { baseURL, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
