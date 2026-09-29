@@ -39,17 +39,21 @@ export async function replayApi(page: Page): Promise<string[]> {
   return missed;
 }
 
-/** Routes the gate walks: the overview, two tour steps, activity, and every decision. */
+/** Routes the gate walks: Today, the list, Evidence with two tour steps, activity, and every decision. */
 export const routes = [
   "/",
-  "/?tour=1",
-  "/?tour=4",
+  "/decisions",
+  "/evidence",
+  "/evidence?tour=1",
+  "/evidence?tour=4",
   "/activity",
   ...digests.map((d) => `/decisions/${d}`),
 ];
 
 export const names = [
-  "overview",
+  "today",
+  "decisions",
+  "evidence",
   "tour-1",
   "tour-4",
   "activity",

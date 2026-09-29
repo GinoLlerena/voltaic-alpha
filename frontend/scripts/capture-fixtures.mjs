@@ -77,6 +77,8 @@ for (const state of ["open", "all"]) {
   captured[`/api/v1/incidents?state=${state}`] = await envelope(`/api/v1/incidents?state=${state}`);
 }
 captured["/api/v1/worker/events"] = await envelope("/api/v1/worker/events");
+// PUI Phase 2: Today's attention list reads only the recorded faults.
+captured["/api/v1/worker/events?faults_only=true"] = await envelope("/api/v1/worker/events?faults_only=true");
 
 writeFileSync("fixtures/api.json", JSON.stringify(captured, null, 1) + "\n");
 console.log(

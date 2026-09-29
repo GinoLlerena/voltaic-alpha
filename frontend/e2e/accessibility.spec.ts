@@ -72,7 +72,7 @@ for (const width of [360, 400, 736]) {
 
 test("every decision is reachable and openable from the keyboard alone", async ({ page }) => {
   await replayApi(page);
-  await page.goto("/");
+  await page.goto("/decisions");
   await page.waitForLoadState("networkidle");
 
   const reached = new Set<string>();
@@ -92,7 +92,7 @@ test("every decision is reachable and openable from the keyboard alone", async (
   expect(reached.size, "not every decision was tab-reachable").toBeGreaterThan(0);
 
   const first = [...reached][0];
-  await page.goto("/");
+  await page.goto("/decisions");
   await page.waitForLoadState("networkidle");
   for (let i = 0; i < 12 && opened === null; i += 1) {
     await page.keyboard.press("Tab");

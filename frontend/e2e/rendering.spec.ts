@@ -20,7 +20,7 @@ const DIM = "rgb(134, 153, 178)";
 test.describe("the proof tiles", () => {
   test("are laid out, rather than a bulleted list of same-sized text", async ({ page }) => {
     await replayApi(page);
-    await page.goto("/");
+    await page.goto("/evidence");
     await page.waitForLoadState("networkidle");
 
     const tiles = await page.evaluate(() => {
@@ -60,7 +60,7 @@ test.describe("the proof tiles", () => {
     // Authority rule 6: observed, read, replayed and derived stay visibly
     // different. The mode is carried on `data-mode`, not inferred here.
     await replayApi(page);
-    await page.goto("/");
+    await page.goto("/evidence");
     await page.waitForLoadState("networkidle");
 
     const byMode = await page.evaluate(() => {
@@ -264,4 +264,23 @@ test.describe("the depth panels (RUI-4)", () => {
     expect(await foreign.count()).toBeGreaterThan(0);
     await expect(foreign.first()).toContainText(/DECISION/);
   });
+});
+
+// PUI Phase 2 gate: at 1280x900 and 400x900, mode/source and attention appear
+// before demonstration metrics - on the first screen, with no metrics above them.
+test.describe("Today's first screen", () => {
+  for (const width of [1280, 400]) {
+    test(`shows mode, source and attention above the fold at ${width}x900`, async ({ page }) => {
+      await replayApi(page);
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      for (const id of ["source-banner", "status-strip", "attention"]) {
+        const box = await page.getByTestId(id).boundingBox();
+        expect(box, `${id} did not render`).not.toBeNull();
+        expect(box!.y, `${id} starts below the first screen`).toBeLessThan(900);
+      }
+      expect(await page.locator(".proof, [data-testid='tour-card']").count()).toBe(0);
+    });
+  }
 });

@@ -298,14 +298,14 @@ describe("the overview", () => {
 
   it("shows an unavailable proof tile as unavailable", async () => {
     vi.stubGlobal("fetch", respond());
-    render(at("/"));
+    render(at("/evidence"));
     const tilesEl = await screen.findByTestId("proof-tiles");
     expect(tilesEl.querySelector('[data-available="false"]')).not.toBeNull();
   });
 
   it("shows the server's caveat about what the outcomes do not measure", async () => {
     vi.stubGlobal("fetch", respond());
-    render(at("/"));
+    render(at("/evidence"));
     expect(await screen.findByTestId("review-caveat")).toHaveTextContent("are refusals");
   });
 
@@ -326,7 +326,7 @@ describe("a decision is addressable", () => {
 
   it("is reachable by following the list", async () => {
     vi.stubGlobal("fetch", respond());
-    render(at("/"));
+    render(at("/decisions"));
     const user = userEvent.setup();
     await user.click(await screen.findByRole("link", { name: /SPY agent 1/ }));
     await waitFor(() => expect(screen.getByTestId("decision-ticket")).toBeInTheDocument());
@@ -656,12 +656,12 @@ describe("the decision views", () => {
   it("asks for the Notable view by default", async () => {
     const fetchMock = respond();
     vi.stubGlobal("fetch", fetchMock);
-    render(at("/"));
+    render(at("/decisions"));
     await screen.findByTestId("decision-list");
     expect(requested(fetchMock)).toEqual(["/api/v1/decisions/grouped?view=Notable"]);
   });
 
-  it("asks for the view in the URL, and marks it current", async () => {
+  it("honours a link shared before the list moved (/?view=…), and marks it current", async () => {
     const fetchMock = respond();
     vi.stubGlobal("fetch", fetchMock);
     render(at("/?view=Refusals"));
@@ -675,21 +675,21 @@ describe("the decision views", () => {
   it("treats an unknown view as the default rather than sending it", async () => {
     const fetchMock = respond();
     vi.stubGlobal("fetch", fetchMock);
-    render(at("/?view=Bogus"));
+    render(at("/decisions?view=Bogus"));
     await screen.findByTestId("decision-list");
     expect(requested(fetchMock)).toEqual(["/api/v1/decisions/grouped?view=Notable"]);
   });
 
   it("offers every view as a shareable link", async () => {
     vi.stubGlobal("fetch", respond());
-    render(at("/"));
+    render(at("/decisions"));
     const nav = await screen.findByRole("navigation", { name: "Decision views" });
     const links = [...nav.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]);
     expect(links).toEqual([
-      ["Notable", "/"],
-      ["Positions", "/?view=Positions"],
-      ["Refusals", "/?view=Refusals"],
-      ["Everything", "/?view=Everything"],
+      ["Notable", "/decisions"],
+      ["Positions", "/decisions?view=Positions"],
+      ["Refusals", "/decisions?view=Refusals"],
+      ["Everything", "/decisions?view=Everything"],
     ]);
   });
 
@@ -852,7 +852,122 @@ describe("truthful state (PUI phase 1)", () => {
 
   it("says the decision list is unavailable instead of dropping it", async () => {
     vi.stubGlobal("fetch", respond(new Set(["/api/v1/decisions/grouped"])));
-    render(at("/"));
+    render(at("/decisions"));
     expect(await screen.findByText(/recorded decisions unavailable/)).toBeInTheDocument();
+  });
+});
+
+// PUI Phase 2: the personal shell. `/` answers "does anything need attention?"
+// before anything else, and demonstration material lives under Evidence.
+describe("Today (PUI phase 2)", () => {
+  const FAULTS = "/api/v1/worker/events?faults_only=true";
+
+  it("puts status and attention first, then the latest decision, and no demo metrics", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    const latest = screen.getByTestId("latest-decision");
+    const strip = await screen.findByTestId("status-strip");
+    // DOM order is reading order: strip, attention, latest decision.
+    expect(strip.compareDocumentPosition(attention) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(attention.compareDocumentPosition(latest) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId("proof-tiles")).toBeNull();
+    expect(screen.queryByTestId("tour-card")).toBeNull();
+  });
+
+  it("states a verified quiet, dated, only when both sources answered", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const quiet = await screen.findByTestId("attention-quiet");
+    expect(quiet).toHaveTextContent("no incident is open and the worker has recorded no fault");
+    expect(quiet).toHaveTextContent(/Checked \d{4}-\d\d-\d\d/);
+  });
+
+  it("lists open incidents and recorded worker faults as attention", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        "/api/v1/incidents?state=open": envelope([
+          { kind: "broker_unreachable", severity: "critical", execution_state: null,
+            opened_at: "2026-09-29T14:00:00+00:00", resolved_at: null, open: true, withheld: [] },
+        ]),
+        [FAULTS]: envelope({
+          available: true, reason: null,
+          items: [{ event: "tick_failed", kind: "fault", occurred_at: "2026-09-29T14:01:00+00:00",
+            detail: {}, withheld: [] }],
+        }),
+      }),
+    );
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    await waitFor(() => expect(attention).toHaveAttribute("data-quiet", "false"));
+    expect(attention).toHaveTextContent("broker_unreachable");
+    expect(attention).toHaveTextContent("tick_failed");
+    expect(screen.queryByTestId("attention-quiet")).toBeNull();
+  });
+
+  it("treats a fault record that cannot answer as attention, not quiet", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [FAULTS]: envelope({ available: false, reason: "the worker_events table is absent", items: [] }),
+      }),
+    );
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    await waitFor(() => expect(attention).toHaveTextContent("monitor unavailable"));
+    expect(attention).toHaveTextContent("the worker_events table is absent");
+    expect(screen.queryByTestId("attention-quiet")).toBeNull();
+  });
+
+  it("never reports a quiet system when an attention source failed", async () => {
+    vi.stubGlobal("fetch", respond(new Set(["/api/v1/incidents?state=open"])));
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    await waitFor(() => expect(attention).toHaveTextContent("incidents unavailable"));
+    expect(screen.queryByTestId("attention-quiet")).toBeNull();
+  });
+
+  it("shows the latest decision with its own times and a link to the record", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const ticket = await screen.findByTestId("latest-ticket");
+    expect(ticket).toHaveTextContent("NO_TRADE");
+    expect(ticket).toHaveTextContent("no_qualified_setup");
+    expect(ticket).toHaveTextContent("2026-09-17T14:00:00+00:00");
+    const latest = screen.getByTestId("latest-decision");
+    expect(latest).toHaveTextContent("newest of 72 identical consecutive outcomes");
+    expect(within(latest).getByRole("link", { name: "Open the full record" })).toHaveAttribute(
+      "href",
+      `/decisions/${DIGEST}`,
+    );
+  });
+
+  it("offers Today, Decisions, Activity and Evidence", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/"));
+    const nav = await screen.findByRole("navigation", { name: "Primary" });
+    expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "/", "/decisions", "/activity", "/evidence",
+    ]);
+  });
+
+  it("sends a tour link shared before the move to Evidence", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/?tour=1"));
+    expect(await screen.findByTestId("tour-card")).toHaveTextContent("What was observed");
+    expect(screen.getByRole("heading", { name: "Evidence and proof" })).toBeInTheDocument();
+  });
+
+  it("returns to the same filtered list on back navigation", async () => {
+    const fetchMock = respond();
+    vi.stubGlobal("fetch", fetchMock);
+    const history = createMemoryHistory({ initialEntries: ["/decisions?view=Refusals"] });
+    render(<App history={history} />);
+    await userEvent.click(await screen.findByRole("link", { name: /SPY agent 1/ }));
+    await screen.findByTestId("decision-ticket");
+    history.back();
+    const nav = await screen.findByRole("navigation", { name: "Decision views" });
+    expect(nav.querySelector('[aria-current="page"]')).toHaveTextContent("Refusals");
   });
 });
