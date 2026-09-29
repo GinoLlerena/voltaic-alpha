@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { Schemas } from "../api/client";
 import { api } from "../api/client";
-import { useResource } from "../api/useResource";
+import { dataOf, useResource } from "../api/useResource";
 import { Panel } from "./Panel";
+import { checkedAt } from "./time";
 
 type Incident = Schemas["IncidentOut"];
 
@@ -17,8 +18,8 @@ type Incident = Schemas["IncidentOut"];
 export function Incidents() {
   const [state, setState] = useState<"open" | "all">("open");
   const incidents = useResource<Incident[]>(api.incidents(state));
-  const ready = incidents.state === "ready" || incidents.state === "stale";
-  const rows = ready ? incidents.envelope.data : [];
+  const rows = dataOf(incidents) ?? [];
+  const checked = incidents.state === "ready" ? ` Checked ${checkedAt(incidents.fetchedAt)}.` : "";
 
   return (
     <Panel
@@ -26,6 +27,7 @@ export function Incidents() {
       title="Incidents"
       source="incidents"
       present={rows.length > 0}
+      resource={incidents}
       controls={
         <p className="filter">
           {(["open", "all"] as const).map((option) => (
@@ -43,8 +45,8 @@ export function Incidents() {
       }
       absence={
         state === "open"
-          ? "No incident is open. This is the source answering, not a filter hiding one."
-          : "No incident has ever been recorded in this source."
+          ? `No incident is open. This is the source answering, not a filter hiding one.${checked}`
+          : `No incident has ever been recorded in this source.${checked}`
       }
     >
       <ul className="chk">

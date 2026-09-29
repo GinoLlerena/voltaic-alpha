@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { useResource } from "../api/useResource";
 import { DecisionList } from "../components/DecisionList";
 import { ProofTiles } from "../components/ProofTiles";
+import { Loaded } from "../components/ResourceState";
 import { SourceBanner } from "../components/SourceBanner";
 import { StatusStrip } from "../components/StatusStrip";
 
@@ -79,35 +80,40 @@ export function Overview({
         </section>
       ) : null}
 
-      {tiles.state === "ready" || tiles.state === "stale" ? (
-        <ProofTiles tiles={tiles.envelope.data} />
-      ) : null}
+      {/* PUI-001: each block below says it is loading or unavailable rather
+          than vanishing, which would read as "nothing to show". */}
+      <Loaded what="proof tiles" resources={{ tiles }}>
+        {(d) => <ProofTiles tiles={d.tiles} />}
+      </Loaded>
 
-      {review.state === "ready" || review.state === "stale" ? (
-        <p className="caveat" data-testid="review-caveat">
-          {review.envelope.data.caveat}{" "}
-          <span className="note">
-            {review.envelope.data.resolved} horizons resolved, {review.envelope.data.pending}{" "}
-            waiting.
-          </span>
-        </p>
-      ) : null}
+      <Loaded what="review summary" resources={{ review }}>
+        {(d) => (
+          <p className="caveat" data-testid="review-caveat">
+            {d.review.caveat}{" "}
+            <span className="note">
+              {d.review.resolved} horizons resolved, {d.review.pending} waiting.
+            </span>
+          </p>
+        )}
+      </Loaded>
 
-      {listing.state === "ready" || listing.state === "stale" ? (
-        <section>
-          <h2>
-            Recorded decisions{" "}
-            <small>
-              {listing.envelope.data.shown} of {listing.envelope.data.total}
-              {listing.envelope.data.grouped
-                ? " · identical consecutive outcomes are grouped"
-                : ""}
-            </small>
-          </h2>
-          <ViewPicker current={view} />
-          <DecisionList entries={listing.envelope.data.entries} />
-        </section>
-      ) : null}
+      <section>
+        <Loaded what="recorded decisions" resources={{ listing }}>
+          {(d) => (
+            <>
+              <h2>
+                Recorded decisions{" "}
+                <small>
+                  {d.listing.shown} of {d.listing.total}
+                  {d.listing.grouped ? " · identical consecutive outcomes are grouped" : ""}
+                </small>
+              </h2>
+              <ViewPicker current={view} />
+              <DecisionList entries={d.listing.entries} />
+            </>
+          )}
+        </Loaded>
+      </section>
     </>
   );
 }

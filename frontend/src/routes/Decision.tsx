@@ -8,6 +8,7 @@ import { Invalidation } from "../components/Invalidation";
 import { Lifecycle } from "../components/Lifecycle";
 import { Memo } from "../components/Memo";
 import { ProofLineage } from "../components/ProofLineage";
+import { Loaded } from "../components/ResourceState";
 import { Risk } from "../components/Risk";
 import { SourceBanner } from "../components/SourceBanner";
 import { TraderSummary } from "../components/TraderSummary";
@@ -22,7 +23,14 @@ type LifecycleData = Schemas["LifecycleOut"];
 type ProofData = Schemas["ProofOut"];
 type Horizons = Schemas["DecisionHorizonOut"][];
 
-/** One decision, addressable by its hash so the link is the evidence. */
+/**
+ * One decision, addressable by its hash so the link is the evidence.
+ *
+ * `PUI-003`: eight requests, eight states. Each panel renders from its own
+ * request: loading, unavailable, stale or verified. A failed panel never
+ * becomes its "nothing recorded" text, and panels answered from a different
+ * source than the summary say so.
+ */
 export function Decision({ digest }: { digest: string }) {
   const summary = useResource<Summary>(api.summary(digest));
   const market = useResource<Market>(api.market(digest));
@@ -34,15 +42,33 @@ export function Decision({ digest }: { digest: string }) {
   const horizons = useResource<Horizons>(api.outcomes(digest));
 
   if (summary.state === "failed") {
-    return (
+    // Only the server's 404 says the decision does not exist. A network or
+    // server failure says nothing about the record, and must not be read as absence.
+    return summary.notFound ? (
       <p role="alert" className="failed" data-testid="decision-missing">
-        This source holds no decision with that hash ({summary.reason}).{" "}
+        This source holds no decision with that hash.{" "}
+        <Link to="/">Back to the overview</Link>
+      </p>
+    ) : (
+      <p role="alert" className="failed" data-testid="decision-unavailable">
+        This decision could not be loaded ({summary.reason}). That is a failed request, not a
+        missing record.{" "}
+        <button type="button" onClick={summary.retry}>
+          Retry
+        </button>{" "}
         <Link to="/">Back to the overview</Link>
       </p>
     );
   }
-  if (summary.state === "loading") return <p>Loading…</p>;
+  if (summary.state === "loading") {
+    return (
+      <p role="status" data-testid="decision-loading">
+        Loading the decision…
+      </p>
+    );
+  }
 
+  const source = summary.envelope.source_label;
   return (
     <>
       <SourceBanner
@@ -55,40 +81,40 @@ export function Decision({ digest }: { digest: string }) {
       </p>
       <DecisionTicket
         summary={summary.envelope.data}
-        market={ready(market)}
-        horizons={
-          horizons.state === "ready" || horizons.state === "stale"
-            ? horizons.envelope.data
-            : []
-        }
+        market={market}
+        horizons={horizons}
       />
       {/* RUI-4's five questions, in the order a trader asks them: why this
           direction, why now, why this structure, what it can lose, and what
           would prove it wrong. Everything below is a record or an absence. */}
-      <TraderSummary
-        market={ready(market)}
-        memo={ready(memo)}
-        structure={ready(structure)}
-        risk={ready(risk)}
-      />
-      <Memo memo={ready(memo)} market={ready(market)} />
-      <Evidence market={ready(market)} />
-      <Structure structure={ready(structure)} />
-      <Risk risk={ready(risk)} />
-      <Invalidation market={ready(market)} memo={ready(memo)} />
-      <Lifecycle lifecycle={ready(lifecycle)} />
-      <ProofLineage digest={digest} lifecycle={ready(lifecycle)} proof={ready(proof)} />
+      <Loaded
+        what="trader summary"
+        resources={{ market, memo, structure, risk }}
+        expectedSource={source}
+      >
+        {(d) => <TraderSummary market={d.market} memo={d.memo} structure={d.structure} risk={d.risk} />}
+      </Loaded>
+      <Loaded what="setup and memo" resources={{ memo, market }} expectedSource={source}>
+        {(d) => <Memo memo={d.memo} market={d.market} />}
+      </Loaded>
+      <Loaded what="market evidence" resources={{ market }} expectedSource={source}>
+        {(d) => <Evidence market={d.market} />}
+      </Loaded>
+      <Loaded what="structure" resources={{ structure }} expectedSource={source}>
+        {(d) => <Structure structure={d.structure} />}
+      </Loaded>
+      <Loaded what="risk record" resources={{ risk }} expectedSource={source}>
+        {(d) => <Risk risk={d.risk} />}
+      </Loaded>
+      <Loaded what="invalidation conditions" resources={{ market, memo }} expectedSource={source}>
+        {(d) => <Invalidation market={d.market} memo={d.memo} />}
+      </Loaded>
+      <Loaded what="lifecycle" resources={{ lifecycle }} expectedSource={source}>
+        {(d) => <Lifecycle lifecycle={d.lifecycle} />}
+      </Loaded>
+      <Loaded what="proof lineage" resources={{ lifecycle, proof }} expectedSource={source}>
+        {(d) => <ProofLineage digest={digest} lifecycle={d.lifecycle} proof={d.proof} />}
+      </Loaded>
     </>
   );
-}
-
-/**
- * A resource's data once it has some, or null.
- *
- * A panel that cannot tell "still loading" from "the server holds nothing"
- * would render an absence that is not true yet, so every panel below takes
- * null and says what it means in its own terms.
- */
-function ready<T>(resource: ReturnType<typeof useResource<T>>): T | null {
-  return resource.state === "ready" || resource.state === "stale" ? resource.envelope.data : null;
 }
