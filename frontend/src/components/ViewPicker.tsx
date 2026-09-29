@@ -15,7 +15,7 @@ export function ViewPicker({ current }: { current: View }) {
       {VIEWS.map((view) => (
         <Link
           key={view}
-          to="/"
+          to="/decisions"
           search={view === DEFAULT_VIEW ? {} : { view }}
           // The router marks a Link current on a path match alone, and every
           // view shares the path "/" - so without an exact search comparison it

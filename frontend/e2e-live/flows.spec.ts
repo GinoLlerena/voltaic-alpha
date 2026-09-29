@@ -19,7 +19,7 @@ function watch(page: Page): { failures: string[] } {
 }
 
 async function firstDecision(page: Page): Promise<string> {
-  await page.goto("/");
+  await page.goto("/decisions");
   const link = page.getByTestId("decision-list").locator('a[href^="/decisions/"]').first();
   await expect(link).toBeVisible();
   const href = await link.getAttribute("href");
@@ -28,14 +28,29 @@ async function firstDecision(page: Page): Promise<string> {
   return digest!;
 }
 
-test("overview: status, source and decisions render from live records", async ({ page }) => {
+test("today: status, attention and the latest decision render from live records", async ({ page }) => {
   const { failures } = watch(page);
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await expect(page.getByTestId("source-banner")).toBeVisible();
   await expect(page.getByTestId("status-strip")).toBeVisible();
+  // Settled one way or the other: a quiet statement or a list, never loading.
+  await expect(page.getByTestId("attention")).not.toContainText("Loading");
+  await expect(page.getByTestId("latest-ticket")).toBeVisible();
+  await expect(page.getByTestId("latest-decision").locator('a[href^="/decisions/"]')).toBeVisible();
+  expect(failures).toEqual([]);
+});
+
+test("evidence: proof tiles render, and old links reach their new pages", async ({ page }) => {
+  const { failures } = watch(page);
+  await page.goto("/evidence");
+  await page.waitForLoadState("networkidle");
   await expect(page.getByTestId("proof-tiles")).toBeVisible();
-  await expect(page.getByTestId("decision-list").locator('a[href^="/decisions/"]').first()).toBeVisible();
+  // Links shared before the redesign keep working (PUI Phase 2).
+  await page.goto("/?view=Everything");
+  await expect(page).toHaveURL(/\/decisions\?view=Everything/);
+  await page.goto("/?tour=1");
+  await expect(page).toHaveURL(/\/evidence\?tour=1/);
   expect(failures).toEqual([]);
 });
 
@@ -77,10 +92,10 @@ test("export: the manifest downloads and hashes to the digest the page shows", a
 
 test("tour: the guided scenes render and step forward", async ({ page }) => {
   const { failures } = watch(page);
-  await page.goto("/?tour=1");
+  await page.goto("/evidence?tour=1");
   await page.waitForLoadState("networkidle");
   await expect(page.getByTestId("tour-card")).toBeVisible();
-  await page.goto("/?tour=2");
+  await page.goto("/evidence?tour=2");
   await page.waitForLoadState("networkidle");
   await expect(page.getByTestId("tour-card")).toBeVisible();
   expect(failures).toEqual([]);
@@ -103,7 +118,7 @@ test("the boundary: unknown API paths 404, writes are refused", async ({ request
 
 test("views: switching the decision view changes the list and the URL", async ({ page }) => {
   const { failures } = watch(page);
-  await page.goto("/");
+  await page.goto("/decisions");
   await page.waitForLoadState("networkidle");
   const nav = page.getByRole("navigation", { name: "Decision views" });
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Notable");

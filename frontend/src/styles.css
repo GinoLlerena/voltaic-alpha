@@ -3,17 +3,19 @@
   --cool: #5ab3f0; --warm: #e8a33d; --affirm: #46d08a; --alarm: #ff6161;
   --text: #e7edf5; --muted: #a8b4c6; --dim: #8699b2;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* PUI-010: a floor for secondary metadata, and a size for operational data. */
+  --fs-meta: .75rem; --fs-data: .875rem;
   color-scheme: dark;
 }
 body { margin: 0; background: var(--ink); color: var(--text);
   font: 15px/1.5 system-ui, sans-serif; }
 main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
 h1 { font-size: 1.8rem; margin: 0; }
-.sub { color: var(--dim); font-family: var(--mono); font-size: .72rem;
+.sub { color: var(--dim); font-family: var(--mono); font-size: var(--fs-meta);
   letter-spacing: .18em; text-transform: uppercase; margin: .2rem 0 1rem; }
 .source { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap;
   border: 1px solid var(--edge); background: var(--panel); padding: .5rem .7rem;
-  font-family: var(--mono); font-size: .72rem; }
+  font-family: var(--mono); font-size: var(--fs-meta); }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .dot.live { background: var(--affirm); } .dot.frozen { background: var(--cool); }
 .source .mode { letter-spacing: .12em; }
@@ -25,10 +27,10 @@ h1 { font-size: 1.8rem; margin: 0; }
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); background: var(--edge);
   border: 1px solid var(--edge); }
 .status li { background: var(--panel); padding: .55rem .7rem; display: grid; gap: .15rem; }
-.status .k { font-family: var(--mono); font-size: .6rem; letter-spacing: .14em;
+.status .k { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .14em;
   text-transform: uppercase; color: var(--dim); }
 .status .v { font-weight: 600; }
-.status .src, .status .why { font-family: var(--mono); font-size: .6rem; color: var(--dim); }
+.status .src, .status .why { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 .tone-ok .v { color: var(--affirm); } .tone-warn .v { color: var(--warm); }
 .tone-bad .v { color: var(--alarm); } .tone-unknown .v, .tone-off .v { color: var(--dim); }
 .decisions { list-style: none; padding: 0; display: grid; gap: 1px; background: var(--edge);
@@ -37,15 +39,15 @@ h1 { font-size: 1.8rem; margin: 0; }
   border: 0; padding: .55rem .7rem; display: flex; gap: .6rem; align-items: baseline;
   cursor: pointer; font: inherit; }
 .decisions button[aria-current="true"] { background: #101923; box-shadow: inset 2px 0 0 var(--cool); }
-.decisions .summary { color: var(--muted); font-size: .85rem; }
+.decisions .summary { color: var(--muted); font-size: var(--fs-data); }
 .decisions .count { margin-left: auto; font-family: var(--mono); color: var(--dim); }
-h2 small { font-family: var(--mono); font-size: .62rem; color: var(--dim); font-weight: 400; }
+h2 small { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); font-weight: 400; }
 dl { display: grid; grid-template-columns: 180px 1fr; gap: .35rem .9rem; }
-dt { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+dt { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim); }
-dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
+dd { margin: 0; font-family: var(--mono); font-size: var(--fs-data); word-break: break-all; }
 .failed { color: var(--alarm); } .empty { color: var(--dim); }
-.stale-note { color: var(--warm); font-size: .86rem; }
+.stale-note { color: var(--warm); font-size: var(--fs-data); }
 
 /* ---- RUI-VAL-012: the proof tiles, which shipped with no styles at all ----
    The first viewport's three claims rendered as a bulleted list in which the
@@ -58,15 +60,15 @@ dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-a
 .proof li { background: var(--panel); padding: .7rem .8rem; display: grid; gap: .25rem;
   align-content: start; }
 .proof .n { font-size: 1.6rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
-.proof .l { font-size: .84rem; color: var(--text); }
-.proof .mode { justify-self: start; font-family: var(--mono); font-size: .56rem;
+.proof .l { font-size: var(--fs-data); color: var(--text); }
+.proof .mode { justify-self: start; font-family: var(--mono); font-size: .8125rem; /* 13px: above the floor, apart from the 12px provenance */
   letter-spacing: .14em; padding: .1rem .35rem; border: 1px solid currentColor;
   color: var(--dim); }
 .proof li[data-mode="OBSERVED PAPER"] .mode { color: var(--affirm); }
 .proof li[data-mode="LIVE READ"] .mode { color: var(--cool); }
 .proof li[data-mode="FROZEN REPLAY"] .mode { color: var(--muted); }
 .proof li[data-mode="UNAVAILABLE"] .mode { color: var(--alarm); }
-.proof .src { font-family: var(--mono); font-size: .58rem; color: var(--dim); }
+.proof .src { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 /* An unavailable tile stays visibly unavailable — by rule, not by fading it. */
 .proof li.na { box-shadow: inset 2px 0 0 var(--alarm); }
 .proof li.na .n { color: var(--dim); }
@@ -90,31 +92,31 @@ header a { color: inherit; text-decoration: none; }
 .spine li.on .l { color: var(--cool); }
 .spine li.model.on .l { color: var(--warm); }
 .spine li.off .l { color: var(--dim); }
-.spine .n { font-family: var(--mono); font-size: .58rem; color: var(--dim); display: block; }
+.spine .n { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); display: block; }
 .spine .l { font-weight: 600; font-size: .9rem; }
 .spine .fence { flex-basis: 100%; background: var(--panel); color: var(--warm);
-  font-family: var(--mono); font-size: .58rem; text-align: center; }
+  font-family: var(--mono); font-size: var(--fs-meta); text-align: center; }
 .ticket { display: grid; grid-template-columns: 180px 1fr; gap: .3rem .9rem; margin: .6rem 0 1rem; }
-.ticket dt { font-family: var(--mono); font-size: .64rem; letter-spacing: .1em;
+.ticket dt { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim); }
-.ticket dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
+.ticket dd { margin: 0; font-family: var(--mono); font-size: var(--fs-data); word-break: break-all; }
 .why { list-style: none; padding: 0; display: grid; gap: .5rem; }
-.why .s { font-family: var(--mono); font-size: .6rem; letter-spacing: .13em; color: var(--cool); }
-.why .t { display: block; font-size: .86rem; } .why .t.na { color: var(--dim); }
-.why .src { font-family: var(--mono); font-size: .58rem; color: var(--dim); }
+.why .s { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .13em; color: var(--cool); }
+.why .t { display: block; font-size: var(--fs-data); } .why .t.na { color: var(--dim); }
+.why .src { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); }
 .chk { list-style: none; padding: 0; display: grid; gap: 1px; background: var(--edge);
   border: 1px solid var(--edge); }
 .chk li { background: var(--panel); padding: .45rem .7rem; display: flex;
-  justify-content: space-between; gap: 1rem; font-size: .84rem; }
+  justify-content: space-between; gap: 1rem; font-size: var(--fs-data); }
 .chk .m { font-family: var(--mono); font-size: .75rem; color: var(--muted); }
 .tour { border: 1px solid var(--warm); background: rgba(232,163,61,.06); padding: .7rem .85rem;
   margin: .6rem 0; }
-.tour .hd { font-family: var(--mono); font-size: .6rem; letter-spacing: .14em; color: var(--warm); margin: 0; }
+.tour .hd { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .14em; color: var(--warm); margin: 0; }
 .tour h3 { margin: .2rem 0 .3rem; }
-.caveat { color: var(--muted); font-size: .86rem; }
-.gate { font-family: var(--mono); font-size: .8rem; }
-.gate .t.na { display: block; font-family: system-ui, sans-serif; font-size: .86rem; }
-.gate .src { display: block; font-size: .58rem; color: var(--dim); margin-top: .15rem; }
+.caveat { color: var(--muted); font-size: var(--fs-data); }
+.gate { font-family: var(--mono); font-size: var(--fs-data); }
+.gate .t.na { display: block; font-family: system-ui, sans-serif; font-size: var(--fs-data); }
+.gate .src { display: block; font-size: var(--fs-meta); color: var(--dim); margin-top: .15rem; }
 .decisions a { display: flex; gap: .6rem; align-items: baseline; padding: .55rem .7rem;
   background: var(--panel); color: inherit; text-decoration: none; }
 .decisions a:hover { background: #101923; }
@@ -126,14 +128,14 @@ header a { color: inherit; text-decoration: none; }
 
 /* ---- RUI-4: decision depth ---- */
 section > h3 { margin: 1.4rem 0 .5rem; font-size: .95rem; }
-.matrix { width: 100%; border-collapse: collapse; font-size: .78rem; margin: .4rem 0; }
-.matrix th { text-align: left; font-family: var(--mono); font-size: .58rem; letter-spacing: .12em;
+.matrix { width: 100%; border-collapse: collapse; font-size: var(--fs-data); margin: .4rem 0; }
+.matrix th { text-align: left; font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .12em;
   text-transform: uppercase; color: var(--dim); font-weight: 400; padding: .3rem .5rem;
   border-bottom: 1px solid var(--edge); white-space: nowrap; }
 .matrix td { padding: .38rem .5rem; border-bottom: 1px solid var(--edge); vertical-align: top; }
 .matrix td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.matrix td.prose { font-size: .8rem; color: var(--muted); }
-.matrix td.role, .matrix td.verdict { font-family: var(--mono); font-size: .62rem;
+.matrix td.prose { font-size: var(--fs-data); color: var(--muted); }
+.matrix td.role, .matrix td.verdict { font-family: var(--mono); font-size: var(--fs-meta);
   letter-spacing: .06em; white-space: nowrap; }
 /* The server decides a signal's role; the page only colours what it was told. */
 .matrix tr[data-role="cited"] td.role { color: var(--affirm); }
@@ -142,14 +144,14 @@ section > h3 { margin: 1.4rem 0 .5rem; font-size: .95rem; }
 .matrix tr[data-passed="true"] td.verdict { color: var(--affirm); }
 .matrix tr[data-passed="false"] td.verdict { color: var(--alarm); }
 .matrix tr[data-terminal="false"] td.verdict { color: var(--warm); }
-.matrix .src { display: block; font-size: .56rem; }
+.matrix .src { display: block; font-size: var(--fs-meta); }
 [data-approved="true"] { color: var(--affirm); }
 [data-approved="false"] { color: var(--alarm); }
 [data-belongs="false"] .m { color: var(--alarm); }
 /* The memo's advisory boundary, stated where the memo is shown. */
 .fenced { border-left: 2px solid var(--warm); padding-left: .6rem; margin: .5rem 0;
-  font-size: .8rem; color: var(--muted); }
-.prose { font-size: .86rem; color: var(--muted); }
+  font-size: var(--fs-data); color: var(--muted); }
+.prose { font-size: var(--fs-data); color: var(--muted); }
 ul.plain { list-style: none; margin: 0; padding: 0; }
 ul.plain li { margin-bottom: .15rem; }
 dd .src { display: block; }
@@ -161,13 +163,13 @@ dd .src { display: block; }
   border: 1px solid var(--edge); }
 .five > div { background: var(--panel); padding: .5rem .7rem;
   display: grid; grid-template-columns: 210px 1fr; gap: .2rem .9rem; align-items: baseline; }
-.five dt { font-family: var(--mono); font-size: .62rem; letter-spacing: .1em;
+.five dt { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim); }
 .five dt a { color: inherit; }
 .five dd { margin: 0; }
 .five .a { font-size: .9rem; }
-.five .src { display: block; font-size: .58rem; color: var(--dim); font-family: var(--mono); }
-.five > div[data-answered="false"] .t.na { font-size: .86rem; }
+.five .src { display: block; font-size: var(--fs-meta); color: var(--dim); font-family: var(--mono); }
+.five > div[data-answered="false"] .t.na { font-size: var(--fs-data); }
 @media (max-width: 620px) { .five > div { grid-template-columns: 1fr; } }
 
 /* A wide matrix scrolls itself; the page never scrolls sideways. The focus ring
@@ -211,18 +213,18 @@ dd { word-break: normal; overflow-wrap: anywhere; }
 dd.hash, .hash { word-break: break-all; }
 
 /* The manifest's disclosures, quoted from the file the reader is downloading. */
-.disclosures { margin: .5rem 0 0; font-size: .8rem; color: var(--muted); }
+.disclosures { margin: .5rem 0 0; font-size: var(--fs-data); color: var(--muted); }
 .disclosures li { border-left: 2px solid var(--edge); padding-left: .6rem; margin-bottom: .3rem; }
 a[download] { font-family: var(--mono); }
 
 /* ---- RUI-5: activity ---- */
 nav { display: flex; gap: .9rem; margin: .5rem 0 0; }
-nav a { font-family: var(--mono); font-size: .68rem; letter-spacing: .1em;
+nav a { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .1em;
   text-transform: uppercase; color: var(--dim); text-decoration: none; }
 nav a[data-status="active"], nav a.active { color: var(--cool); }
 .filter { display: flex; gap: .4rem; margin: .6rem 0 0; }
 .filter button, .gate button {
-  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase;
+  font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .1em; text-transform: uppercase;
   background: var(--panel); color: var(--muted); border: 1px solid var(--edge);
   padding: .25rem .6rem; cursor: pointer; }
 .filter button[aria-pressed="true"] { color: var(--cool); border-color: var(--cool); }
@@ -237,7 +239,19 @@ nav a[data-status="active"], nav a.active { color: var(--cool); }
 /* Decision views: a row of links, the current one marked for sight and for
    assistive technology alike (aria-current), never by colour alone. */
 .views { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 .5rem; border-bottom: 1px solid var(--edge); }
-.views a { font-family: var(--mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase;
+.views a { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .08em; text-transform: uppercase;
   color: var(--muted); padding: .45rem .8rem; text-decoration: none; border-bottom: 2px solid transparent; }
 .views a:hover { color: var(--text); }
 .views a[aria-current="page"] { color: var(--cool); border-bottom-color: var(--cool); }
+
+/* PUI Phase 2: Today. Amber marks attention; a quiet state is plain text, not
+   a green light - a verified quiet is a statement, not a celebration. */
+.attention { border: 1px solid var(--edge); background: var(--panel); padding: .6rem .9rem; margin: 1rem 0; }
+.attention[data-quiet="false"] { box-shadow: inset 3px 0 0 var(--warm); }
+.attention h2 { margin-top: 0; }
+.attention .quiet { margin: .2rem 0; }
+.attention li[data-kind="incident"] .m, .attention li[data-kind="monitor"] .m { color: var(--warm); }
+.shortcuts { display: flex; gap: 1.2rem; flex-wrap: wrap; margin: 1.5rem 0 .5rem; font-size: var(--fs-data); }
+/* Evidence is secondary navigation: same colour, set apart after a divider. */
+header nav .secondary { margin-left: .3rem; padding-left: 1.2rem; border-left: 1px solid var(--edge); }
+.shortcuts a { font-family: inherit; font-size: var(--fs-data); letter-spacing: 0; text-transform: none; }

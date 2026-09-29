@@ -3363,5 +3363,17 @@
    "reason": null,
    "items": []
   }
+ },
+ "/api/v1/worker/events?faults_only=true": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "available": true,
+   "reason": null,
+   "items": []
+  }
  }
 }

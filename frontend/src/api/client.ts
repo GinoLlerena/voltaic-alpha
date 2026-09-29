@@ -78,6 +78,8 @@ export const api = {
   incidents: (state: "open" | "all") =>
     `${published("/api/v1/incidents")}?state=${state}` as ApiUrl,
   workerEvents: () => published("/api/v1/worker/events") as ApiUrl,
+  /** Only the worker's recorded faults, for the attention list (PUI Phase 2). */
+  workerFaults: () => `${published("/api/v1/worker/events")}?faults_only=true` as ApiUrl,
   proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
   reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
   tour: () => published("/api/v1/tour") as ApiUrl,
