@@ -27,6 +27,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi import Path as PathParam
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -69,6 +70,16 @@ def _decode(cursor: str | None) -> tuple[datetime, str] | None:
         return datetime.fromisoformat(at), str(key)
     except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=400, detail="malformed cursor") from exc
+
+
+def entry_members(entry: listing.Entry) -> tuple[Any, ...]:
+    """The decisions a list entry stands for.
+
+    `entry.members` is the whole run: right for a grouped entry, wrong for each
+    entry of an ungrouped view. Passing it through gave 400 entries a 400-long run
+    each and made "Everything" 10.8 MB, found by the live suite on 28 September.
+    """
+    return entry.members if entry.count > 1 else (entry.decision,)
 
 
 def create_app(
@@ -193,7 +204,7 @@ def create_app(
                 dto.ListEntryOut(
                     decision_id=hex_id(e.decision), snapshot_id=e.decision.snapshot_id,
                     action=e.decision.action, direction=e.decision.direction, label=e.label,
-                    count=e.count, member_ids=[hex_id(m) for m in e.members],
+                    count=e.count, member_ids=[hex_id(m) for m in entry_members(e)],
                 )
                 for e in built.entries
             ],
@@ -417,6 +428,9 @@ def create_app(
         return envelope(db, dto.WorkerEventsOut(available=True, reason=None, items=out))
 
     app.include_router(api)
+    # JSON over the public link compresses about a hundredfold; the 27 KB default
+    # list becomes ~3 KB. Small responses are left alone.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     if limiter is not None:
         # Only /api/ reaches the database; static assets are left alone.

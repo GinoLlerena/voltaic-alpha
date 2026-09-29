@@ -12,11 +12,13 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 from options_alpha_lab.api.limits import RateLimiter, retry_after_header
-from options_alpha_lab.api.server import create_app
+from options_alpha_lab.api.server import create_app, entry_members
+from options_alpha_lab.presentation import listing
 from options_alpha_lab.presentation.source import resolve
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -148,6 +150,61 @@ class RateLimitMiddlewareTests(unittest.TestCase):
                 create_app(resolve("", DB), ui_dir=dist, limiter=RateLimiter(burst=1, rate=0.01))
             )
             self.assertTrue(all(client.get("/").status_code == 200 for _ in range(5)))
+
+
+class ListPayloadTests(unittest.TestCase):
+    """An entry lists the decisions it stands for - not its whole run.
+
+    Found by the live suite on 28 September 2026: every ungrouped entry carried
+    its full run, so "Everything" was 10.8 MB and took 16 s over the public link.
+    """
+
+    def setUp(self) -> None:
+        self.client = TestClient(create_app(resolve("", DB)))
+
+    def entries(self, view: str) -> list[dict[str, object]]:
+        r = self.client.get(f"/api/v1/decisions/grouped?view={view}")
+        self.assertEqual(r.status_code, 200)
+        return list(r.json()["data"]["entries"])
+
+    def test_an_ungrouped_entry_stands_for_itself(self) -> None:
+        for view in ("Positions", "Refusals", "Everything"):
+            for e in self.entries(view):
+                with self.subTest(view=view, entry=e["decision_id"]):
+                    self.assertEqual(e["count"], 1)
+                    self.assertEqual(e["member_ids"], [e["decision_id"]])
+
+    def test_a_run_of_identical_refusals(self) -> None:
+        run = [
+            SimpleNamespace(
+                action="refuse", reason_codes=["no_qualified_setup"], direction=None,
+                decision_hash=f"sha256:{i:064x}", snapshot_id=f"spy-{i}",
+            )
+            for i in range(3)
+        ]
+        grouped = listing.build(run, "Notable").entries
+        self.assertEqual([(e.count, len(entry_members(e))) for e in grouped], [(3, 3)])
+        for e in listing.build(run, "Everything").entries:
+            self.assertEqual(entry_members(e), (e.decision,))
+
+    def test_a_grouped_entry_lists_its_whole_run(self) -> None:
+        for e in self.entries("Notable"):
+            with self.subTest(entry=e["decision_id"]):
+                ids = e["member_ids"]
+                assert isinstance(ids, list)
+                self.assertEqual(len(ids), e["count"])
+                self.assertIn(e["decision_id"], ids)
+
+    def test_large_json_is_compressed(self) -> None:
+        r = self.client.get(
+            "/api/v1/decisions/grouped?view=Everything", headers={"Accept-Encoding": "gzip"}
+        )
+        if len(r.content) > 1024:
+            self.assertEqual(r.headers.get("content-encoding"), "gzip")
+
+    def test_small_responses_are_left_alone(self) -> None:
+        r = self.client.get("/api/v1/no-such-route", headers={"Accept-Encoding": "gzip"})
+        self.assertIsNone(r.headers.get("content-encoding"))
 
 
 if __name__ == "__main__":  # pragma: no cover
