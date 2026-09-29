@@ -408,11 +408,20 @@ def deploy(args: argparse.Namespace) -> int:
            chunks=len(chunks(payload)), index_sha256=manifest["frontend/dist/index.html"][:16])
     if not args.apply:
         print("\nDry run. Would: ship, install (keeping the old API), add the API drop-in,")
-        print(f"restart the API, open {API_PORT} to this machine's /32, run the live suite,")
-        print(f"cut port 80 over, run it again on port 80, revoke {API_PORT}. Nothing changed.")
+        if args.verify_on_port_80:
+            print("restart the API, cut port 80 over, run the live suite there. Nothing changed.")
+        else:
+            print(f"restart the API, open {API_PORT} to this machine's /32, run the live suite,")
+            print(f"cut port 80 over, run it again on port 80, revoke {API_PORT}. Nothing changed.")
         return 0
 
-    cidr = operator_cidr()
+    # --verify-on-port-80 (owner, 29 September 2026): a Cloudflare WARP client
+    # reaches the host from several egress addresses, so no /32 rule can admit
+    # only the operator. The host checks still gate the cutover; the live suite
+    # then runs on port 80, and a failure puts Streamlit back on it.
+    restricted = not args.verify_on_port_80
+    record["verification"] = "operator /32 on 8600, then port 80" if restricted else "port 80 only"
+    cidr = operator_cidr() if restricted else ""
     stage = "ship"
     try:
         staged = ship(payload, stamp)
@@ -428,13 +437,16 @@ def deploy(args: argparse.Namespace) -> int:
         if bad := check_failures(checks):
             raise rt.Stop(f"host checks failed: {bad}")
 
-        sg_rule("Authorize", cidr)
-        record["sg_open"] = True
-        rt.log(record, f"{API_PORT} opened to the operator's /32")
-        wait_public(f"http://{EIP}:{API_PORT}/")
-        if not live_suite(f"http://{EIP}:{API_PORT}"):
-            raise rt.Stop(f"live suite failed on :{API_PORT}")
-        rt.log(record, "live suite passed", target=f":{API_PORT}")
+        if restricted:
+            sg_rule("Authorize", cidr)
+            record["sg_open"] = True
+            rt.log(record, f"{API_PORT} opened to the operator's /32")
+            wait_public(f"http://{EIP}:{API_PORT}/")
+            if not live_suite(f"http://{EIP}:{API_PORT}"):
+                raise rt.Stop(f"live suite failed on :{API_PORT}")
+            rt.log(record, "live suite passed", target=f":{API_PORT}")
+        else:
+            rt.log(record, "restricted check skipped", reason="--verify-on-port-80")
 
         stage = "port80"
         rules = rt.remote(CUTOVER, timeout=120)
@@ -485,6 +497,11 @@ def main() -> int:
     d = sub.add_parser("deploy")
     d.add_argument("--apply", action="store_true", help="make the change; default is a dry run")
     d.add_argument("--ignore-window", action="store_true", help="deploy during the trading day")
+    d.add_argument(
+        "--verify-on-port-80", action="store_true",
+        help="skip the operator-/32 check on 8600 (it cannot admit a WARP client); "
+        "verify on port 80, reverting it to Streamlit on failure",
+    )
     r = sub.add_parser("rollback")
     r.add_argument("--full", action="store_true", help="also restore the previous API")
     args = parser.parse_args()
