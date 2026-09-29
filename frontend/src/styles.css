@@ -18,6 +18,8 @@ h1 { font-size: 1.8rem; margin: 0; }
 .dot.live { background: var(--affirm); } .dot.frozen { background: var(--cool); }
 .source .mode { letter-spacing: .12em; }
 .source .label, .source time { color: var(--muted); }
+/* PUI-004: the qualifier on a time is secondary to the time itself. */
+.source .note, .ticket .note { color: var(--dim); }
 .source .stale { color: var(--warm); }
 .status { list-style: none; display: grid; gap: 1px; padding: 0; margin: .8rem 0;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); background: var(--edge);
@@ -43,6 +45,7 @@ dt { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-tra
   color: var(--dim); }
 dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
 .failed { color: var(--alarm); } .empty { color: var(--dim); }
+.stale-note { color: var(--warm); font-size: .86rem; }
 
 /* ---- RUI-VAL-012: the proof tiles, which shipped with no styles at all ----
    The first viewport's three claims rendered as a bulleted list in which the

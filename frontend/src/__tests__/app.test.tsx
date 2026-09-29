@@ -1,5 +1,5 @@
 import { createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -212,6 +212,15 @@ const incidentsAll = [
 
 const workerEvents = { available: true, reason: null, items: [] };
 
+// What the server actually returns for a refusal's depth panels: 200 with empty
+// records (checked against the demo database, 29 Sep 2026). These used to be
+// left unrouted, so the panels were fed failed requests - the PUI-001 mistake.
+const refusalMemo = { produced: false, thesis: null, model_call: null };
+const refusalStructure = { selected: null, candidates: [] };
+const refusalRisk = { decisions: [], accounting: null };
+const refusalLifecycle = { ...lifecycle, receipt: lifecycle.receipt, trail: { complete: true, gaps: [], events: [] } };
+const refusalProof = { manifest_digest: "sha256:refusal-manifest", manifest: { manifest_version: "proof-manifest-2", disclosures: [] } };
+
 const routes: Record<string, unknown> = {
   "/api/v1/system/status": envelope(status),
   "/api/v1/system/proof": envelope(tiles),
@@ -221,6 +230,11 @@ const routes: Record<string, unknown> = {
   [`/api/v1/decisions/${DIGEST}/summary`]: envelope(summary),
   [`/api/v1/decisions/${DIGEST}/market`]: envelope(market),
   [`/api/v1/decisions/${DIGEST}/outcomes`]: envelope(horizons),
+  [`/api/v1/decisions/${DIGEST}/memo`]: envelope(refusalMemo),
+  [`/api/v1/decisions/${DIGEST}/structure`]: envelope(refusalStructure),
+  [`/api/v1/decisions/${DIGEST}/risk`]: envelope(refusalRisk),
+  [`/api/v1/decisions/${DIGEST}/lifecycle`]: envelope(refusalLifecycle),
+  [`/api/v1/decisions/${DIGEST}/proof`]: envelope(refusalProof),
   [`/api/v1/decisions/${QUALIFIED}/summary`]: envelope(qualifiedSummary),
   [`/api/v1/decisions/${QUALIFIED}/market`]: envelope(qualifiedMarket),
   [`/api/v1/decisions/${QUALIFIED}/memo`]: envelope(memo),
@@ -236,12 +250,25 @@ const routes: Record<string, unknown> = {
   "/api/v1/worker/events": envelope(workerEvents),
 };
 
-function respond(failing: Set<string> = new Set(), over: Record<string, unknown> = {}) {
+function respond(
+  failing: Set<string> = new Set(),
+  over: Record<string, unknown> = {},
+  statuses: Record<string, number> = {},
+  pending: Set<string> = new Set(),
+) {
   const map = { ...routes, ...over };
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
     // Longest match first: /decisions/{d}/outcomes must not be served by /outcomes.
     const key = Object.keys(map).sort((a, b) => b.length - a.length).find((k) => url.startsWith(k));
+    if (key && pending.has(key)) return new Promise<Response>(() => undefined);
+    if (key && statuses[key] !== undefined) {
+      const code = statuses[key];
+      return Promise.resolve({
+        ok: false, status: code, statusText: code === 404 ? "Not Found" : "Server Error",
+        json: () => Promise.resolve({ detail: "x" }),
+      } as Response);
+    }
     if (!key || failing.has(key)) return Promise.reject(new Error("network down"));
     return Promise.resolve({
       ok: true, status: 200, statusText: "OK", json: () => Promise.resolve(map[key]),
@@ -306,9 +333,22 @@ describe("a decision is addressable", () => {
   });
 
   it("says so when the source holds no such decision", async () => {
-    vi.stubGlobal("fetch", respond(new Set([`/api/v1/decisions/${DIGEST}/summary`])));
+    vi.stubGlobal("fetch", respond(new Set(), {}, { [`/api/v1/decisions/${DIGEST}/summary`]: 404 }));
     render(at(`/decisions/${DIGEST}`));
     expect(await screen.findByTestId("decision-missing")).toBeInTheDocument();
+  });
+
+  it("does not call a failed request a missing decision (PUI-001)", async () => {
+    for (const fetcher of [
+      respond(new Set([`/api/v1/decisions/${DIGEST}/summary`])),
+      respond(new Set(), {}, { [`/api/v1/decisions/${DIGEST}/summary`]: 500 }),
+    ]) {
+      vi.stubGlobal("fetch", fetcher);
+      const { unmount } = render(at(`/decisions/${DIGEST}`));
+      expect(await screen.findByTestId("decision-unavailable")).toHaveTextContent("not a missing record");
+      expect(screen.queryByTestId("decision-missing")).toBeNull();
+      unmount();
+    }
   });
 });
 
@@ -466,12 +506,17 @@ describe("the depth panels", () => {
     expect(panel).toHaveTextContent("Nothing here is investment advice");
   });
 
-  it("says there is nothing to export when no manifest exists", async () => {
+  it("says the proof is unavailable when its request fails, not that nothing exists", async () => {
+    // The server returns a manifest for every decision it holds, so "nothing to
+    // export" was only ever reachable through a failed request (PUI-003).
     vi.stubGlobal("fetch", respond(new Set([`/api/v1/decisions/${QUALIFIED}/proof`])));
     render(at(`/decisions/${QUALIFIED}`));
-    const panel = await screen.findByTestId("proof-export");
-    expect(panel).toHaveAttribute("data-present", "false");
-    expect(panel).toHaveTextContent("nothing to export");
+    const state = await screen.findByText(/proof lineage unavailable/);
+    expect(state).toHaveTextContent("not an empty record");
+    expect(screen.queryByTestId("proof-export")).toBeNull();
+    expect(screen.queryByText(/nothing to export/)).toBeNull();
+    // The other panels are unaffected by one panel's failure.
+    expect(await screen.findByTestId("risk-accounting")).toBeInTheDocument();
   });
 
   it("says nothing reached the broker when nothing did", async () => {
@@ -659,5 +704,155 @@ describe("the decision views", () => {
     const server = /^\^\((.*)\)\$$/.exec(pattern)?.[1]?.split("|");
     expect(server, "the view parameter must carry an enumerating pattern").toBeDefined();
     expect([...VIEWS]).toEqual(server);
+  });
+});
+
+// PUI Phase 1 (docs/improvements/options_alpha_personal_ui_redesign_v0_1.md):
+// no failed or unanswered request may render an invented zero, a healthy
+// state, or a business absence.
+describe("truthful state (PUI phase 1)", () => {
+  const OPEN = "/api/v1/incidents?state=open";
+
+  it("says incidents are loading, not that none is open, before the answer arrives", async () => {
+    vi.stubGlobal("fetch", respond(new Set(), {}, {}, new Set([OPEN])));
+    render(at("/activity"));
+    const panel = await screen.findByTestId("incidents");
+    await waitFor(() => expect(panel).toHaveTextContent("Loading incidents"));
+    expect(panel).not.toHaveTextContent("No incident is open");
+    expect(panel).toHaveAttribute("data-present", "false");
+  });
+
+  it("says incidents are unavailable when the request fails, and offers a retry", async () => {
+    const fetchMock = respond(new Set([OPEN]));
+    vi.stubGlobal("fetch", fetchMock);
+    render(at("/activity"));
+    const panel = await screen.findByTestId("incidents");
+    await waitFor(() => expect(panel).toHaveTextContent("incidents unavailable"));
+    expect(panel).not.toHaveTextContent("No incident is open");
+    const before = fetchMock.mock.calls.filter((c) => String(c[0]) === OPEN).length;
+    await userEvent.click(within(panel).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter((c) => String(c[0]) === OPEN).length).toBe(before + 1),
+    );
+  });
+
+  it("dates a verified empty incident list", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/activity"));
+    const panel = await screen.findByTestId("incidents");
+    await waitFor(() => expect(panel).toHaveTextContent(/No incident is open\..*Checked \d{4}-\d\d-\d\d/));
+  });
+
+  it("does not report an empty worker feed when the request fails", async () => {
+    vi.stubGlobal("fetch", respond(new Set(["/api/v1/worker/events"])));
+    render(at("/activity"));
+    const panel = await screen.findByTestId("worker-events");
+    await waitFor(() => expect(panel).toHaveTextContent("unavailable"));
+    expect(panel).not.toHaveTextContent("holds no worker events");
+  });
+
+  it("does not turn failed horizons or market data into 'nothing scheduled/recorded'", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set([`/api/v1/decisions/${DIGEST}/outcomes`, `/api/v1/decisions/${DIGEST}/market`])),
+    );
+    render(at(`/decisions/${DIGEST}`));
+    const horizonsPanel = await screen.findByTestId("horizons");
+    await waitFor(() => expect(horizonsPanel).toHaveTextContent("review horizons unavailable"));
+    expect(horizonsPanel).not.toHaveTextContent("No horizons were scheduled");
+    const reading = screen.getByTestId("structure-reading");
+    expect(reading).toHaveTextContent("setup reading unavailable");
+    expect(reading).not.toHaveTextContent("No structure reading was recorded");
+    expect(screen.getByTestId("market-as-of")).toHaveTextContent("unavailable");
+  });
+
+  it("flags a panel answered from a different source than the decision", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [`/api/v1/decisions/${QUALIFIED}/market`]: envelope(qualifiedMarket, {
+          source_label: "committed evidence (5 decisions)",
+        }),
+      }),
+    );
+    render(at(`/decisions/${QUALIFIED}`));
+    const notes = await screen.findAllByTestId("source-mismatch");
+    expect(notes[0]).toHaveTextContent("committed evidence (5 decisions)");
+    expect(notes[0]).toHaveTextContent("live worker database (201 decisions)");
+  });
+
+  it("heads the setup reading by the recorded outcome", async () => {
+    vi.stubGlobal("fetch", respond());
+    const refused = render(at(`/decisions/${DIGEST}`));
+    expect(await screen.findByTestId("structure-reading")).toHaveTextContent(
+      "Why the setup did not qualify",
+    );
+    refused.unmount();
+
+    render(at(`/decisions/${QUALIFIED}`));
+    const reading = await screen.findByTestId("structure-reading");
+    expect(reading).toHaveTextContent("How the setup qualified");
+    expect(reading).not.toHaveTextContent("did not qualify");
+  });
+
+  it("does not call a refusal for another reason a setup that did not qualify", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [`/api/v1/decisions/${DIGEST}/summary`]: envelope({
+          ...summary, reason_codes: ["risk_budget_exceeded"],
+        }),
+      }),
+    );
+    render(at(`/decisions/${DIGEST}`));
+    const reading = await screen.findByTestId("structure-reading");
+    expect(reading).toHaveTextContent("The setup reading");
+    expect(reading).not.toHaveTextContent("did not qualify");
+  });
+
+  it("does not present an unselected fallback candidate as the structure taken", async () => {
+    // The API's `selected` falls back to the first candidate when none is marked.
+    const fallback = { ...structure.selected, selected: false, rejection_reasons: ["quote too wide"] };
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [`/api/v1/decisions/${QUALIFIED}/structure`]: envelope({
+          selected: fallback, candidates: [fallback],
+        }),
+      }),
+    );
+    render(at(`/decisions/${QUALIFIED}`));
+    const taken = await screen.findByTestId("structure-selected");
+    expect(taken).toHaveAttribute("data-present", "false");
+    expect(taken).toHaveTextContent("No candidate was selected. 1 evaluated candidate(s)");
+    expect(screen.getByTestId("structure-rejected")).toHaveTextContent("quote too wide");
+  });
+
+  it("labels the banner time as the API's answer, and shows the market input's own time", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${QUALIFIED}`));
+    expect(await screen.findByTestId("api-answered")).toHaveTextContent("API answered");
+    expect(screen.getByTestId("source-banner")).toHaveTextContent("not market-data time");
+    expect(screen.getByTestId("market-as-of")).toHaveTextContent("2026-08-28T15:47:47+00:00");
+  });
+
+  it("holds the activity view still while older pages are shown, and offers the newest", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/activity"));
+    const feed = await screen.findByTestId("activity");
+    await waitFor(() => expect(feed.querySelectorAll("tbody tr")).toHaveLength(1));
+    expect(screen.queryByTestId("activity-newest")).toBeNull();
+
+    await userEvent.click(screen.getByTestId("activity-more"));
+    await waitFor(() => expect(feed.querySelectorAll("tbody tr")).toHaveLength(3));
+    await userEvent.click(screen.getByTestId("activity-newest"));
+    await waitFor(() => expect(feed.querySelectorAll("tbody tr")).toHaveLength(1));
+    expect(screen.getByTestId("activity-count")).toHaveTextContent("more available");
+  });
+
+  it("says the decision list is unavailable instead of dropping it", async () => {
+    vi.stubGlobal("fetch", respond(new Set(["/api/v1/decisions/grouped"])));
+    render(at("/"));
+    expect(await screen.findByText(/recorded decisions unavailable/)).toBeInTheDocument();
   });
 });

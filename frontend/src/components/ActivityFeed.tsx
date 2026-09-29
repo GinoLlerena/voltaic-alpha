@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Schemas } from "../api/client";
 import { api } from "../api/client";
 import { get } from "../api/client";
-import { useResource } from "../api/useResource";
+import { dataOf, useResource } from "../api/useResource";
 import { Matrix, Panel } from "./Panel";
 
 type Page = Schemas["ActivityPage"];
@@ -16,18 +16,32 @@ type Event = Schemas["ActivityEventOut"];
  * deciding what happened. This appends the server's pages in the order given
  * and passes `next_cursor` back untouched. When the cursor runs out, the feed
  * is over — the browser never infers that from a short page.
+ *
+ * `PUI-009`: page one refreshes on its own only while it is all that is shown.
+ * Once older pages are appended, a refresh of page one could shift it past the
+ * cursor they were fetched with and open a silent gap, so the view holds still
+ * and offers to start again from the newest instead.
  */
 export function ActivityFeed() {
-  const first = useResource<Page>(api.activity());
   const [extra, setExtra] = useState<Event[]>([]);
+  const browsing = extra.length > 0;
+  const first = useResource<Page>(api.activity(), 15_000, { paused: browsing });
   const [cursor, setCursor] = useState<string | null | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
-  const ready = first.state === "ready" || first.state === "stale";
-  const items = ready ? [...first.envelope.data.items, ...extra] : [];
+  const page = dataOf(first);
+  const ready = page !== null;
+  const items = page ? [...page.items, ...extra] : [];
   // `undefined` means "not paged yet", so the server's own first cursor stands.
-  const nextCursor = cursor === undefined ? (ready ? first.envelope.data.next_cursor : null) : cursor;
+  const nextCursor = cursor === undefined ? (page ? page.next_cursor : null) : cursor;
+
+  function newest(): void {
+    setExtra([]);
+    setCursor(undefined);
+    setFailed(null);
+    first.retry();
+  }
 
   async function more(): Promise<void> {
     if (nextCursor === null || loading) return;
@@ -50,6 +64,7 @@ export function ActivityFeed() {
       title="What the system did"
       source="audit_events"
       present={ready && items.length > 0}
+      resource={first}
       absence="No activity is recorded in this source."
     >
       <Matrix label="Audit events">
@@ -94,6 +109,11 @@ export function ActivityFeed() {
             {loading ? "Loading…" : "Show more"}
           </button>
         )}
+        {browsing ? (
+          <button type="button" onClick={newest} data-testid="activity-newest">
+            Paused while you browse older events — show the newest
+          </button>
+        ) : null}
         {failed === null ? null : (
           <span className="failed" role="alert">
             {failed}

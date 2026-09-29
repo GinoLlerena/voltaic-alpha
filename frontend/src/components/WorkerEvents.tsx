@@ -1,6 +1,6 @@
 import type { Schemas } from "../api/client";
 import { api } from "../api/client";
-import { useResource } from "../api/useResource";
+import { dataOf, useResource } from "../api/useResource";
 import { Matrix, Panel } from "./Panel";
 
 type WorkerEvents = Schemas["WorkerEventsOut"];
@@ -15,8 +15,7 @@ type WorkerEvents = Schemas["WorkerEventsOut"];
  */
 export function WorkerEvents() {
   const resource = useResource<WorkerEvents>(api.workerEvents());
-  const ready = resource.state === "ready" || resource.state === "stale";
-  const data = ready ? resource.envelope.data : null;
+  const data = dataOf(resource);
   const unavailable = data !== null && !data.available;
 
   return (
@@ -25,6 +24,7 @@ export function WorkerEvents() {
       title="What the worker recorded about itself"
       source="worker_events"
       present={data !== null && data.available && data.items.length > 0}
+      resource={resource}
       absence={
         unavailable
           ? `This source cannot answer: ${data?.reason ?? "no reason given"}`

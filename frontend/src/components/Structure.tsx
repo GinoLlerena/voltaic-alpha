@@ -25,10 +25,16 @@ const show = (value: Scalar | undefined): string =>
  * `RUI-4` asks for a leg matrix and a tabular alternative to any chart. This is
  * the table, and there is no chart: a payoff diagram drawn in the browser would
  * be the browser calculating, which authority rule 3 forbids.
+ *
+ * `PUI-005`: the API's `selected` falls back to the first candidate when none
+ * is marked selected (a dashboard convention). Only a candidate whose own
+ * record says `selected` is presented as the structure taken; an unselected
+ * fallback is listed with the others that were evaluated and not taken.
  */
 export function Structure({ structure }: { structure: Structure | null }) {
-  const selected = structure?.selected ?? null;
-  const rejected = (structure?.candidates ?? []).filter((candidate) => !candidate.selected);
+  const selected = structure?.selected?.selected === true ? structure.selected : null;
+  const candidates = structure?.candidates ?? [];
+  const rejected = candidates.filter((candidate) => !candidate.selected);
 
   return (
     <>
@@ -37,7 +43,11 @@ export function Structure({ structure }: { structure: Structure | null }) {
         title="Why this structure"
         source="spread_candidates"
         present={selected !== null}
-        absence="No structure was selected, so no contracts were ever priced."
+        absence={
+          candidates.length === 0
+            ? "No structure was selected, so no contracts were ever priced."
+            : `No candidate was selected. ${candidates.length} evaluated candidate(s) are listed below as not taken.`
+        }
       >
         {selected ? (
           <>

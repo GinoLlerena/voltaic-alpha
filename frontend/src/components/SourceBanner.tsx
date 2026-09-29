@@ -5,6 +5,10 @@ import type { Envelope } from "../api/client";
  *
  * The dashboard's rule, carried over: "live" is never implied when it is not
  * true, and a stale view says so rather than looking current.
+ *
+ * `PUI-004`: `observed_at` is stamped by the server when it answers, so it
+ * dates the request, not the market data. It is labelled as such; the market
+ * input's own time is shown with each decision.
  */
 export function SourceBanner({
   envelope,
@@ -21,9 +25,10 @@ export function SourceBanner({
       <span className={live ? "dot live" : "dot frozen"} aria-hidden="true" />
       <span className="mode">{live ? "LIVE" : "COMMITTED EVIDENCE"}</span>
       <span className="label">{envelope.source_label}</span>
-      <time dateTime={envelope.observed_at}>
-        observed {new Date(envelope.observed_at).toISOString().replace("T", " ").slice(0, 19)} UTC
+      <time dateTime={envelope.observed_at} data-testid="api-answered">
+        API answered {new Date(envelope.observed_at).toISOString().replace("T", " ").slice(0, 19)} UTC
       </time>
+      <span className="note">request time, not market-data time</span>
       {stale ? (
         <strong className="stale" role="status">
           Showing last verified state — refresh failed ({reason})

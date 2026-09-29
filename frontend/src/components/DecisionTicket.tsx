@@ -1,5 +1,7 @@
 import type { Schemas } from "../api/client";
+import { dataOf, type Resource } from "../api/useResource";
 import { AuthoritySpine } from "./AuthoritySpine";
+import { Pending, StaleNote } from "./ResourceState";
 
 type Summary = Schemas["DecisionSummary"];
 type Market = Schemas["MarketOut"];
@@ -11,17 +13,32 @@ type Horizon = Schemas["DecisionHorizonOut"];
  * Everything shown is the server's: the `why` lines come from
  * `presentation/explain`, the structure reading from `CIIP-VAL-012`, the
  * horizons from `CIIP-008`. The browser orders and labels; it derives nothing.
+ *
+ * `PUI-005`: headings follow the recorded outcome. A position is not explained
+ * as a setup that "did not qualify", and a missing reading is not a refusal.
  */
+
+/** The heading for the setup reading, from what the decision recorded. */
+export function setupHeading(summary: Summary): string {
+  if (summary.action === "OPTIONS_POSITION") return "How the setup qualified";
+  if (summary.reason_codes.includes("no_qualified_setup")) return "Why the setup did not qualify";
+  return "The setup reading";
+}
+
 export function DecisionTicket({
   summary,
   market,
   horizons,
 }: {
   summary: Summary;
-  market: Market | null;
-  horizons: Horizon[];
+  market: Resource<Market>;
+  horizons: Resource<Horizon[]>;
 }) {
-  const structure = market?.structure ?? null;
+  const marketData = dataOf(market);
+  const structure = marketData?.structure ?? null;
+  const observedAt = marketData?.observation?.source_time ?? null;
+  const heading = setupHeading(summary);
+  const horizonRows = dataOf(horizons);
   return (
     <article data-testid="decision-ticket">
       <h2>{summary.snapshot_id}</h2>
@@ -43,15 +60,30 @@ export function DecisionTicket({
         ) : null}
         <dt>Decided</dt>
         <dd>{summary.decided_at ?? "—"}</dd>
+        <dt>Market data as of</dt>
+        <dd data-testid="market-as-of">
+          {marketData === null
+            ? market.state === "failed"
+              ? "unavailable — the market request failed"
+              : "loading…"
+            : (observedAt ?? "not recorded for this decision")}
+          <span className="note"> the input's own time, not when this page refreshed</span>
+        </dd>
         <dt>Decision hash</dt>
         <dd className="hash">{summary.decision_hash}</dd>
         <dt>Policy</dt>
         <dd>{summary.policy_version}</dd>
       </dl>
 
-      {structure ? (
+      {marketData === null ? (
+        <section data-testid="structure-reading" data-present="false" data-state={market.state}>
+          <h3>{heading}</h3>
+          <Pending what="setup reading" resources={[market]} />
+        </section>
+      ) : structure ? (
         <section data-testid="structure-reading" data-present="true">
-          <h3>Why the setup did not qualify</h3>
+          <h3>{heading}</h3>
+          <StaleNote what="setup reading" resources={[market]} />
           <p className="gate">
             Gate: <strong>{structure.gate}</strong>
           </p>
@@ -99,7 +131,7 @@ export function DecisionTicket({
            the dashboard. The client states that the record is absent and names
            where it would come from; it does not guess at a reason. */
         <section data-testid="structure-reading" data-present="false">
-          <h3>Why the setup did not qualify</h3>
+          <h3>{heading}</h3>
           <p className="gate">
             <span className="t na">No structure reading was recorded for this decision.</span>
             <span className="src">structure_readings</span>
@@ -120,13 +152,16 @@ export function DecisionTicket({
         </ol>
       </section>
 
-      <section data-testid="horizons">
+      <section data-testid="horizons" data-state={horizons.state}>
         <h3>Review horizons</h3>
-        {horizons.length === 0 ? (
+        <StaleNote what="review horizons" resources={[horizons]} />
+        {horizonRows === null ? (
+          <Pending what="review horizons" resources={[horizons]} />
+        ) : horizonRows.length === 0 ? (
           <p className="empty">No horizons were scheduled for this decision.</p>
         ) : (
           <ul className="chk">
-            {horizons.map((horizon) => (
+            {horizonRows.map((horizon) => (
               <li key={horizon.horizon} data-resolved={String(horizon.resolved)}>
                 <span>
                   {horizon.horizon} · {horizon.sessions} completed session

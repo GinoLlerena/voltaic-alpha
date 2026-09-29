@@ -34,6 +34,9 @@ for (const screen of SCREENS) {
   for (const width of [1280, 400]) {
     test(`${screen.name} at ${width}px looks as it did`, async ({ page }) => {
       await replayApi(page);
+      // The page now dates what it checked ("Checked … UTC", PUI-001) from the
+      // browser's clock. Pinned, so the image changes only when the screen does.
+      await page.clock.setFixedTime(new Date("2026-09-17T12:00:00Z"));
       await page.setViewportSize({ width, height: 900 });
       await page.goto(screen.path);
       await page.waitForLoadState("networkidle");

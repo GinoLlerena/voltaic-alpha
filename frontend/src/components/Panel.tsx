@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { Resource } from "../api/useResource";
+import { Pending, StaleNote } from "./ResourceState";
 
 /**
  * A section that says when it has nothing, and names where that would come from.
@@ -16,6 +18,7 @@ export function Panel({
   controls,
   children,
   testId,
+  resource,
 }: {
   title: string;
   /** The record this panel reads, named even when it holds nothing. */
@@ -29,12 +32,26 @@ export function Panel({
   controls?: ReactNode;
   children?: ReactNode;
   testId: string;
+  /** The request behind this panel, when the panel owns one. Until it has
+   *  answered, `present` and `absence` mean nothing: a loading or failed request
+   *  is not an empty record (`PUI-001`). */
+  resource?: Resource<unknown> | undefined;
 }) {
+  const settled = resource === undefined || resource.state === "ready" || resource.state === "stale";
   return (
-    <section id={testId} data-testid={testId} data-present={String(present)}>
+    <section
+      id={testId}
+      data-testid={testId}
+      data-present={String(settled && present)}
+      data-state={resource?.state ?? "given"}
+    >
       <h3>{title}</h3>
       {controls}
-      {present ? (
+      {!settled && resource ? (
+        <Pending what={title.toLowerCase()} resources={[resource]} />
+      ) : null}
+      {settled && resource ? <StaleNote what={title.toLowerCase()} resources={[resource]} /> : null}
+      {!settled ? null : present ? (
         children
       ) : (
         <p className="gate">
