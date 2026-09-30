@@ -151,6 +151,9 @@ def _apply_function(gid: str) -> int:
             "--Namespace", "acs_fc", "--MetricName", metric, "--Resources", resources,
             "--ContactGroups", CONTACTS, "--Interval", window,
             "--NoDataPolicy", "INSUFFICIENT_DATA",
+            # 1 h, not CloudMonitor's default 24 h: a second, separate failure
+            # of the function must not be hidden for a day behind the first.
+            "--SilenceTime", "3600",
             "--Escalations.Critical.Statistics", "Value",
             "--Escalations.Critical.ComparisonOperator", comparison,
             "--Escalations.Critical.Threshold", threshold, "--Escalations.Critical.Times", "1")
