@@ -235,12 +235,16 @@ goes unnoticed:
    than 5 minutes. Otherwise it sends an alert. It retries `StartInstance` once
    on `OperationDenied.NoStock` (economical mode may have released the capacity),
    and alerts if that also fails.
-2. **CloudMonitor site monitoring** probes `http://47.236.50.157/api/v1/system/status`
-   every 5 minutes, alerting only between 14:30 and 20:00 UTC on weekdays. That
-   core window is inside the session in both EDT and EST. This covers the
-   function itself failing: a role change, a code error, or a missed timer.
-   Market holidays inside the window produce a known false alarm, about 9 a
-   year, which can be muted ahead of time.
+2. **Alarms on the function itself.** CloudMonitor watches the function's own
+   metrics and emails the owner. `oa-scheduler-errors` fires on any failed
+   invocation: a tick that cannot decide raises, after trying to send its own
+   alert. `oa-scheduler-silent` fires when the timer delivers nothing for an
+   hour. Together they cover the function failing, whatever the cause: a
+   permission change, a code error, or a stopped timer.
+
+   *Changed from the first draft (30 Sep):* a site probe on the public URL was
+   dropped. CloudMonitor's alert window cannot exclude weekends, so the probe
+   would have emailed every weekend while the server is correctly stopped.
 
 **Channel.** Both go through CloudMonitor alert contacts (the owner's email, and
 optionally SMS). Neither involves the Mac, a Claude session or any new
@@ -337,11 +341,19 @@ explicit approval:
 3. Keep the 24-hour cap.
 4. Keep the 08:30 ET start.
 
-## 11. Provisioning status
+## 11. Provisioning status (30 Sep 2026)
 
 | Item | State |
 |---|---|
-| RAM role `oa-scheduler-role`, trusted by Function Compute only | **Created** 30 Sep. No permissions yet |
-| Policy `oa-scheduler-policy` (`deploy/scheduler/ram-policy.json`) | **Blocked**: the operator RAM user lacks `ram:CreatePolicy`. The owner creates it in the RAM console and attaches it to the role |
-| CloudMonitor contact `oa-owner` (email) and group `oa-alerts` | **Created** 30 Sep. Email is **PENDING** until the owner clicks the activation link CloudMonitor sent |
-| Function Compute function, timer, site probe | Not yet: they follow the prerequisites in §6 and §7 |
+| RAM role `oa-scheduler-role`, trusted by Function Compute only | Created |
+| Policy `oa-scheduler-policy` (`deploy/scheduler/ram-policy.json`) | **Blocked on the owner.** The operator user lacks `ram:CreatePolicy`. Confirmed live: the function's first `DescribeInstances` returned `Forbidden.RAM` |
+| CloudMonitor contact `oa-owner` (email) and group `oa-alerts` | Created. Email activated by the owner |
+| CloudMonitor group `oa-scheduler`, custom-event rule `oa-scheduler-alert` | Created |
+| Metric rules `oa-scheduler-errors`, `oa-scheduler-silent` | Created |
+| Function `oa-scheduler` (Python 3.12, 128 MB), `DRY_RUN=1` | Created. Its signing is verified against Alibaba's published example and against the live API |
+| Timer `every-15-min` | Created, then **disabled** until the policy exists, so failing ticks do not email every few minutes |
+
+Commands (`scripts/provision_scheduler.py`): `apply` (create or update),
+`mode dry|live` (the only switch that lets it act), `disable|enable` (the
+timer), `status` (configuration, timer, and the last decisions and alerts,
+logged as CloudMonitor custom events).
