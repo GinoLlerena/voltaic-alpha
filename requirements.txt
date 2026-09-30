@@ -72,7 +72,7 @@ typing-extensions==4.16.0
 typing-inspection==0.4.4
 tzdata==2026.3 ; sys_platform == 'emscripten' or sys_platform == 'win32'
 tzlocal==5.4.4
-urllib3==2.7.0
+urllib3==2.8.0
 uvicorn==0.52.4
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
 watchdog==6.0.0 ; sys_platform != 'darwin'
