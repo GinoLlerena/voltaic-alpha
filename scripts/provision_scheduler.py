@@ -94,13 +94,26 @@ def group_id() -> str:
 def apply(args: argparse.Namespace) -> int:
     gid = group_id()
     print(f"CloudMonitor group {GROUP}: {gid}")
+    # PutCustomEventRule ADDS a rule on every call, even with the same RuleId,
+    # and there is no API to delete one. On 30 Sep repeated `apply` runs left
+    # seven identical rules and every alert became seven emails. So the rule is
+    # created only when the group has none; to change it, delete the group
+    # (DeleteMonitorGroup) and re-run `apply`. Period 15 s: one email per event.
+    existing = cms("DescribeMetricRuleList", "--GroupId", gid)
+    names = [a.get("RuleName") for a in (existing.get("Alarms") or {}).get("Alarm", [])]
+    if "oa-scheduler-alert" in names:
+        print("custom-event rule oa-scheduler-alert already present (not re-added)")
+        return _apply_function(gid)
     cms("PutCustomEventRule", "--RuleId", "oa-scheduler-alert", "--RuleName", "oa-scheduler-alert",
         "--EventName", "oa-scheduler-alert", "--GroupId", gid, "--ContactGroups", CONTACTS,
-        "--Level", "CRITICAL", "--Threshold", "1", "--Period", "60",
+        "--Level", "CRITICAL", "--Threshold", "1", "--Period", "15",
         "--EffectiveInterval", "00:00-23:59",
         "--EmailSubject", "Options Alpha scheduler alert")
     print("custom-event rule oa-scheduler-alert -> email")
+    return _apply_function(gid)
 
+
+def _apply_function(gid: str) -> int:
     existing = fc("GET", f"{FC}/{FUNCTION}", check=False)
     dry = "1"
     if "_error" not in existing:
