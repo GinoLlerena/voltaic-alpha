@@ -39,9 +39,11 @@ import os
 import subprocess
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+from .calendar import MARKET_TZ, TradingCalendar, committed_calendar
 
 #: Must equal `watchdog.DEFAULT_BACKUP_FILE`; a test holds the two together.
 #: Restated rather than imported because importing the watchdog would pull the
@@ -59,9 +61,14 @@ DEFAULT_STAGING_DIR = "/run/options-alpha-backup-offsite"
 #: Same bound the watchdog applies to the hourly job: two missed runs. A record
 #: older than this is a stale record, not this cycle's dump.
 MAX_DUMP_AGE_SECONDS = 7800
-#: Sunday, in `datetime.weekday()` numbering. The plan names no day. Sunday's
-#: dump is taken with the market closed and so carries the whole trading week.
+#: Fallback only, for a dump past the committed calendar: Sunday, in
+#: `datetime.weekday()` numbering. With the calendar, the weekly copy is the
+#: week's last session's post-close dump (scheduled-stop design §6), because a
+#: server stopped outside market hours takes no Sunday dump.
 WEEKLY_WEEKDAY = 6
+#: A dump belongs to a session only once this long after its close: SPY
+#: options trade until 16:15 ET on a 16:00 session.
+POST_CLOSE_LAG = timedelta(minutes=15)
 #: §7.2: one daily cycle plus margin. With a run every four hours, roughly six
 #: attempts have failed before this fires.
 MAX_OFFSITE_AGE_SECONDS = 30 * 3600
@@ -185,9 +192,37 @@ def verify_source(status: dict[str, Any] | None, now: datetime) -> SourceDump:
     )
 
 
-def destination_keys(dump_at: datetime) -> list[str]:
-    """`daily/` always; `weekly/` too when the dump was taken on the weekly day."""
-    day = _utc(dump_at).date()
+def destination_keys(
+    dump_at: datetime, calendar: tuple[TradingCalendar, date] | None = None
+) -> list[str]:
+    """The keys this dump should be stored under.
+
+    With the calendar (scheduled-stop design §6): the daily copy is keyed by the
+    trading session the dump follows, and is the first verified dump taken after
+    that session's close. The bucket forbids overwrites, so "first" must mean
+    post-close: keyed by UTC date instead, a server stopped overnight would store
+    its morning dump and never the session's data. A dump taken during a session
+    returns no keys and waits for the post-close one. The week's last session
+    also gets a `weekly/` key.
+
+    Without the calendar, or for a date past its coverage: the original rule,
+    keyed by the dump's UTC date, with Sunday as the weekly day.
+    """
+    at = _utc(dump_at)
+    if calendar is not None:
+        sessions, covered_through = calendar
+        if at.astimezone(MARKET_TZ).date() <= covered_through:
+            today = sessions.session_for(at)
+            if today is not None and today.open_at <= at < today.close_at + POST_CLOSE_LAG:
+                return []
+            closed = sessions.last_closed(at, POST_CLOSE_LAG)
+            if closed is None:
+                return []
+            keys = [f"daily/{closed.day.isoformat()}.dump.age"]
+            if sessions.is_last_of_week(closed.day):
+                keys.append(f"weekly/{closed.day.isoformat()}.dump.age")
+            return keys
+    day = at.date()
     keys = [f"daily/{day.isoformat()}.dump.age"]
     if day.weekday() == WEEKLY_WEEKDAY:
         keys.append(f"weekly/{day.isoformat()}.dump.age")
@@ -294,8 +329,14 @@ def run_offsite(
     staging_dir: str = DEFAULT_STAGING_DIR,
     ossutil: str = DEFAULT_OSSUTIL,
     age: str = DEFAULT_AGE,
+    calendar: tuple[TradingCalendar, date] | None = None,
 ) -> dict[str, Any]:
-    """One idempotent pass. Returns the status record; raises OffsiteError to refuse."""
+    """One idempotent pass. Returns the status record; raises OffsiteError to refuse.
+
+    `calendar` defaults to the committed session calendar; tests pass their own.
+    """
+    if calendar is None:
+        calendar = committed_calendar()
     try:
         status = json.loads(Path(backup_file).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -304,7 +345,7 @@ def run_offsite(
     recipient = _read_recipient(recipient_file)
     oss = Oss(config, runner, ossutil)
 
-    keys = destination_keys(source.at)
+    keys = destination_keys(source.at, calendar)
     missing = [key for key in keys if oss.exists(key) is None]
     record: dict[str, Any] = {
         "dump_at": source.at.isoformat(), "dump_path": str(source.path),
@@ -377,9 +418,13 @@ def main(argv: list[str] | None = None) -> int:
             backup_file=args.backup_file, recipient_file=args.recipient_file,
             staging_dir=args.staging_dir,
         )
-        outcome = {**base, "ok": True, **record,
-                   "detail": ("uploaded " + ", ".join(record["uploaded"])) if record["uploaded"]
-                   else "all destinations already hold this dump"}
+        if record["uploaded"]:
+            detail = "uploaded " + ", ".join(record["uploaded"])
+        elif not record["keys"]:
+            detail = "no upload: the dump was taken during a session; the post-close dump is stored"
+        else:
+            detail = "all destinations already hold this dump"
+        outcome = {**base, "ok": True, **record, "detail": detail}
     except OffsiteError as exc:
         outcome = {**base, "ok": False, "detail": str(exc)}
     except Exception as exc:  # noqa: BLE001 - anything unforeseen is still a failed run

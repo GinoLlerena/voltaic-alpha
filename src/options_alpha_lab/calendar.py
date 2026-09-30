@@ -20,10 +20,12 @@ treated as closed rather than assumed open.
 
 from __future__ import annotations
 
+import json
 from bisect import bisect_right
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from enum import Enum
+from importlib import resources
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -130,6 +132,20 @@ class TradingCalendar:
     def is_trading_day(self, day: date) -> bool:
         return day in self._sessions
 
+    def last_closed(self, moment: datetime, lag: timedelta = timedelta(0)) -> Session | None:
+        """The most recent session whose close, plus `lag`, is at or before `moment`."""
+        closed = [s for s in self._sessions.values() if s.close_at + lag <= moment]
+        return max(closed, key=lambda s: s.close_at, default=None)
+
+    def is_last_of_week(self, day: date) -> bool:
+        """Whether `day` is the final session of its ISO week (normally Friday)."""
+        if day not in self._sessions:
+            return False
+        year, week, _ = day.isocalendar()
+        return not any(
+            other > day and other.isocalendar()[:2] == (year, week) for other in self._sessions
+        )
+
     def closes_through(self, moment: datetime) -> int:
         """Sessions that had closed at or before `moment`."""
         return bisect_right(self._closes, moment)
@@ -181,3 +197,19 @@ class TradingCalendar:
         return WindowDecision(
             WindowState.OPEN, f"entry permitted until {local_cutoff} ET{early}", session
         )
+
+
+#: Sessions committed with the code, so decisions that must be made while the
+#: server is stopped, or without broker keys, need no live calendar.
+COMMITTED_CALENDAR_FILE = "data/nyse_sessions.json"
+
+
+def committed_calendar() -> tuple[TradingCalendar, date]:
+    """The committed session calendar and the last date it covers.
+
+    Refreshed from Alpaca by `scripts/refresh_calendar.py`. A date past the
+    coverage is unknown, and each caller decides which way unknown fails.
+    """
+    raw = resources.files("options_alpha_lab").joinpath(COMMITTED_CALENDAR_FILE).read_text("utf-8")
+    payload = json.loads(raw)
+    return TradingCalendar.from_payload(payload), date.fromisoformat(payload["covered_through"])

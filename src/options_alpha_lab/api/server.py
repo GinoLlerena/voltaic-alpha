@@ -32,6 +32,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
+from .. import offsite
+from ..calendar import committed_calendar
 from ..presentation import (
     activity,
     book,
@@ -41,6 +43,7 @@ from ..presentation import (
     horizons,
     listing,
     proof,
+    readiness,
     status,
     tour,
 )
@@ -89,6 +92,8 @@ def create_app(
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ui_dir: Path | None = None,
     limiter: RateLimiter | None = None,
+    backup_file: str = offsite.DEFAULT_BACKUP_FILE,
+    offsite_file: str = offsite.DEFAULT_STATUS_FILE,
 ) -> FastAPI:
     app = FastAPI(
         title="Options Alpha presentation API",
@@ -144,6 +149,21 @@ def create_app(
             )
             for i in items
         ])
+
+    @api.get("/system/stop-readiness", response_model=dto.Envelope[dto.StopReadinessOut])
+    def system_stop_readiness(db: Db) -> dict[str, Any]:
+        """Scheduled-stop design §7: asked by the scheduler before any stop."""
+        chosen: Source = db.info["source"]
+        r = readiness.stop_readiness(
+            db, now=clock(), live=chosen.mode == "LIVE", backup_file=backup_file,
+            offsite_file=offsite_file, calendar=committed_calendar(),
+        )
+        return envelope(db, dto.StopReadinessOut(
+            ok=r.ok, open_positions=r.open_positions, working_orders=r.working_orders,
+            unresolved_incidents=r.unresolved_incidents, backup_at=r.backup_at,
+            backup_verified=r.backup_verified, session_due=r.session_due,
+            session_copy_off_host=r.session_copy_off_host, reasons=list(r.reasons),
+        ))
 
     @api.get("/system/proof", response_model=dto.Envelope[list[dto.ProofTileOut]])
     def system_proof(db: Db) -> dict[str, Any]:

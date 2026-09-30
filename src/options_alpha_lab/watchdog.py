@@ -22,13 +22,14 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.engine import Engine
 
+from .calendar import MARKET_TZ, TradingCalendar, committed_calendar
 from .offsite import (
     DEFAULT_STATUS_FILE as DEFAULT_OFFSITE_STATUS_FILE,
 )
@@ -187,7 +188,46 @@ class OffsiteProbe:
     list_daily: Callable[[], list[StoredObject]]
 
 
-def _check_offsite(probe: OffsiteProbe, now: datetime) -> list[Check]:
+#: A session's off-host copy is due this long after its close: the 17:00 ET
+#: post-close backup, then the hourly upload at :10 (scheduled-stop design §6).
+OFFSITE_DUE_AFTER_CLOSE = timedelta(hours=3)
+#: After a start, periodic jobs have not run yet: the backup timer catches up at
+#: boot and the upload at the next :10. Their checks do not fail inside this.
+BOOT_GRACE_PERIODIC = timedelta(minutes=90)
+#: The worker's first tick after a start.
+BOOT_GRACE_TICK = timedelta(minutes=15)
+_PERIODIC_CHECKS = frozenset({"backup_status", "offsite_run", "offsite_fresh"})
+
+
+def _session_copy_check(
+    objects: list[StoredObject], now: datetime, calendar: tuple[TradingCalendar, date]
+) -> Check | None:
+    """Whether the last completed session's copy is off-host, or None past coverage.
+
+    Asked by session rather than by age: a server stopped from Friday evening to
+    Monday morning holds a copy about 63 hours old that is exactly the right one.
+    """
+    sessions, covered_through = calendar
+    if now.astimezone(MARKET_TZ).date() > covered_through:
+        return None
+    due = sessions.last_closed(now, OFFSITE_DUE_AFTER_CLOSE)
+    if due is None:
+        return Check("offsite_fresh", True, "no session's copy is due yet")
+    held = sorted(
+        o.key.removeprefix("daily/")[:10] for o in objects if o.key.startswith("daily/")
+    )
+    newest = held[-1] if held else None
+    ok = newest is not None and newest >= due.day.isoformat()
+    return Check(
+        "offsite_fresh", ok,
+        f"copy for the {due.day.isoformat()} session "
+        + ("is off-host" if ok else f"is missing (newest daily/ is {newest or 'none'})"),
+    )
+
+
+def _check_offsite(
+    probe: OffsiteProbe, now: datetime, calendar: tuple[TradingCalendar, date] | None = None
+) -> list[Check]:
     checks: list[Check] = []
     status = _read_json(Path(probe.status_file))
     if status is None:
@@ -215,6 +255,10 @@ def _check_offsite(probe: OffsiteProbe, now: datetime) -> list[Check]:
         objects = probe.list_daily()
     except Exception as exc:  # noqa: BLE001 - failing to look is a failure, never a pass
         checks.append(Check("offsite_fresh", False, f"cannot list daily/: {exc}"))
+        return checks
+    by_session = _session_copy_check(objects, now, calendar) if calendar else None
+    if by_session is not None:
+        checks.append(by_session)
         return checks
     newest = max((o.last_modified for o in objects), default=None)
     if newest is None:
@@ -282,19 +326,51 @@ def evaluate(
     backup_file: str = DEFAULT_BACKUP_FILE,
     offsite: OffsiteProbe | None = None,
     now: datetime | None = None,
+    calendar: tuple[TradingCalendar, date] | None = None,
+    uptime: timedelta | None = None,
 ) -> WatchdogResult:
-    """Run every check. Nothing here raises; a failure to look is a failed check."""
+    """Run every check. Nothing here raises; a failure to look is a failed check.
+
+    `uptime` enables the boot grace: a server just started by the scheduled
+    stop (design §6) has old tick, backup and upload records until its first
+    runs, and those must not open false incidents. Only those checks, and only
+    inside the grace, are excused; each excused check says so.
+    """
     stamp = now or datetime.now(UTC)
     checks: list[Check] = []
     checks += _check_health_file(Path(health_file), stamp)
     checks += _check_backup(Path(backup_file), stamp)
     if offsite is not None:
-        checks += _check_offsite(offsite, stamp)
+        checks += _check_offsite(offsite, stamp, calendar)
     if engine is None:
         checks.append(Check("database", False, "no database configured"))
     else:
         checks += _check_database(engine, stamp)
+    if uptime is not None:
+        checks = [_boot_grace(check, uptime) for check in checks]
     return WatchdogResult(at=stamp, checks=tuple(checks))
+
+
+def _boot_grace(check: Check, uptime: timedelta) -> Check:
+    if check.ok:
+        return check
+    grace = (
+        BOOT_GRACE_PERIODIC if check.name in _PERIODIC_CHECKS
+        else BOOT_GRACE_TICK if check.name == "tick_recent"
+        else None
+    )
+    if grace is None or uptime >= grace:
+        return check
+    minutes = int(uptime.total_seconds() // 60)
+    return Check(check.name, True, f"{check.detail} (excused: up {minutes} min, boot grace)")
+
+
+def system_uptime(path: str = "/proc/uptime") -> timedelta | None:
+    """Seconds since boot, or None where the platform does not say."""
+    try:
+        return timedelta(seconds=float(Path(path).read_text().split()[0]))
+    except (OSError, ValueError, IndexError):
+        return None
 
 
 def _notify(url: str, result: WatchdogResult) -> Check:
@@ -366,6 +442,7 @@ def main(argv: list[str] | None = None) -> int:
 
     result = evaluate(
         engine, health_file=args.health_file, backup_file=args.backup_file, offsite=offsite,
+        calendar=committed_calendar(), uptime=system_uptime(),
     )
 
     webhook = os.environ.get("WATCHDOG_WEBHOOK_URL")

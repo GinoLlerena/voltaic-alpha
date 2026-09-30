@@ -1,13 +1,15 @@
 [Unit]
-Description=Copy the newest verified dump off-host, retried every four hours
+Description=Copy the newest verified dump off-host, hourly
 
 [Timer]
-# Every four hours at :30, clear of the hourly dump at :00. The service uploads
-# at most once a day; the cadence is the retry, not a higher backup frequency,
-# so a transient failure costs at most four hours (plan §7.1).
-OnCalendar=*-*-* 00/4:30:00
+# Hourly at :10, ten minutes after the hourly dump at :00. The service uploads
+# a session's copy once, from the first verified dump after that session's
+# close (scheduled-stop design §6), so the post-close 17:00 ET dump is off-host
+# by about 17:12 ET: before a scheduled stop at 17:30 ET. A dump taken during a
+# session uploads nothing; the hourly cadence is the retry.
+OnCalendar=*-*-* *:10:00
 Persistent=true
-RandomizedDelaySec=300
+RandomizedDelaySec=60
 
 [Install]
 WantedBy=timers.target

@@ -119,4 +119,4 @@ source = ["src"]
 branch = true
 
 [tool.setuptools.package-data]
-"options_alpha_lab" = ["py.typed"]
+"options_alpha_lab" = ["py.typed", "data/*.json"]

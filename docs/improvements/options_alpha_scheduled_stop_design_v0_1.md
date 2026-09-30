@@ -246,43 +246,49 @@ goes unnoticed:
 optionally SMS). Neither involves the Mac, a Claude session or any new
 third-party service.
 
-## 6. What a stopped server changes elsewhere
+## 6. What a stopped server changes elsewhere (implemented 30 Sep 2026)
 
-These must ship before enabling, or the first weekend stop raises false incidents
-and skips backups:
+These ship before enabling, or the first weekend stop would skip backups and
+raise false incidents. They are also correct for a server that never stops, so
+they ship first.
 
-| Area | Today | Change |
+| Area | Before | Now |
 |---|---|---|
-| Daily off-host copy | Uploaded at 00:30 UTC, when the server would be stopped | Run the offsite upload immediately after the 17:00 ET post-close backup (timer `OnCalendar` in ET, or triggered by `ExecStartPost`). The dump key stays dated by the dump. |
-| Weekly copy | Taken on Sunday (UTC), when the server is off | Taken on the week's last trading session, normally Friday post-close. `offsite.WEEKLY_WEEKDAY` becomes "last session of the ISO week". |
-| Watchdog freshness | `offsite_fresh` fails at 30 h; a Friday-to-Monday stop is about 63 h | Measure staleness in hours the server has been running since the last scheduled stop. The stop records `/var/lib/options-alpha/last_scheduled_stop.json` via `ExecStop` on shutdown. Also add a 90-minute start-up grace. |
-| Timers at boot | `Persistent=true` on the backup timer | Keep it: the missed hourly backup runs at boot, so a fresh dump exists before the first watchdog check. |
-| Capacity collector | Gaps while stopped | None needed; the evaluator already windows by session. |
+| Calendar | Fetched from Alpaca at worker start-up, never stored | `src/options_alpha_lab/data/nyse_sessions.json`: Alpaca's calendar for 2026–2027, fetched on the host with the worker's read-only client by `scripts/refresh_calendar.py`. Used by the uploader, the watchdog, readiness and the scheduler. Past its coverage, each falls back to its previous rule. |
+| Daily off-host copy | Keyed by the dump's UTC date: the first dump of each UTC day. The bucket forbids overwrites | Keyed by the **trading session** the dump follows: the first verified dump taken at least 15 min after that session's close. A dump taken during a session uploads nothing, so a partial day is never stored under a session's key. |
+| Weekly copy | Sunday (UTC), when a stopped server takes no dump | The week's last session (normally Friday; Thursday 2 Jul 2026, before a holiday). |
+| Upload cadence | Every 4 h at :30 | Hourly at :10, ten minutes after the hourly dump. The 17:00 ET post-close dump is off-host by about 17:12 ET, before a 17:30 ET stop. |
+| Watchdog freshness | Newest copy under 30 h old | The last completed session's copy is in OSS, checked 3 h after that session's close. A Friday-to-Monday stop leaves a 63-hour-old copy, which is the right one. |
+| Watchdog after a start | Old tick, backup and upload records would fail at once | Boot grace: those checks are excused for 90 min (backup and upload) and 15 min (worker tick) after boot, and say so. Nothing else is excused. |
 
-## 7. A read-only stop-readiness endpoint
+**Transition.** On the day this deploys, today's session key already exists
+from the old 00:30 UTC upload. That day's post-close copy is skipped, and
+off-host coverage is about a day staler until the next session's copy lands.
+
+## 7. A read-only stop-readiness endpoint (implemented 30 Sep 2026)
 
 `GET /api/v1/system/stop-readiness`. This is public-safe: it returns counts and
-timestamps, with no identifiers or broker detail.
+timestamps only.
 
 ```json
-{ "ok": false,
-  "open_positions": 0, "working_orders": 0, "unreconciled": 1,
-  "last_backup": {"at": "2026-09-29T21:00:11Z", "verified": true},
-  "last_offsite": {"key_date": "2026-09-29", "at": "2026-09-29T21:31:02Z", "ok": true},
-  "sessions_next": [{"date": "2026-09-30", "open": "09:30", "close": "16:00"}, "…"],
-  "reasons": ["1 unreconciled order"] }
+{ "ok": false, "open_positions": 0, "working_orders": 0, "unresolved_incidents": 1,
+  "backup_at": "2026-10-02T21:01:03+00:00", "backup_verified": true,
+  "session_due": "2026-10-02", "session_copy_off_host": true,
+  "reasons": ["1 unresolved incident(s)"] }
 ```
 
-`ok` requires:
+`ok` requires all of:
 
-- no open positions;
-- no working orders;
-- nothing unreconciled;
-- a verified backup newer than today's close;
-- an off-host copy of that backup.
+- a live database;
+- no open position;
+- no non-terminal broker order;
+- no unresolved incident (which covers unreconciled state);
+- a verified backup taken after the last session's close (+15 min);
+- that session's key in the uploader's last successful record.
 
-The function never infers readiness from other endpoints. `sessions_next` is the
-worker's Alpaca calendar, used for the §3 cross-check.
+Anything missing or unreadable counts against a stop. The earlier idea of
+cross-checking the calendar here was dropped: the committed calendar already is
+Alpaca's.
 
 ## 8. Verification before enabling
 
