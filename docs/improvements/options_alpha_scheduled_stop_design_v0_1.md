@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 29 September 2026, America/Lima |
-| Status | Design for review. Nothing is provisioned or enabled by this document |
+| Status | Approved by the owner 29 Sep 2026 (§9 provisioning; §10 answered). Stopping stays disabled until every §8 check passes |
 | Instance | `i-t4n88bkfwsq0lhzmfjii`, `ecs.e-c1m1.large` (2c2g), pay-as-you-go |
 | Owner requirements | 27 Sep 2026: an external failed-start alert; a manual override for demos **and** development that does not change the market-hours schedule and that a scheduled stop never interrupts; show the session check before `StopInstance` and how a forgotten override expires; verify both before enabling |
 | Cost analysis | [§ Option 6 and §7.7](options_alpha_deployment_cost_analysis_v0_1.md) |
@@ -24,6 +24,20 @@ cost analysis. The trade-offs, from cost analysis Option 6, still hold:
 - The server must never stop with open exposure, working orders or unresolved
   reconciliation.
 
+**Billing mode: checked 30 Sep 2026.**
+
+- The instance is pay-as-you-go, VPC, not spot, with a pay-as-you-go ESSD PL1
+  system disk. Economical mode (`StopCharging`) requires exactly this.
+- The EIP is pay-by-traffic, and no separate EIP line appears on the daily bill.
+- The bill for 29 Sep, the first full day on 2c2g, was **$0.670**. The model
+  predicts compute $0.0178 × 24 = $0.427 plus disk $0.0101 × 24 = $0.242, which
+  is $0.669.
+- The same instance was measured earlier at $0.24/day while stopped in this
+  mode (cost analysis Option 6). That is the disk alone.
+
+So the savings rest on real bills, not only list prices. The first stopped
+day's bill is still checked during validation (§8, step 6).
+
 ## 2. Where the scheduler runs: outside the server and outside the Mac
 
 The instance cannot start itself, and this week showed that the operator Mac and
@@ -38,10 +52,16 @@ late. The scheduler therefore runs on **Alibaba Cloud Function Compute**, on a
 | Rejected: OOS scheduled templates | Also cloud-side, but the lock, calendar and readiness logic would live in YAML with little testability. |
 | Rejected: cron on the instance or the Mac | The instance cannot start itself, and the Mac proved unreliable. |
 
-The RAM role is minimal: `ecs:DescribeInstances`, `ecs:StartInstance` and
-`ecs:StopInstance` on this one instance, plus `cms:PutCustomEvent` for
-alerts. It has no OSS, no RunCommand and no tag writes:
-the function reads the override and never has to edit it (§4).
+The RAM role `oa-scheduler-role` is minimal:
+
+- `ecs:DescribeInstances`;
+- `ecs:StartInstance`, `ecs:StopInstance` and `ecs:TagResources` on this one
+  instance only;
+- `cms:PutCustomEvent` for alerts and a durable decision log.
+
+It has no OSS and no RunCommand. The one tag write exists for a single case: an
+invalid lock is rewritten to a valid 24-hour one (§4.2). The policy is committed
+as `deploy/scheduler/ram-policy.json`.
 
 ## 3. The schedule
 
@@ -112,12 +132,14 @@ instance is Running. Every "no" leaves the server running.
 def tick(now):
     inst = describe_instance()                     # status + tags, one call
     lock = read_lock(inst.tags, now)               # §4.2
+    if lock.invalid:                               # (0) never a stop past a badly written lock:
+        retag(until=now + 24h)                     #     held, alerted, rewritten to the cap
+        alert(f"session lock invalid: {lock.problem}")
+        return KEEP_RUNNING
     if lock.active:
         log("lock active", reason=lock.reason, until=lock.until)
         warn_if_expiring(lock, now)                # one alert ~30 min before expiry
         return KEEP_RUNNING                        # (1) a session in progress is never stopped
-    if lock.invalid:
-        alert(f"session lock ignored: {lock.problem}")   # malformed, or longer than the cap
     if calendar_unavailable():
         return KEEP_RUNNING                        # (2) fail toward availability
     if in_run_window(now) or grace_after_lock_end(now, inst):
@@ -146,28 +168,55 @@ def read_lock(tags, now) -> Lock:
     try:
         until = parse_utc(raw)                     # must be ISO-8601 with Z / +00:00
     except ValueError:
-        return Lock.invalid("unparseable until")   # ignored, alerted, never honoured
+        return Lock.invalid("unparseable until")
     if until <= now:
         return Lock.expired(until)                 # expired: treated exactly as no lock
     if until - now > MAX_LOCK:
-        return Lock.invalid("longer than 24 h")    # a typo'd year cannot pin the server on
+        return Lock.invalid("longer than 24 h")
     return Lock.active(until, tags.get("oa-session-reason", "unspecified"))
+    # Also invalid: a reason with no expiry, and any other `oa-session…` key
+    # (a misspelling or wrong case).
 ```
 
 - Every lock carries its own absolute expiry. There is no "on until I say off"
   state to forget.
-- No lock can reach more than 24 h ahead. The CLI refuses longer, and the
-  function ignores a longer tag set by hand in the console and alerts on it. A
-  forgotten session therefore costs at most one day of compute, about $0.43.
+- No lock can reach more than 24 h ahead. The CLI refuses longer.
+- **An invalid lock never permits a stop (owner, 29 Sep).** Invalid means
+  over the cap, unreadable, missing a timezone, a reason with no expiry, or a
+  misspelt key. The function keeps the server running (starting it if stopped),
+  alerts, and rewrites the tag to a valid lock expiring 24 h from that tick. The
+  lock is then honoured and expires normally. If the rewrite fails, the server
+  still stays up and the alert repeats on every tick.
+- A forgotten session, valid or not, therefore costs at most about one day of
+  compute, about $0.43.
 - About 30 minutes before expiry, one alert is sent: "dev session ends at 22:00Z;
   `session.py extend` to keep it".
 - After expiry, the next tick past the 15-minute grace runs the normal checks
   from §4.1 step (3) onward, and stops the server if it is outside the schedule
   and ready.
-- The function never deletes the expired tag, which keeps its role read-only on
-  tags. `session.py end` expires a lock by setting `until` to the current
-  time, so ending and forgetting follow one path, with the same grace.
-  `session.py status` shows the lock as expired, and `start` overwrites it.
+- The function never deletes a tag. Its only write is the rewrite above.
+  `session.py end` expires a lock by setting `until` to the current time, so
+  ending and forgetting follow one path, with the same grace. `session.py
+  status` shows the lock as expired, and `start` overwrites it.
+
+### 4.3 Setting the lock from a phone
+
+The ECS web console works in a phone's browser. Times are UTC, and Lima is
+UTC−5, so 17:00 Lima is `22:00Z`.
+
+| Action | Console steps |
+|---|---|
+| **Start a session** | ECS → Instances → `options-alpha-demo` → **Tags** → Edit. Add `oa-session-until` = the end time, e.g. `2026-10-03T22:00Z` (no more than 24 h ahead), and `oa-session-reason` = `dev` or `demo`. Save. If the server is stopped, the next 15-minute tick starts it, or press **Start** to skip the wait. |
+| **Extend** | Edit `oa-session-until` to a later time, again no more than 24 h ahead. |
+| **End** | Edit `oa-session-until` to the current UTC time. After the 15-minute grace, the next tick stops the server if it is outside market hours. |
+| **Check** | The tags show the expiry. The email alerts say when a lock was rewritten or is about to expire. |
+
+A mistyped value can never stop the server. It is held, rewritten to 24 h, and
+emailed (§4.2).
+
+*Unverified:* whether the Alibaba Cloud mobile app can edit instance tags.
+Until the owner confirms that it can, use the web console in the phone's
+browser; the steps above work there.
 
 The rules in §3 and §4 are implemented and tested now, as a pure function
 without cloud calls: `src/options_alpha_lab/scheduler.py` (`read_lock`,
@@ -275,14 +324,18 @@ explicit approval:
 - the §6 host changes, the §7 endpoint and `scripts/session.py`, through normal
   PRs and deploys.
 
-## 10. Open questions for the owner
+## 10. The owner's answers (29 Sep 2026)
 
-1. Is email enough for alerts, or should SMS be added? SMS costs a little per
-   message.
-2. Should `session.py start` also be available as a one-tap console action, with
-   documented steps to edit the instance tags from the Alibaba app?
-3. Is 24 h the right cap for a lock? It bounds the cost of forgetting at about
-   $0.43.
-4. The run window is 08:30–17:30 ET. A later start (09:00) saves about 10 h a
-   month (~$0.18) but tightens start-up margin. The recommendation is to keep
-   08:30.
+1. Alerts go by email only, with no SMS.
+2. Document setting, extending and ending the lock from a phone: see §4.3.
+3. Keep the 24-hour cap.
+4. Keep the 08:30 ET start.
+
+## 11. Provisioning status
+
+| Item | State |
+|---|---|
+| RAM role `oa-scheduler-role`, trusted by Function Compute only | **Created** 30 Sep. No permissions yet |
+| Policy `oa-scheduler-policy` (`deploy/scheduler/ram-policy.json`) | **Blocked**: the operator RAM user lacks `ram:CreatePolicy`. The owner creates it in the RAM console and attaches it to the role |
+| CloudMonitor contact `oa-owner` (email) and group `oa-alerts` | **Created** 30 Sep. Email is **PENDING** until the owner clicks the activation link CloudMonitor sent |
+| Function Compute function, timer, site probe | Not yet: they follow the prerequisites in §6 and §7 |

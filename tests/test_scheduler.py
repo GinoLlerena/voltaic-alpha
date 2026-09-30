@@ -151,10 +151,38 @@ class TheCheckBeforeStopInstance(unittest.TestCase):
         self.assertIs(after_grace.action, Action.STOP)
         self.assertEqual(probe.calls, 1)
 
-    def test_an_over_long_lock_is_ignored_and_alerted_not_honoured(self) -> None:
-        decision, _ = tick(self.SATURDAY, tags=lock("2027-10-03T19:00Z"))
-        self.assertIs(decision.action, Action.STOP)
-        self.assertTrue(any("ignored" in a for a in decision.alerts))
+    def test_an_invalid_lock_never_permits_a_stop(self) -> None:
+        # Owner, 29 Sep 2026: an invalid or unreadable lock must not silently
+        # allow a stop during an active session. Each is held, alerted, and
+        # rewritten to the 24-hour cap; readiness is never even asked.
+        cases = {
+            "over the cap": lock("2027-10-03T19:00Z"),
+            "unreadable": lock("tomorrow evening"),
+            "no timezone": lock("2026-10-03T19:00"),
+            "empty": lock(""),
+            "reason only": {LOCK_REASON_TAG: "demo"},
+            "misspelt key": {"oa-session-untill": "2026-10-03T19:00Z"},
+            "wrong case": {"OA-Session-Until": "2026-10-03T19:00Z"},
+        }
+        for name, tags in cases.items():
+            with self.subTest(name):
+                decision, probe = tick(self.SATURDAY, tags=tags)
+                self.assertIs(decision.action, Action.NONE)
+                self.assertEqual(probe.calls, 0)
+                self.assertEqual(decision.retag_until, utc(self.SATURDAY) + timedelta(hours=24))
+                self.assertTrue(any("invalid" in a for a in decision.alerts))
+
+    def test_an_invalid_lock_on_a_stopped_server_starts_it(self) -> None:
+        decision, _ = tick(self.SATURDAY, status="Stopped", tags=lock("tomorrow"))
+        self.assertIs(decision.action, Action.START)
+
+    def test_a_rewritten_lock_is_honoured_then_expires_like_any_other(self) -> None:
+        rewritten = lock("2026-10-04T15:00Z", "unspecified")      # what the handler writes
+        held, _ = tick("2026-10-04T14:00", tags=rewritten)
+        self.assertIs(held.action, Action.NONE)
+        self.assertIsNone(held.retag_until)                       # valid now: not rewritten again
+        stopped, _ = tick("2026-10-04T15:16", tags=rewritten)     # expired, past the grace
+        self.assertIs(stopped.action, Action.STOP)
 
     def test_no_calendar_means_no_stop(self) -> None:
         decision, probe = tick(self.SATURDAY, calendar=None)
@@ -187,6 +215,18 @@ class TheCheckBeforeStopInstance(unittest.TestCase):
     def test_the_schedule_starts_the_server_for_a_session(self) -> None:
         decision, _ = tick("2026-09-29T12:45", status="Stopped")
         self.assertIs(decision.action, Action.START)
+
+
+class ExhaustiveNoStopPastAnInvalidLock(unittest.TestCase):
+    def test_no_tick_of_a_weekend_with_an_unreadable_lock_ends_in_a_stop(self) -> None:
+        # Even if every rewrite failed and the bad tag stayed, no tick stops.
+        tags = lock("next Tuesday")
+        now = utc("2026-10-03T04:00")
+        while now < utc("2026-10-05T04:00"):
+            decision = decide(now=now, status="Running", tags=tags, calendar=CAL,
+                              covered_until=COVERED, readiness=lambda: Readiness(True))
+            self.assertIsNot(decision.action, Action.STOP, now.isoformat())
+            now += timedelta(minutes=15)
 
 
 class ExhaustiveNoStopPastALock(unittest.TestCase):

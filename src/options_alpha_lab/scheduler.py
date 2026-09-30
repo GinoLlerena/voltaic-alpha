@@ -34,6 +34,8 @@ EXPIRY_WARNING = timedelta(minutes=30)
 
 LOCK_UNTIL_TAG = "oa-session-until"
 LOCK_REASON_TAG = "oa-session-reason"
+#: Any tag whose key starts with this is read as an attempt at a session lock.
+LOCK_TAG_PREFIX = "oa-session"
 
 
 class LockState(str, Enum):  # noqa: UP042 - matches the str-Enum style used project-wide
@@ -55,13 +57,23 @@ def read_lock(tags: Mapping[str, str], now: datetime) -> Lock:
     """The owner's session lock, from the instance tags.
 
     Every lock carries an absolute expiry, so there is no "on until I say off"
-    state to forget. One that cannot be read, or reaches more than 24 hours
-    ahead, is invalid: ignored and alerted on, never honoured.
+    state to forget. A lock that cannot be read, has no timezone, reaches more
+    than 24 hours ahead, or is only partly there (a reason with no expiry, a
+    misspelt `oa-session…` key) is INVALID. `decide` never lets an invalid lock
+    permit a stop: it asks for the lock to be rewritten to a valid 24-hour one.
     """
     raw = tags.get(LOCK_UNTIL_TAG)
-    if raw is None:
-        return Lock(LockState.NONE)
+    stray = sorted(
+        k for k in tags
+        if k.lower().startswith(LOCK_TAG_PREFIX) and k not in (LOCK_UNTIL_TAG, LOCK_REASON_TAG)
+    )
     reason = tags.get(LOCK_REASON_TAG, "unspecified")
+    if stray:
+        return Lock(LockState.INVALID, reason=reason, problem=f"unrecognised lock tag(s) {stray}")
+    if raw is None:
+        if LOCK_REASON_TAG in tags:
+            return Lock(LockState.INVALID, reason=reason, problem="a reason with no expiry")
+        return Lock(LockState.NONE)
     try:
         until = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
     except ValueError:
@@ -110,6 +122,9 @@ class Decision:
     action: Action
     reason: str
     alerts: tuple[str, ...] = field(default=())
+    #: When set, the handler rewrites the lock to expire here. Only ever for an
+    #: invalid lock: it becomes a valid one, honoured and then expiring normally.
+    retag_until: datetime | None = None
 
 
 def decide(
@@ -129,8 +144,22 @@ def decide(
     """
     lock = read_lock(tags, now)
     alerts: list[str] = []
+
+    # (0) An invalid lock is somebody's session, badly written. It never permits
+    # a stop, and it is not left to pin the server on for ever either: it is
+    # rewritten to the cap, so it is honoured for at most 24 hours and then
+    # expires like any other. If the rewrite fails, the server simply stays up.
     if lock.state is LockState.INVALID:
-        alerts.append(f"session lock ignored: {lock.problem}")
+        alerts.append(
+            f"session lock was invalid ({lock.problem}); rewritten to expire in "
+            f"{MAX_LOCK} — correct it with `session.py`"
+        )
+        return Decision(
+            Action.START if status == "Stopped" else Action.NONE,
+            "invalid session lock: held, and rewritten to the cap",
+            tuple(alerts),
+            retag_until=now + MAX_LOCK,
+        )
 
     # (1) An active session is never stopped, and a stopped server is started for it.
     if lock.state is LockState.ACTIVE and lock.until is not None:
