@@ -119,13 +119,16 @@ class Cloud:
         return dict(items[0])
 
     def event(self, name: str, content: dict[str, Any]) -> None:
-        info = json.dumps([{
-            "EventName": name, "GroupId": self.group_id,
-            "Content": json.dumps(content, sort_keys=True)[:4000],
-            "Time": datetime.now(UTC).strftime("%Y%m%dT%H%M%S.000+0000"),
-        }])
+        # CloudMonitor takes the event as numbered fields, not one JSON value
+        # (a single `EventInfo` is refused as MissingEventInfo).
+        params = {
+            "EventInfo.1.EventName": name,
+            "EventInfo.1.GroupId": self.group_id,
+            "EventInfo.1.Content": json.dumps(content, sort_keys=True)[:4000],
+            "EventInfo.1.Time": datetime.now(UTC).strftime("%Y%m%dT%H%M%S.000+0000"),
+        }
         rpc(f"metrics.{self.region}.aliyuncs.com", CMS_VERSION, "PutCustomEvent",
-            {"EventInfo": info}, self.creds)
+            params, self.creds)
 
 
 def tags_of(inst: dict[str, Any]) -> dict[str, str]:
