@@ -306,6 +306,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/stop-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System Stop Readiness
+         * @description Scheduled-stop design §7: asked by the scheduler before any stop.
+         */
+        get: operations["system_stop_readiness_api_v1_system_stop_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tour": {
         parameters: {
             query?: never;
@@ -729,6 +749,27 @@ export interface components {
             /** Correlation Id */
             correlation_id?: string | null;
             data: components["schemas"]["RiskOut"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
+        /** Envelope[StopReadinessOut] */
+        Envelope_StopReadinessOut_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["StopReadinessOut"];
             /** Observed At */
             observed_at: string;
             /**
@@ -1393,6 +1434,30 @@ export interface components {
             /** Value */
             value: string;
         };
+        /**
+         * StopReadinessOut
+         * @description Whether the server may be stopped now (scheduled-stop design §7).
+         */
+        StopReadinessOut: {
+            /** Backup At */
+            backup_at: string | null;
+            /** Backup Verified */
+            backup_verified: boolean;
+            /** Ok */
+            ok: boolean;
+            /** Open Positions */
+            open_positions: number;
+            /** Reasons */
+            reasons: string[];
+            /** Session Copy Off Host */
+            session_copy_off_host: boolean;
+            /** Session Due */
+            session_due: string | null;
+            /** Unresolved Incidents */
+            unresolved_incidents: number;
+            /** Working Orders */
+            working_orders: number;
+        };
         /** StructureOut */
         StructureOut: {
             /** Candidates */
@@ -1992,6 +2057,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_list_StatusItemOut__"];
+                };
+            };
+        };
+    };
+    system_stop_readiness_api_v1_system_stop_readiness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_StopReadinessOut_"];
                 };
             };
         };

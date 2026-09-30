@@ -59,6 +59,20 @@ class StatusItemOut(Public):
     reason: str | None
 
 
+class StopReadinessOut(Public):
+    """Whether the server may be stopped now (scheduled-stop design §7)."""
+
+    ok: bool
+    open_positions: int
+    working_orders: int
+    unresolved_incidents: int
+    backup_at: str | None
+    backup_verified: bool
+    session_due: str | None
+    session_copy_off_host: bool
+    reasons: list[str]
+
+
 class ProofTileOut(Public):
     value: str
     label: str

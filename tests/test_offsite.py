@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from options_alpha_lab import offsite, watchdog
+from options_alpha_lab.calendar import committed_calendar
 from options_alpha_lab.offsite import (
     MAX_DUMP_AGE_SECONDS,
     OffsiteError,
@@ -28,8 +29,10 @@ from options_alpha_lab.offsite import (
     verify_source,
 )
 
-MONDAY = datetime(2026, 9, 21, 20, 5, tzinfo=UTC)
-SUNDAY = datetime(2026, 9, 27, 20, 5, tzinfo=UTC)
+# Post-close dumps (17:05 ET): since the scheduled-stop design (§6) the daily
+# copy is the first dump after the session's close, keyed by the session.
+MONDAY = datetime(2026, 9, 21, 21, 5, tzinfo=UTC)
+FRIDAY = datetime(2026, 9, 25, 21, 5, tzinfo=UTC)
 CONFIG = OssConfig("bucket", "ap-southeast-1", "oss-ap-southeast-1-internal.aliyuncs.com")
 #: Shape only - the module checks for a single `age1...` token, not a real key.
 RECIPIENT = "age1" + "q" * 58
@@ -144,17 +147,26 @@ class SourceRefusals(OffsiteCase):
 
 
 class Uploads(OffsiteCase):
+    def test_a_dump_taken_during_the_session_is_not_uploaded(self) -> None:
+        # 11:00 ET: the hourly dump holds a partial day. Storing it would take
+        # the session's key, and the bucket forbids overwriting it later.
+        fake = FakeOss(MONDAY)
+        record = self.run_once(fake, datetime(2026, 9, 21, 15, 0, tzinfo=UTC))
+        self.assertEqual((record["keys"], record["uploaded"]), ([], []))
+        self.assertEqual(fake.encryptions(), 0)
+        self.assertEqual(fake.puts(), [])
+
     def test_a_weekday_uploads_daily_only(self) -> None:
         fake = FakeOss(MONDAY)
         record = self.run_once(fake, MONDAY)
         self.assertEqual(record["uploaded"], ["daily/2026-09-21.dump.age"])
         self.assertEqual(fake.encryptions(), 1)
 
-    def test_sunday_encrypts_once_and_uploads_both(self) -> None:
-        fake = FakeOss(SUNDAY)
-        record = self.run_once(fake, SUNDAY)
+    def test_the_weeks_last_session_encrypts_once_and_uploads_both(self) -> None:
+        fake = FakeOss(FRIDAY)
+        record = self.run_once(fake, FRIDAY)
         self.assertEqual(record["uploaded"],
-                         ["daily/2026-09-27.dump.age", "weekly/2026-09-27.dump.age"])
+                         ["daily/2026-09-25.dump.age", "weekly/2026-09-25.dump.age"])
         self.assertEqual(fake.encryptions(), 1)
 
     def test_a_second_run_the_same_day_uploads_nothing(self) -> None:
@@ -165,16 +177,16 @@ class Uploads(OffsiteCase):
         self.assertEqual(fake.puts(), ["daily/2026-09-21.dump.age"])
 
     def test_a_missing_weekly_is_retried_without_touching_daily(self) -> None:
-        fake = FakeOss(SUNDAY)
-        fake.fail_put = {"weekly/2026-09-27.dump.age"}
+        fake = FakeOss(FRIDAY)
+        fake.fail_put = {"weekly/2026-09-25.dump.age"}
         with self.assertRaisesRegex(OffsiteError, "403"):
-            self.run_once(fake, SUNDAY)
-        daily_before = fake.objects["daily/2026-09-27.dump.age"]
+            self.run_once(fake, FRIDAY)
+        daily_before = fake.objects["daily/2026-09-25.dump.age"]
 
         fake.fail_put = set()
-        record = self.run_once(fake, SUNDAY)
-        self.assertEqual(record["uploaded"], ["weekly/2026-09-27.dump.age"])
-        self.assertEqual(fake.objects["daily/2026-09-27.dump.age"], daily_before)
+        record = self.run_once(fake, FRIDAY)
+        self.assertEqual(record["uploaded"], ["weekly/2026-09-25.dump.age"])
+        self.assertEqual(fake.objects["daily/2026-09-25.dump.age"], daily_before)
 
     def test_an_upload_that_did_not_land_intact_fails(self) -> None:
         fake = FakeOss(MONDAY)
@@ -241,14 +253,53 @@ class Parsing(unittest.TestCase):
         self.assertNotIn("Request Id", summary)
 
 
-class Keys(unittest.TestCase):
-    def test_keys_come_from_the_dump_date_so_reruns_target_the_same_key(self) -> None:
-        late = MONDAY.replace(hour=23, minute=59)
-        self.assertEqual(destination_keys(MONDAY), destination_keys(late))
+CAL = committed_calendar()
 
-    def test_only_sunday_gets_a_weekly_key(self) -> None:
-        self.assertEqual(len(destination_keys(MONDAY)), 1)
-        self.assertEqual(destination_keys(SUNDAY)[1], "weekly/2026-09-27.dump.age")
+
+def utc(text: str) -> datetime:
+    return datetime.fromisoformat(text).replace(tzinfo=UTC)
+
+
+class Keys(unittest.TestCase):
+    """Scheduled-stop design §6: keyed by the session the dump follows."""
+
+    def test_reruns_after_the_close_target_the_same_key(self) -> None:
+        late = MONDAY.replace(hour=23, minute=59)
+        self.assertEqual(destination_keys(MONDAY, CAL), destination_keys(late, CAL))
+        self.assertEqual(destination_keys(MONDAY, CAL), ["daily/2026-09-21.dump.age"])
+
+    def test_a_dump_taken_during_a_session_waits_for_the_post_close_one(self) -> None:
+        for at in ("2026-09-21T14:00", "2026-09-21T20:14"):  # 10:00 ET; 16:14 ET, options open
+            with self.subTest(at):
+                self.assertEqual(destination_keys(utc(at), CAL), [])
+
+    def test_a_morning_dump_after_a_stopped_night_belongs_to_the_previous_session(self) -> None:
+        # Monday 08:35 ET, the first dump after a weekend stop: Friday's session.
+        self.assertEqual(
+            destination_keys(utc("2026-09-28T12:35"), CAL),
+            ["daily/2026-09-25.dump.age", "weekly/2026-09-25.dump.age"],
+        )
+
+    def test_the_weekly_copy_is_the_weeks_last_session(self) -> None:
+        self.assertEqual(destination_keys(FRIDAY, CAL)[1], "weekly/2026-09-25.dump.age")
+        self.assertEqual(len(destination_keys(MONDAY, CAL)), 1)
+        # 3 July 2026 is a holiday, so Thursday 2 July is the week's last session.
+        self.assertIn("weekly/2026-07-02.dump.age", destination_keys(utc("2026-07-02T21:05"), CAL))
+
+    def test_an_early_close_is_honoured(self) -> None:
+        # 27 Nov 2026 closes at 13:00 ET (18:00 UTC); 13:20 ET is post-close.
+        self.assertEqual(destination_keys(utc("2026-11-27T18:10"), CAL), [])
+        self.assertIn("daily/2026-11-27.dump.age", destination_keys(utc("2026-11-27T18:20"), CAL))
+
+    def test_past_the_calendar_the_utc_date_rule_applies(self) -> None:
+        sunday_2028 = utc("2028-01-02T20:05")
+        self.assertEqual(
+            destination_keys(sunday_2028, CAL),
+            ["daily/2028-01-02.dump.age", "weekly/2028-01-02.dump.age"],
+        )
+
+    def test_without_a_calendar_the_utc_date_rule_applies(self) -> None:
+        self.assertEqual(destination_keys(MONDAY), ["daily/2026-09-21.dump.age"])
 
 
 class Config(unittest.TestCase):

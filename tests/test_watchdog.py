@@ -16,6 +16,7 @@ from pathlib import Path
 
 from sqlalchemy import insert
 
+from options_alpha_lab.calendar import committed_calendar
 from options_alpha_lab.config import load_settings
 from options_alpha_lab.offsite import (
     MAX_OFFSITE_AGE_SECONDS,
@@ -402,3 +403,78 @@ class OffsiteTests(WatchdogCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class ScheduledStopTests(WatchdogCase):
+    """Scheduled-stop design §6: a stopped weekend must not look like a failure."""
+
+    CAL = committed_calendar()
+    # Monday 5 Oct 2026, 08:40 ET: ten minutes after a scheduled start.
+    MONDAY_START = datetime(2026, 10, 5, 12, 40, tzinfo=UTC)
+
+    def status_file(self, at: datetime) -> str:
+        path = self.dir / "offsite.json"
+        path.write_text(json.dumps({"checked_at": at.isoformat(), "ok": True, "detail": "x"}))
+        return str(path)
+
+    def copies(self, *days: str) -> list[StoredObject]:
+        return [StoredObject(f"daily/{d}.dump.age", 10, NOW) for d in days]
+
+    def evaluate_at(self, now: datetime, days: tuple[str, ...], uptime: timedelta | None,
+                    status_at: datetime) -> object:
+        return evaluate(
+            self.engine, health_file=self.health(), backup_file=self.backup(),
+            offsite=OffsiteProbe(self.status_file(status_at), lambda: self.copies(*days)),
+            now=now, calendar=self.CAL, uptime=uptime,
+        )
+
+    def test_friday_s_copy_is_the_right_one_on_monday_morning(self) -> None:
+        result = self.evaluate_at(self.MONDAY_START, ("2026-10-01", "2026-10-02"),
+                                  None, self.MONDAY_START)
+        self.assertNotIn("offsite_fresh", self.failed(result))
+
+    def test_a_missing_session_copy_fails_however_recent_the_newest_is(self) -> None:
+        result = self.evaluate_at(self.MONDAY_START, ("2026-10-01",), None, self.MONDAY_START)
+        self.assertIn("offsite_fresh", self.failed(result))
+        self.assertIn("2026-10-02", result.summary)  # type: ignore[attr-defined]
+
+    def test_the_session_copy_is_not_due_until_three_hours_after_the_close(self) -> None:
+        # Friday 2 Oct, 18:30 ET: the copy for that day is not due yet.
+        friday_evening = datetime(2026, 10, 2, 22, 30, tzinfo=UTC)
+        result = self.evaluate_at(friday_evening, ("2026-10-01",), None, friday_evening)
+        self.assertNotIn("offsite_fresh", self.failed(result))
+
+    def test_after_a_start_old_backup_and_upload_records_are_excused(self) -> None:
+        friday = datetime(2026, 10, 2, 21, 10, tzinfo=UTC)
+        path = self.dir / "backup.json"
+        path.write_text(json.dumps({"at": friday.isoformat(), "verified": True, "path": "/x"}))
+        result = evaluate(
+            self.engine, health_file=self.health(), backup_file=str(path),
+            offsite=OffsiteProbe(self.status_file(friday), lambda: self.copies("2026-10-02")),
+            now=self.MONDAY_START, calendar=self.CAL, uptime=timedelta(minutes=10),
+        )
+        failed = self.failed(result)
+        self.assertFalse(failed & {"backup_status", "offsite_run"})
+        excused = [c for c in result.checks if "boot grace" in c.detail]  # type: ignore[attr-defined]
+        # Ten minutes after start the old tick is excused too (its grace is 15 min).
+        self.assertEqual({c.name for c in excused}, {"backup_status", "offsite_run", "tick_recent"})
+        at_twenty = evaluate(
+            self.engine, health_file=self.health(), backup_file=str(path),
+            now=self.MONDAY_START, calendar=self.CAL, uptime=timedelta(minutes=20),
+        )
+        self.assertIn("tick_recent", self.failed(at_twenty))
+        self.assertNotIn("backup_status", self.failed(at_twenty))
+
+    def test_the_grace_ends_and_never_excuses_other_checks(self) -> None:
+        friday = datetime(2026, 10, 2, 21, 10, tzinfo=UTC)
+        path = self.dir / "backup.json"
+        path.write_text(json.dumps({"at": friday.isoformat(), "verified": True, "path": "/x"}))
+        late = evaluate(
+            self.engine, health_file=self.health(), backup_file=str(path),
+            now=self.MONDAY_START, calendar=self.CAL, uptime=timedelta(minutes=95),
+        )
+        self.assertIn("backup_status", self.failed(late))
+        broken = evaluate(None, health_file=self.health(), backup_file=self.backup(),
+                          now=NOW, uptime=timedelta(minutes=1))
+        self.assertIn("database", self.failed(broken))
+

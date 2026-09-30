@@ -1126,6 +1126,55 @@
         "title": "Envelope[RiskOut]",
         "type": "object"
       },
+      "Envelope_StopReadinessOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/StopReadinessOut"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[StopReadinessOut]",
+        "type": "object"
+      },
       "Envelope_StructureOut_": {
         "additionalProperties": false,
         "properties": {
@@ -3266,6 +3315,78 @@
         "title": "StatusItemOut",
         "type": "object"
       },
+      "StopReadinessOut": {
+        "additionalProperties": false,
+        "description": "Whether the server may be stopped now (scheduled-stop design \u00a77).",
+        "properties": {
+          "backup_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup At"
+          },
+          "backup_verified": {
+            "title": "Backup Verified",
+            "type": "boolean"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "open_positions": {
+            "title": "Open Positions",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "session_copy_off_host": {
+            "title": "Session Copy Off Host",
+            "type": "boolean"
+          },
+          "session_due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Due"
+          },
+          "unresolved_incidents": {
+            "title": "Unresolved Incidents",
+            "type": "integer"
+          },
+          "working_orders": {
+            "title": "Working Orders",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "open_positions",
+          "working_orders",
+          "unresolved_incidents",
+          "backup_at",
+          "backup_verified",
+          "session_due",
+          "session_copy_off_host",
+          "reasons"
+        ],
+        "title": "StopReadinessOut",
+        "type": "object"
+      },
       "StructureOut": {
         "additionalProperties": false,
         "properties": {
@@ -4325,6 +4446,25 @@
           }
         },
         "summary": "System Status"
+      }
+    },
+    "/api/v1/system/stop-readiness": {
+      "get": {
+        "description": "Scheduled-stop design \u00a77: asked by the scheduler before any stop.",
+        "operationId": "system_stop_readiness_api_v1_system_stop_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_StopReadinessOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "System Stop Readiness"
       }
     },
     "/api/v1/tour": {
