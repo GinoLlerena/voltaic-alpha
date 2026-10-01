@@ -5,20 +5,16 @@ type Memo = Schemas["MemoOut"];
 type Market = Schemas["MarketOut"];
 
 /**
- * Why direction, from both sides of the authority line.
+ * Why direction, from both sides of the authority line: `Qualification`, then `ModelMemo`.
  *
  * The classifier decides the direction; the memo is advisory and sizes nothing.
  * Showing them in one panel with the classifier first is the point: a reader
  * should be able to see that the model agreed without being able to conclude
  * that the model decided.
  */
-export function Memo({ memo, market }: { memo: Memo | null; market: Market | null }) {
+export function Qualification({ market }: { market: Market | null }) {
   const qualification = market?.qualification ?? null;
-  const thesis = memo?.thesis ?? null;
-  const call = memo?.model_call ?? null;
-
   return (
-    <>
       <Panel
         testId="qualification"
         title="Why this direction"
@@ -35,7 +31,17 @@ export function Memo({ memo, market }: { memo: Memo | null; market: Market | nul
           </dl>
         ) : null}
       </Panel>
+  );
+}
 
+/**
+ * The model's memo, in the Evidence section (PUI-007): it is advisory, so it
+ * supports the record rather than leading it.
+ */
+export function ModelMemo({ memo }: { memo: Memo | null }) {
+  const thesis = memo?.thesis ?? null;
+  const call = memo?.model_call ?? null;
+  return (
       <Panel
         testId="memo"
         title="What the model contributed"
@@ -82,6 +88,5 @@ export function Memo({ memo, market }: { memo: Memo | null; market: Market | nul
           </>
         ) : null}
       </Panel>
-    </>
   );
 }

@@ -31,7 +31,9 @@ export function TraderSummary({
   risk: Risk | null;
 }) {
   const qualification = market?.qualification ?? null;
-  const selected = structure?.selected ?? null;
+  // `PUI-005`: the API falls back to the first candidate when none is marked
+  // selected. Only a candidate whose own record says `selected` was taken.
+  const selected = structure?.selected?.selected === true ? structure.selected : null;
   const accounting = risk?.accounting ?? null;
   const conditions = qualification?.invalidation_conditions ?? [];
   const cited = (market?.signals ?? []).filter((signal) => signal.role === "cited");
@@ -62,7 +64,7 @@ export function TraderSummary({
       question: "Why this structure",
       target: "structure-selected",
       answer: selected
-        ? `${selected.strategy} ×${selected.quantity}, debit ${selected.estimated_debit ?? "—"}`
+        ? `${selected.strategy} ×${selected.quantity}, debit ${selected.estimated_debit ?? "—"} per share`
         : null,
       note: selected ? `${selected.long_contract_symbol} / ${selected.short_contract_symbol}` : "",
     },
@@ -70,7 +72,7 @@ export function TraderSummary({
       question: "What it could lose",
       target: "risk-accounting",
       answer: accounting?.maximum_loss
-        ? `${accounting.maximum_loss} of ${accounting.risk_budget ?? "—"}`
+        ? `$${accounting.maximum_loss} of a $${accounting.risk_budget ?? "—"} budget`
         : null,
       note: accounting?.budget_used_percent ? `${accounting.budget_used_percent}% of budget` : "",
     },
@@ -84,7 +86,7 @@ export function TraderSummary({
 
   return (
     <section data-testid="trader-summary">
-      <h3>The five questions</h3>
+      <h3>At a glance</h3>
       <dl className="five">
         {answers.map((row) => (
           <div key={row.question} data-answered={String(row.answer !== null)}>

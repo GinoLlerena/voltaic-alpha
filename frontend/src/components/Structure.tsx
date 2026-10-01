@@ -54,11 +54,15 @@ export function Structure({ structure }: { structure: Structure | null }) {
             <dl className="ticket">
               <Fact label="Strategy" value={selected.strategy} />
               <Fact label="Quantity" value={selected.quantity} />
-              <Fact label="Estimated debit" value={show(selected.estimated_debit)} />
+              <Fact
+                label="Estimated debit"
+                value={show(selected.estimated_debit)}
+                source="per share, as quoted; a contract is 100 shares"
+              />
               <Fact
                 label="Maximum loss"
-                value={show(selected.calculated_max_loss)}
-                source="recomputed by the risk governor"
+                value={selected.calculated_max_loss === null ? "—" : `$${selected.calculated_max_loss}`}
+                source="whole structure, recomputed by the risk governor"
               />
             </dl>
             <Matrix label="Contract legs and their quotes">

@@ -1,12 +1,20 @@
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import type { Schemas } from "../api/client";
 import { api } from "../api/client";
 import { useResource } from "../api/useResource";
-import { DecisionTicket } from "../components/DecisionTicket";
+import { AuthoritySpine } from "../components/AuthoritySpine";
+import {
+  DecisionTicket,
+  Horizons,
+  Identifiers,
+  SetupReading,
+  WhyDecision,
+} from "../components/DecisionTicket";
 import { Evidence } from "../components/Evidence";
 import { Invalidation } from "../components/Invalidation";
 import { Lifecycle } from "../components/Lifecycle";
-import { Memo } from "../components/Memo";
+import { ModelMemo, Qualification } from "../components/Memo";
 import { ProofLineage } from "../components/ProofLineage";
 import { Loaded } from "../components/ResourceState";
 import { Risk } from "../components/Risk";
@@ -30,6 +38,11 @@ type Horizons = Schemas["DecisionHorizonOut"][];
  * request: loading, unavailable, stale or verified. A failed panel never
  * becomes its "nothing recorded" text, and panels answered from a different
  * source than the summary say so.
+ *
+ * `PUI-007`: a concise summary, then three named sections - Setup & risk,
+ * Execution, Evidence - each reachable from a section list, instead of a dozen
+ * panels in one column. Every panel is still on the page, and its warnings
+ * still show; only the order changed.
  */
 export function Decision({ digest }: { digest: string }) {
   const summary = useResource<Summary>(api.summary(digest));
@@ -47,7 +60,7 @@ export function Decision({ digest }: { digest: string }) {
     return summary.notFound ? (
       <p role="alert" className="failed" data-testid="decision-missing">
         This source holds no decision with that hash.{" "}
-        <Link to="/">Back to the overview</Link>
+        <Link to="/decisions">Back to the decisions</Link>
       </p>
     ) : (
       <p role="alert" className="failed" data-testid="decision-unavailable">
@@ -56,7 +69,7 @@ export function Decision({ digest }: { digest: string }) {
         <button type="button" onClick={summary.retry}>
           Retry
         </button>{" "}
-        <Link to="/">Back to the overview</Link>
+        <Link to="/decisions">Back to the decisions</Link>
       </p>
     );
   }
@@ -69,6 +82,7 @@ export function Decision({ digest }: { digest: string }) {
   }
 
   const source = summary.envelope.source_label;
+  const data = summary.envelope.data;
   return (
     <>
       <SourceBanner
@@ -77,44 +91,77 @@ export function Decision({ digest }: { digest: string }) {
         {...(summary.state === "stale" ? { reason: summary.reason } : {})}
       />
       <p>
-        <Link to="/">← All decisions</Link>
+        <Link to="/decisions">← Decisions</Link>
       </p>
-      <DecisionTicket
-        summary={summary.envelope.data}
-        market={market}
-        horizons={horizons}
-      />
-      {/* RUI-4's five questions, in the order a trader asks them: why this
-          direction, why now, why this structure, what it can lose, and what
-          would prove it wrong. Everything below is a record or an absence. */}
+      <DecisionTicket summary={data} market={market} />
       <Loaded
-        what="trader summary"
+        what="decision summary"
         resources={{ market, memo, structure, risk }}
         expectedSource={source}
       >
         {(d) => <TraderSummary market={d.market} memo={d.memo} structure={d.structure} risk={d.risk} />}
       </Loaded>
-      <Loaded what="setup and memo" resources={{ memo, market }} expectedSource={source}>
-        {(d) => <Memo memo={d.memo} market={d.market} />}
-      </Loaded>
-      <Loaded what="market evidence" resources={{ market }} expectedSource={source}>
-        {(d) => <Evidence market={d.market} />}
-      </Loaded>
-      <Loaded what="structure" resources={{ structure }} expectedSource={source}>
-        {(d) => <Structure structure={d.structure} />}
-      </Loaded>
-      <Loaded what="risk record" resources={{ risk }} expectedSource={source}>
-        {(d) => <Risk risk={d.risk} />}
-      </Loaded>
-      <Loaded what="invalidation conditions" resources={{ market, memo }} expectedSource={source}>
-        {(d) => <Invalidation market={d.market} memo={d.memo} />}
-      </Loaded>
-      <Loaded what="lifecycle" resources={{ lifecycle }} expectedSource={source}>
-        {(d) => <Lifecycle lifecycle={d.lifecycle} />}
-      </Loaded>
-      <Loaded what="proof lineage" resources={{ lifecycle, proof }} expectedSource={source}>
-        {(d) => <ProofLineage digest={digest} lifecycle={d.lifecycle} proof={d.proof} />}
-      </Loaded>
+
+      <nav className="sections" aria-label="Decision sections">
+        <a href="#setup">Setup &amp; risk</a>
+        <a href="#execution">Execution</a>
+        <a href="#evidence">Evidence</a>
+      </nav>
+
+      <Part id="setup" title="Setup & risk">
+        <SetupReading summary={data} market={market} />
+        <Loaded what="qualification" resources={{ market }} expectedSource={source}>
+          {(d) => <Qualification market={d.market} />}
+        </Loaded>
+        <Loaded what="market evidence" resources={{ market }} expectedSource={source}>
+          {(d) => <Evidence market={d.market} />}
+        </Loaded>
+        <Loaded what="structure" resources={{ structure }} expectedSource={source}>
+          {(d) => <Structure structure={d.structure} />}
+        </Loaded>
+        <Loaded what="risk record" resources={{ risk }} expectedSource={source}>
+          {(d) => <Risk risk={d.risk} />}
+        </Loaded>
+        <Loaded what="invalidation conditions" resources={{ market, memo }} expectedSource={source}>
+          {(d) => <Invalidation market={d.market} memo={d.memo} />}
+        </Loaded>
+      </Part>
+
+      <Part id="execution" title="Execution">
+        <p className="note">
+          Intent, broker acceptance, fills, reconciliation and exits are separate records; one
+          present does not imply the next.
+        </p>
+        <Loaded what="lifecycle" resources={{ lifecycle }} expectedSource={source}>
+          {(d) => <Lifecycle lifecycle={d.lifecycle} />}
+        </Loaded>
+      </Part>
+
+      <Part id="evidence" title="Evidence">
+        <AuthoritySpine
+          modelWasCalled={data.model_was_called}
+          reachedTheBroker={data.reached_the_broker}
+        />
+        <WhyDecision summary={data} />
+        <Loaded what="model memo" resources={{ memo }} expectedSource={source}>
+          {(d) => <ModelMemo memo={d.memo} />}
+        </Loaded>
+        <Horizons horizons={horizons} />
+        <Loaded what="proof lineage" resources={{ lifecycle, proof }} expectedSource={source}>
+          {(d) => <ProofLineage digest={digest} lifecycle={d.lifecycle} proof={d.proof} />}
+        </Loaded>
+        <Identifiers summary={data} />
+      </Part>
     </>
+  );
+}
+
+/** A named, linkable section of the decision page. */
+function Part({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section id={id} className="part" aria-labelledby={`${id}-heading`} data-testid={`part-${id}`}>
+      <h2 id={`${id}-heading`}>{title}</h2>
+      {children}
+    </section>
   );
 }

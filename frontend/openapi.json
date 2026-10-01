@@ -35,6 +35,7 @@
                 "type": "null"
               }
             ],
+            "description": "US dollars for the whole structure.",
             "title": "Maximum Loss"
           },
           "risk_budget": {
@@ -46,6 +47,7 @@
                 "type": "null"
               }
             ],
+            "description": "US dollars allowed to be lost on this trade.",
             "title": "Risk Budget"
           }
         },
@@ -389,6 +391,25 @@
             "title": "Direction",
             "type": "string"
           },
+          "instrument": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument"
+          },
+          "outcome": {
+            "enum": [
+              "position",
+              "refusal"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
           "policy_version": {
             "title": "Policy Version",
             "type": "string"
@@ -408,6 +429,8 @@
         "required": [
           "decision_id",
           "snapshot_id",
+          "instrument",
+          "outcome",
           "action",
           "direction",
           "reason_codes",
@@ -420,6 +443,10 @@
       "DecisionListOut": {
         "additionalProperties": false,
         "properties": {
+          "bounded": {
+            "title": "Bounded",
+            "type": "boolean"
+          },
           "entries": {
             "items": {
               "$ref": "#/components/schemas/ListEntryOut"
@@ -452,6 +479,21 @@
             ],
             "title": "View",
             "type": "string"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          },
+          "window_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Since"
           }
         },
         "required": [
@@ -460,7 +502,10 @@
           "shown",
           "total",
           "grouped",
-          "pin_missing"
+          "pin_missing",
+          "window",
+          "window_since",
+          "bounded"
         ],
         "title": "DecisionListOut",
         "type": "object"
@@ -485,11 +530,16 @@
               }
             ],
             "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
           }
         },
         "required": [
           "items",
-          "next_cursor"
+          "next_cursor",
+          "total"
         ],
         "title": "DecisionPage",
         "type": "object"
@@ -2047,6 +2097,17 @@
             "title": "Count",
             "type": "integer"
           },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
           "decision_id": {
             "title": "Decision Id",
             "type": "string"
@@ -2054,6 +2115,28 @@
           "direction": {
             "title": "Direction",
             "type": "string"
+          },
+          "first_decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Decided At"
+          },
+          "instrument": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument"
           },
           "label": {
             "title": "Label",
@@ -2066,6 +2149,21 @@
             "title": "Member Ids",
             "type": "array"
           },
+          "outcome": {
+            "enum": [
+              "position",
+              "refusal"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          },
           "snapshot_id": {
             "title": "Snapshot Id",
             "type": "string"
@@ -2074,8 +2172,13 @@
         "required": [
           "decision_id",
           "snapshot_id",
+          "instrument",
+          "outcome",
           "action",
           "direction",
+          "reason_codes",
+          "decided_at",
+          "first_decided_at",
           "label",
           "count",
           "member_ids"
@@ -3167,6 +3270,7 @@
                 "type": "null"
               }
             ],
+            "description": "US dollars for the whole structure at its quantity.",
             "title": "Calculated Max Loss"
           },
           "candidate_id": {
@@ -3182,6 +3286,7 @@
                 "type": "null"
               }
             ],
+            "description": "Long ask minus short bid, per share as quoted; one contract is 100 shares.",
             "title": "Estimated Debit"
           },
           "leg_quotes": {
@@ -3846,6 +3951,7 @@
     },
     "/api/v1/decisions": {
       "get": {
+        "description": "Every decision, newest first: the full history the grouped list bounds.",
         "operationId": "decisions_api_v1_decisions_get",
         "parameters": [
           {
@@ -3862,6 +3968,26 @@
                 }
               ],
               "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "position",
+                    "refusal"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
             }
           },
           {

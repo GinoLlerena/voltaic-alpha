@@ -255,3 +255,24 @@ nav a[data-status="active"], nav a.active { color: var(--cool); }
 /* Evidence is secondary navigation: same colour, set apart after a divider. */
 header nav .secondary { margin-left: .3rem; padding-left: 1.2rem; border-left: 1px solid var(--edge); }
 .shortcuts a { font-family: inherit; font-size: var(--fs-data); letter-spacing: 0; text-transform: none; }
+
+/* PUI Phase 3: typed decision rows, the history's stated scope, and the
+   decision page's three sections. Position versus no trade is said in words;
+   the colour only repeats it. */
+.decisions a { flex-wrap: wrap; }
+.decisions .name { font-weight: 600; }
+.decisions .outcome { font-weight: 400; color: var(--muted); margin-left: .5rem; font-size: var(--fs-data); }
+.decisions a[data-outcome="position"] .outcome { color: var(--cool); }
+.decisions .when { margin-left: auto; font-family: var(--mono); font-size: var(--fs-meta);
+  color: var(--dim); font-variant-numeric: tabular-nums; }
+.decisions .count { margin-left: 0; }
+.scope { color: var(--muted); font-size: var(--fs-data); }
+.snapshot { font-family: var(--mono); font-size: var(--fs-meta); color: var(--dim); margin: -.4rem 0 .6rem; }
+.utc { font-size: var(--fs-meta); color: var(--dim); }
+nav.sections { position: sticky; top: 0; z-index: 1; background: var(--ink); margin: 1.2rem 0 0;
+  padding: .55rem 0; border-bottom: 1px solid var(--edge); }
+nav.sections a { color: var(--muted); }
+nav.sections a:hover, nav.sections a:focus-visible { color: var(--cool); }
+.part { scroll-margin-top: 3rem; }
+.part > h2 { margin-top: 2rem; padding-bottom: .3rem; border-bottom: 1px solid var(--edge); }
+.part .note, #horizons .note, [data-testid="horizons"] > .note { color: var(--dim); font-size: var(--fs-data); }

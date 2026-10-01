@@ -42,6 +42,17 @@ const published = <P extends Path>(path: P): P => path;
 export const api = {
   status: () => published("/api/v1/system/status") as ApiUrl,
   copy: () => published("/api/v1/copy") as ApiUrl,
+  /**
+   * The full history, newest first, paged by the server's opaque cursor
+   * (PUI-008). The grouped list is bounded; this is not.
+   */
+  decisions: (outcome: Schemas["DecisionListItem"]["outcome"] | null, cursor?: string | null) => {
+    const query = new URLSearchParams();
+    if (outcome) query.set("outcome", outcome);
+    query.set("limit", "50");
+    if (cursor) query.set("cursor", cursor);
+    return `${published("/api/v1/decisions")}?${query.toString()}` as ApiUrl;
+  },
   groupedDecisions: (view: string) =>
     `${published("/api/v1/decisions/grouped")}?view=${encodeURIComponent(view)}` as ApiUrl,
   summary: (digest: string) =>

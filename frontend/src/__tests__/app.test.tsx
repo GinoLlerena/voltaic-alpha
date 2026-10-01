@@ -28,10 +28,27 @@ const status = [
 const listing = {
   view: "Notable",
   entries: [{
-    decision_id: DIGEST, snapshot_id: "spy-agent-1", action: "NO_TRADE",
-    direction: "neutral", label: "SPY agent 1\nno_qualified_setup", count: 72, member_ids: [],
+    decision_id: DIGEST, snapshot_id: "spy-agent-1", instrument: "SPY", outcome: "refusal",
+    action: "NO_TRADE", direction: "neutral", reason_codes: ["no_qualified_setup"],
+    decided_at: "2026-09-29T19:45:00+00:00", first_decided_at: "2026-09-29T13:45:00+00:00",
+    label: "SPY agent 1\nno_qualified_setup", count: 72, member_ids: [],
   }],
   shown: 1, total: 201, grouped: true, pin_missing: false,
+  window: 201, window_since: "2026-09-01T13:45:00+00:00", bounded: false,
+};
+
+const historyItem = (id: string, at: string) => ({
+  decision_id: id, snapshot_id: `spy-agent-${id.slice(0, 4)}`, instrument: "SPY",
+  outcome: "refusal", action: "NO_TRADE", direction: "neutral",
+  reason_codes: ["no_qualified_setup"], policy_version: "h0-provisional-1", decided_at: at,
+});
+const historyPage1 = {
+  items: [historyItem(DIGEST, "2026-09-29T19:45:00+00:00")],
+  next_cursor: "opaque-history-2", total: 2,
+};
+const historyPage2 = {
+  items: [historyItem("c".repeat(64), "2026-09-28T19:45:00+00:00")],
+  next_cursor: null, total: 2,
 };
 
 const summary = {
@@ -243,6 +260,8 @@ const routes: Record<string, unknown> = {
   [`/api/v1/decisions/${QUALIFIED}/lifecycle`]: envelope(lifecycle),
   [`/api/v1/decisions/${QUALIFIED}/proof`]: envelope(proof),
   [`/api/v1/decisions/${QUALIFIED}/outcomes`]: envelope(horizons),
+  "/api/v1/decisions?outcome=refusal&limit=50&cursor=opaque-history-2": envelope(historyPage2),
+  "/api/v1/decisions?": envelope(historyPage1),
   "/api/v1/activity?cursor=opaque-page-2": envelope(activityPage2),
   "/api/v1/activity": envelope(activityPage1),
   "/api/v1/incidents?state=open": envelope(incidentsOpen),
@@ -328,7 +347,7 @@ describe("a decision is addressable", () => {
     vi.stubGlobal("fetch", respond());
     render(at("/decisions"));
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("link", { name: /SPY agent 1/ }));
+    await user.click(await screen.findByRole("link", { name: /SPY.*No trade/ }));
     await waitFor(() => expect(screen.getByTestId("decision-ticket")).toBeInTheDocument());
   });
 
@@ -410,8 +429,8 @@ describe("a trader's five questions", () => {
     const five = await screen.findByTestId("trader-summary");
     expect(five).toHaveTextContent("bullish, by deterministic_trend_retest_v0");
     expect(five).toHaveTextContent("1 signal(s) cited at 771.100000");
-    expect(five).toHaveTextContent("bull_call_debit_spread ×1, debit 3.500000");
-    expect(five).toHaveTextContent("350.000000 of 750.000000");
+    expect(five).toHaveTextContent("bull_call_debit_spread ×1, debit 3.500000 per share");
+    expect(five).toHaveTextContent("$350.000000 of a $750.000000 budget");
     expect(five).toHaveTextContent("close below 759.53 invalidates the retest");
     expect(five.querySelectorAll('[data-answered="true"]')).toHaveLength(5);
   });
@@ -651,7 +670,9 @@ describe("the guided path", () => {
 
 describe("the decision views", () => {
   const requested = (fetchMock: ReturnType<typeof respond>) =>
-    fetchMock.mock.calls.map(([input]) => String(input)).filter((u) => u.includes("/decisions/grouped"));
+    fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter((u) => u.includes("/decisions/grouped") || u.startsWith("/api/v1/decisions?"));
 
   it("asks for the Notable view by default", async () => {
     const fetchMock = respond();
@@ -666,7 +687,8 @@ describe("the decision views", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(at("/?view=Refusals"));
     await screen.findByTestId("decision-list");
-    expect(requested(fetchMock)).toEqual(["/api/v1/decisions/grouped?view=Refusals"]);
+    // An ungrouped view pages the full history (PUI-008), filtered on the server.
+    expect(requested(fetchMock)).toEqual(["/api/v1/decisions?outcome=refusal&limit=50"]);
     const nav = screen.getByRole("navigation", { name: "Decision views" });
     const current = nav.querySelector('[aria-current="page"]');
     expect(current).toHaveTextContent("Refusals");
@@ -964,10 +986,120 @@ describe("Today (PUI phase 2)", () => {
     vi.stubGlobal("fetch", fetchMock);
     const history = createMemoryHistory({ initialEntries: ["/decisions?view=Refusals"] });
     render(<App history={history} />);
-    await userEvent.click(await screen.findByRole("link", { name: /SPY agent 1/ }));
+    await userEvent.click(await screen.findByRole("link", { name: /SPY.*No trade/ }));
     await screen.findByTestId("decision-ticket");
     history.back();
     const nav = await screen.findByRole("navigation", { name: "Decision views" });
     expect(nav.querySelector('[aria-current="page"]')).toHaveTextContent("Refusals");
+  });
+});
+
+describe("the decision workflow (PUI phase 3)", () => {
+  it("lists a decision by instrument, outcome, reason and New York time, not by snapshot ID", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/decisions"));
+    const row = await screen.findByRole("link", { name: /SPY.*No trade/ });
+    expect(row).toHaveTextContent("no qualified setup");
+    // A run of 72 spans its first and last member, in ET with the zone named.
+    expect(row).toHaveTextContent("Tue, Sep 29, 2026, 09:45–15:45 ET");
+    expect(row).toHaveTextContent("×72");
+    expect(row).not.toHaveTextContent("spy-agent-1");
+    expect(row.querySelector("time")).toHaveAttribute("dateTime", "2026-09-29T19:45:00+00:00");
+  });
+
+  it("states the grouping window, and says nothing is outside it when nothing is", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at("/decisions"));
+    const scope = await screen.findByTestId("decision-scope");
+    expect(scope).toHaveTextContent("1 entry for the newest 201 of 201 decisions, since Tue, Sep 1, 2026");
+    expect(scope).not.toHaveTextContent("outside this window");
+  });
+
+  it("says how many decisions a bounded window leaves out and links the full history", async () => {
+    // 29 Sep 2026: Notable grouped 400 of 718 and read as the whole history.
+    vi.stubGlobal("fetch", respond(new Set(), {
+      "/api/v1/decisions/grouped": envelope({ ...listing, total: 718, window: 400, bounded: true }),
+    }));
+    render(at("/decisions"));
+    const scope = await screen.findByTestId("decision-scope");
+    expect(scope).toHaveTextContent("newest 400 of 718 decisions");
+    expect(scope).toHaveTextContent("318 older decisions are outside this window.");
+    expect(within(scope).getByRole("link", { name: "Browse the full history" }))
+      .toHaveAttribute("href", "/decisions?view=Everything");
+  });
+
+  it("pages the full history on the server's cursor and holds still while browsing", async () => {
+    const fetchMock = respond();
+    vi.stubGlobal("fetch", fetchMock);
+    render(at("/decisions?view=Refusals"));
+    expect(await screen.findByTestId("decision-scope")).toHaveTextContent("1 of 2 decisions");
+    await userEvent.click(screen.getByTestId("history-more"));
+    expect(await screen.findByTestId("history-end")).toHaveTextContent("The history ends here.");
+    expect(screen.getByTestId("decision-scope")).toHaveTextContent("2 of 2 decisions");
+    expect(screen.getAllByRole("link", { name: /SPY.*No trade/ })).toHaveLength(2);
+    // The cursor is passed back exactly as served, never built.
+    expect(fetchMock.mock.calls.map(([u]) => String(u))).toContain(
+      "/api/v1/decisions?outcome=refusal&limit=50&cursor=opaque-history-2",
+    );
+    expect(screen.getByTestId("history-newest")).toBeInTheDocument();
+  });
+
+  it("says a failed history request failed rather than that there are no decisions", async () => {
+    vi.stubGlobal("fetch", respond(new Set(["/api/v1/decisions?"])));
+    render(at("/decisions?view=Everything"));
+    expect(await screen.findByText(/unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/holds no/)).toBeNull();
+  });
+
+  it("opens with a concise summary, then three linked sections", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${QUALIFIED}`));
+    const ticket = await screen.findByTestId("decision-ticket");
+    expect(ticket).toHaveTextContent("Opened a Paper position");
+    expect(ticket).not.toHaveTextContent("sha256:");
+    const nav = screen.getByRole("navigation", { name: "Decision sections" });
+    expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
+      "#setup", "#execution", "#evidence",
+    ]);
+    const setup = screen.getByTestId("part-setup");
+    await waitFor(() => expect(within(setup).getByTestId("structure-selected")).toBeInTheDocument());
+    expect(within(setup).getByTestId("structure-reading")).toBeInTheDocument();
+    expect(within(setup).getByTestId("risk-accounting")).toBeInTheDocument();
+    expect(within(screen.getByTestId("part-execution")).getByTestId("lifecycle-orders")).toBeInTheDocument();
+    const evidence = screen.getByTestId("part-evidence");
+    expect(within(evidence).getByTestId("memo")).toBeInTheDocument();
+    expect(within(evidence).getByTestId("identifiers")).toHaveTextContent(`sha256:${QUALIFIED}`);
+    expect(within(evidence).getByTestId("horizons")).toHaveTextContent("not the position's profit or loss");
+  });
+
+  it("calls a refusal a valid outcome, with its reason in words", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${DIGEST}`));
+    const ticket = await screen.findByTestId("decision-ticket");
+    // This fixture records no observation: the instrument is said to be missing, not guessed.
+    expect(ticket).toHaveTextContent("Instrument not recorded · No trade");
+    expect(ticket).toHaveTextContent("No trade: no qualified setup");
+    expect(ticket).toHaveTextContent("a valid outcome, not a system error");
+  });
+
+  it("never answers 'why this structure' with a candidate that was not selected", async () => {
+    const fallback = { ...structure.candidates[0], selected: false };
+    vi.stubGlobal("fetch", respond(new Set(), {
+      [`/api/v1/decisions/${QUALIFIED}/structure`]: envelope({ selected: fallback, candidates: [fallback] }),
+    }));
+    render(at(`/decisions/${QUALIFIED}`));
+    const five = await screen.findByTestId("trader-summary");
+    const row = within(five).getByRole("link", { name: "Why this structure" }).closest("div");
+    expect(row).toHaveAttribute("data-answered", "false");
+    expect(five).not.toHaveTextContent("SPY260911C00790000");
+  });
+
+  it("labels money with its unit", async () => {
+    vi.stubGlobal("fetch", respond());
+    render(at(`/decisions/${QUALIFIED}`));
+    const selected = await screen.findByTestId("structure-selected");
+    expect(selected).toHaveTextContent("per share, as quoted; a contract is 100 shares");
+    expect(selected).toHaveTextContent("$350.000000");
+    expect(screen.getByTestId("risk-accounting")).toHaveTextContent("USD, whole structure");
   });
 });

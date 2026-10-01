@@ -45,7 +45,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Decisions */
+        /**
+         * Decisions
+         * @description Every decision, newest first: the full history the grouped list bounds.
+         */
         get: operations["decisions_api_v1_decisions_get"];
         put?: never;
         post?: never;
@@ -370,9 +373,15 @@ export interface components {
             account_equity: string | null;
             /** Budget Used Percent */
             budget_used_percent: string | null;
-            /** Maximum Loss */
+            /**
+             * Maximum Loss
+             * @description US dollars for the whole structure.
+             */
             maximum_loss: string | null;
-            /** Risk Budget */
+            /**
+             * Risk Budget
+             * @description US dollars allowed to be lost on this trade.
+             */
             risk_budget: string | null;
         };
         /** ActivityEventOut */
@@ -474,6 +483,13 @@ export interface components {
             decision_id: string;
             /** Direction */
             direction: string;
+            /** Instrument */
+            instrument: string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "position" | "refusal";
             /** Policy Version */
             policy_version: string;
             /** Reason Codes */
@@ -483,6 +499,8 @@ export interface components {
         };
         /** DecisionListOut */
         DecisionListOut: {
+            /** Bounded */
+            bounded: boolean;
             /** Entries */
             entries: components["schemas"]["ListEntryOut"][];
             /** Grouped */
@@ -498,6 +516,10 @@ export interface components {
              * @enum {string}
              */
             view: "Notable" | "Positions" | "Refusals" | "Everything";
+            /** Window */
+            window: number;
+            /** Window Since */
+            window_since: string | null;
         };
         /** DecisionPage */
         DecisionPage: {
@@ -505,6 +527,8 @@ export interface components {
             items: components["schemas"]["DecisionListItem"][];
             /** Next Cursor */
             next_cursor: string | null;
+            /** Total */
+            total: number;
         };
         /** DecisionSummary */
         DecisionSummary: {
@@ -1089,14 +1113,27 @@ export interface components {
             action: string;
             /** Count */
             count: number;
+            /** Decided At */
+            decided_at: string | null;
             /** Decision Id */
             decision_id: string;
             /** Direction */
             direction: string;
+            /** First Decided At */
+            first_decided_at: string | null;
+            /** Instrument */
+            instrument: string | null;
             /** Label */
             label: string;
             /** Member Ids */
             member_ids: string[];
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "position" | "refusal";
+            /** Reason Codes */
+            reason_codes: string[];
             /** Snapshot Id */
             snapshot_id: string;
         };
@@ -1391,11 +1428,17 @@ export interface components {
         };
         /** SpreadCandidateOut */
         SpreadCandidateOut: {
-            /** Calculated Max Loss */
+            /**
+             * Calculated Max Loss
+             * @description US dollars for the whole structure at its quantity.
+             */
             calculated_max_loss: string | null;
             /** Candidate Id */
             candidate_id: string;
-            /** Estimated Debit */
+            /**
+             * Estimated Debit
+             * @description Long ask minus short bid, per share as quoted; one contract is 100 shares.
+             */
             estimated_debit: string | null;
             /** Leg Quotes */
             leg_quotes: {
@@ -1621,6 +1664,7 @@ export interface operations {
         parameters: {
             query?: {
                 action?: string | null;
+                outcome?: ("position" | "refusal") | null;
                 limit?: number;
                 cursor?: string | null;
             };

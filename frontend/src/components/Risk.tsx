@@ -30,8 +30,12 @@ export function Risk({ risk }: { risk: Risk | null }) {
       >
         {accounting ? (
           <dl className="ticket">
-            <Fact label="Maximum loss" value={<strong>{show(accounting.maximum_loss)}</strong>} />
-            <Fact label="Risk budget" value={show(accounting.risk_budget)} />
+            <Fact
+              label="Maximum loss"
+              value={<strong>{show(accounting.maximum_loss)}</strong>}
+              source="USD, whole structure"
+            />
+            <Fact label="Risk budget" value={show(accounting.risk_budget)} source="USD, this trade" />
             <Fact
               label="Budget used"
               value={accounting.budget_used_percent === null ? "—" : `${accounting.budget_used_percent}%`}
