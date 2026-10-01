@@ -32,6 +32,8 @@ const paths = [
   "/api/v1/tour",
   "/api/v1/copy",
   "/api/v1/decisions/grouped?view=Notable",
+  // PUI Phase 3: the full history, as the Everything view asks for it.
+  "/api/v1/decisions?limit=50",
 ];
 
 const captured = {};

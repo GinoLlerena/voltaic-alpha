@@ -296,8 +296,13 @@
     {
      "decision_id": "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
      "snapshot_id": "spy-live-20260828T153310Z",
+     "instrument": "SPY",
+     "outcome": "position",
      "action": "OPTIONS_POSITION",
      "direction": "bullish",
+     "reason_codes": [],
+     "decided_at": "2026-09-17T11:47:21.352701+00:00",
+     "first_decided_at": "2026-09-17T11:47:21.352701+00:00",
      "label": "SPY live 20260828T153310Z\nposition · bullish",
      "count": 1,
      "member_ids": [
@@ -307,8 +312,13 @@
     {
      "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
      "snapshot_id": "spy-lifecycle-20260828T154747Z",
+     "instrument": "SPY",
+     "outcome": "position",
      "action": "OPTIONS_POSITION",
      "direction": "bullish",
+     "reason_codes": [],
+     "decided_at": "2026-09-17T11:47:21.193215+00:00",
+     "first_decided_at": "2026-09-17T11:47:21.193215+00:00",
      "label": "SPY lifecycle 20260828T154747Z\nposition · bullish",
      "count": 1,
      "member_ids": [
@@ -318,8 +328,15 @@
     {
      "decision_id": "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
      "snapshot_id": "spy-refusal-2026-08-27",
+     "instrument": "SPY",
+     "outcome": "refusal",
      "action": "NO_TRADE",
      "direction": "neutral",
+     "reason_codes": [
+      "no_qualified_setup"
+     ],
+     "decided_at": "2026-09-17T11:47:21.119512+00:00",
+     "first_decided_at": "2026-09-17T11:47:21.119512+00:00",
      "label": "SPY refusal 2026 08 27\nno_qualified_setup",
      "count": 1,
      "member_ids": [
@@ -329,8 +346,13 @@
     {
      "decision_id": "b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
      "snapshot_id": "spy-bearish-qualified-2026-08-27",
+     "instrument": "SPY",
+     "outcome": "position",
      "action": "OPTIONS_POSITION",
      "direction": "bearish",
+     "reason_codes": [],
+     "decided_at": "2026-09-17T11:47:21.103428+00:00",
+     "first_decided_at": "2026-09-17T11:47:21.103428+00:00",
      "label": "SPY bearish qualified 2026 08 27\nposition · bearish",
      "count": 1,
      "member_ids": [
@@ -340,8 +362,13 @@
     {
      "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
      "snapshot_id": "spy-qualified-2026-08-27",
+     "instrument": "SPY",
+     "outcome": "position",
      "action": "OPTIONS_POSITION",
      "direction": "bullish",
+     "reason_codes": [],
+     "decided_at": "2026-09-17T11:47:21.063587+00:00",
+     "first_decided_at": "2026-09-17T11:47:21.063587+00:00",
      "label": "SPY qualified 2026 08 27\nposition · bullish",
      "count": 1,
      "member_ids": [
@@ -352,7 +379,80 @@
    "shown": 5,
    "total": 5,
    "grouped": false,
-   "pin_missing": false
+   "pin_missing": false,
+   "window": 5,
+   "window_since": "2026-09-17T11:47:21.063587+00:00",
+   "bounded": false
+  }
+ },
+ "/api/v1/decisions?limit=50": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "decision_id": "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5",
+     "snapshot_id": "spy-live-20260828T153310Z",
+     "instrument": "SPY",
+     "outcome": "position",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "reason_codes": [],
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.352701+00:00"
+    },
+    {
+     "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+     "snapshot_id": "spy-lifecycle-20260828T154747Z",
+     "instrument": "SPY",
+     "outcome": "position",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "reason_codes": [],
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.193215+00:00"
+    },
+    {
+     "decision_id": "8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
+     "snapshot_id": "spy-refusal-2026-08-27",
+     "instrument": "SPY",
+     "outcome": "refusal",
+     "action": "NO_TRADE",
+     "direction": "neutral",
+     "reason_codes": [
+      "no_qualified_setup"
+     ],
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.119512+00:00"
+    },
+    {
+     "decision_id": "b0bd9654d88fd480740a464fd6fe2b0cd287b78aa6cc9592e9cb2b528d6074c5",
+     "snapshot_id": "spy-bearish-qualified-2026-08-27",
+     "instrument": "SPY",
+     "outcome": "position",
+     "action": "OPTIONS_POSITION",
+     "direction": "bearish",
+     "reason_codes": [],
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.103428+00:00"
+    },
+    {
+     "decision_id": "1a9b85507b66e5838b4c6f985179946e08c2b48b7d5433c260fd673d6c81f0d0",
+     "snapshot_id": "spy-qualified-2026-08-27",
+     "instrument": "SPY",
+     "outcome": "position",
+     "action": "OPTIONS_POSITION",
+     "direction": "bullish",
+     "reason_codes": [],
+     "policy_version": "h0-provisional-1",
+     "decided_at": "2026-09-17T11:47:21.063587+00:00"
+    }
+   ],
+   "next_cursor": null,
+   "total": 5
   }
  },
  "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/summary": {

@@ -75,6 +75,11 @@ def _decode(cursor: str | None) -> tuple[datetime, str] | None:
         raise HTTPException(status_code=400, detail="malformed cursor") from exc
 
 
+#: Decisions the grouped list considers. The dashboard bounds its list the same
+#: way (app.DECISION_LIMIT); the response says so (`window`, `bounded`).
+LIST_LIMIT = 400
+
+
 def entry_members(entry: listing.Entry) -> tuple[Any, ...]:
     """The decisions a list entry stands for.
 
@@ -179,25 +184,29 @@ def create_app(
     def decisions(
         db: Db,
         action: str | None = None,
+        outcome: dto.Outcome | None = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         cursor: str | None = None,
     ) -> dict[str, Any]:
-        rows, after = decision.listing(db, action=action, limit=limit, before=_decode(cursor))
+        """Every decision, newest first: the full history the grouped list bounds."""
+        rows, after = decision.listing(
+            db, action=action, outcome=outcome, limit=limit, before=_decode(cursor)
+        )
+        symbols = decision.instruments(db, rows)
         return envelope(db, dto.DecisionPage(
             items=[
                 dto.DecisionListItem(
                     decision_id=r.decision_hash.removeprefix("sha256:"),
-                    snapshot_id=r.snapshot_id, action=r.action, direction=r.direction,
+                    snapshot_id=r.snapshot_id, instrument=symbols.get(r.id),
+                    outcome=decision.outcome_of(r), action=r.action, direction=r.direction,
                     reason_codes=sorted(r.reason_codes or []),
                     policy_version=r.policy_version, decided_at=dto.utc(r.decided_at),
                 )
                 for r in rows
             ],
             next_cursor=_encode(*after) if after else None,
+            total=decision.count(db, action=action, outcome=outcome),
         ))
-
-    #: The dashboard bounds its list the same way (app.DECISION_LIMIT).
-    LIST_LIMIT = 400
 
     @api.get("/decisions/grouped", response_model=dto.Envelope[dto.DecisionListOut])
     def decisions_grouped(
@@ -218,18 +227,29 @@ def create_app(
         def hex_id(d: Any) -> str:
             return str(d.decision_hash).removeprefix("sha256:")
 
+        symbols = decision.instruments(db, recent)
+        total = decision.count(db)
+
+        def entry(e: listing.Entry) -> dto.ListEntryOut:
+            d, members = e.decision, entry_members(e)
+            return dto.ListEntryOut(
+                decision_id=hex_id(d), snapshot_id=d.snapshot_id,
+                instrument=symbols.get(d.id), outcome=decision.outcome_of(d),
+                action=d.action, direction=d.direction,
+                reason_codes=list(d.reason_codes or []),
+                decided_at=dto.utc(d.decided_at),
+                first_decided_at=dto.utc(members[0].decided_at) if members else None,
+                label=e.label, count=e.count, member_ids=[hex_id(m) for m in members],
+            )
+
         return envelope(db, dto.DecisionListOut(
             view=view,  # type: ignore[arg-type]
-            entries=[
-                dto.ListEntryOut(
-                    decision_id=hex_id(e.decision), snapshot_id=e.decision.snapshot_id,
-                    action=e.decision.action, direction=e.decision.direction, label=e.label,
-                    count=e.count, member_ids=[hex_id(m) for m in entry_members(e)],
-                )
-                for e in built.entries
-            ],
-            shown=len(built.entries), total=decision.count(db),
+            entries=[entry(e) for e in built.entries],
+            shown=len(built.entries), total=total,
             grouped=built.grouped, pin_missing=pin_missing,
+            window=len(recent),
+            window_since=dto.utc(recent[-1].decided_at) if recent else None,
+            bounded=total > len(recent),
         ))
 
     @api.get("/copy", response_model=dto.Envelope[dto.CopyOut])

@@ -18,9 +18,10 @@ reading.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -243,21 +244,58 @@ def by_hash(session: Session, decision_hash: str) -> Decision | None:
     ).one_or_none()
 
 
-def count(session: Session) -> int:
-    return int(session.scalar(select(func.count()).select_from(Decision)) or 0)
+#: The action that opens a position; every other action is a refusal.
+POSITION_ACTION = "OPTIONS_POSITION"
+
+ListOutcome = Literal["position", "refusal"]
+
+
+def _filtered(stmt: Any, action: str | None, outcome: ListOutcome | None) -> Any:
+    if action:
+        stmt = stmt.where(Decision.action == action)
+    if outcome == "position":
+        stmt = stmt.where(Decision.action == POSITION_ACTION)
+    elif outcome == "refusal":
+        stmt = stmt.where(Decision.action != POSITION_ACTION)
+    return stmt
+
+
+def count(
+    session: Session, *, action: str | None = None, outcome: ListOutcome | None = None
+) -> int:
+    stmt = _filtered(select(func.count()).select_from(Decision), action, outcome)
+    return int(session.scalar(stmt) or 0)
+
+
+def outcome_of(decision: Decision) -> ListOutcome:
+    return "position" if decision.action == POSITION_ACTION else "refusal"
+
+
+def instruments(session: Session, decisions: Sequence[Decision]) -> dict[str, str]:
+    """Each decision's observed underlying, in one query rather than one per row."""
+    ids = {d.market_snapshot_id for d in decisions}
+    if not ids:
+        return {}
+    rows = session.execute(
+        select(MarketSnapshot.id, MarketSnapshot.symbol).where(MarketSnapshot.id.in_(ids))
+    ).all()
+    symbols = {snapshot_id: symbol for snapshot_id, symbol in rows}
+    return {
+        d.id: symbols[d.market_snapshot_id] for d in decisions if d.market_snapshot_id in symbols
+    }
 
 
 def listing(
     session: Session,
     *,
     action: str | None = None,
+    outcome: ListOutcome | None = None,
     limit: int = 50,
     before: DecisionCursor | None = None,
 ) -> tuple[list[Decision], DecisionCursor | None]:
     """Decisions newest first, one page at a time, keyed on a total order."""
     stmt = select(Decision).order_by(Decision.decided_at.desc(), Decision.decision_hash.desc())
-    if action:
-        stmt = stmt.where(Decision.action == action)
+    stmt = _filtered(stmt, action, outcome)
     if before is not None:
         at, key = before
         stmt = stmt.where(

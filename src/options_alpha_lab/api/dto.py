@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 SCHEMA_VERSION: Literal["public.v1"] = "public.v1"
 
@@ -82,9 +82,16 @@ class ProofTileOut(Public):
     detail: str
 
 
+#: What a decision did, in the list's terms: it opened a position or it did not.
+Outcome = Literal["position", "refusal"]
+
+
 class DecisionListItem(Public):
     decision_id: str
     snapshot_id: str
+    #: The observed underlying, from the decision's market snapshot.
+    instrument: str | None
+    outcome: Outcome
     action: str
     direction: str
     reason_codes: list[str]
@@ -95,6 +102,8 @@ class DecisionListItem(Public):
 class DecisionPage(Public):
     items: list[DecisionListItem]
     next_cursor: str | None
+    #: Decisions matching the filter in this source, across every page.
+    total: int
 
 
 class Observation(Public):
@@ -283,8 +292,12 @@ class SpreadCandidateOut(Public):
     long_contract_symbol: str
     short_contract_symbol: str
     quantity: int
-    estimated_debit: str | None
-    calculated_max_loss: str | None
+    estimated_debit: str | None = Field(
+        description="Long ask minus short bid, per share as quoted; one contract is 100 shares."
+    )
+    calculated_max_loss: str | None = Field(
+        description="US dollars for the whole structure at its quantity."
+    )
     selected: bool
     rejection_reasons: list[str]
     leg_quotes: list[dict[str, Scalar]]
@@ -308,8 +321,8 @@ class RiskDecisionOut(Public):
 
 class AccountingOut(Public):
     account_equity: str | None
-    risk_budget: str | None
-    maximum_loss: str | None
+    risk_budget: str | None = Field(description="US dollars allowed to be lost on this trade.")
+    maximum_loss: str | None = Field(description="US dollars for the whole structure.")
     #: Of the per-trade budget, not of the portfolio.
     budget_used_percent: str | None
 
@@ -459,8 +472,18 @@ class SceneOut(Public):
 class ListEntryOut(Public):
     decision_id: str
     snapshot_id: str
+    #: The observed underlying, from the decision's market snapshot.
+    instrument: str | None
+    outcome: Outcome
     action: str
     direction: str
+    reason_codes: list[str]
+    #: When the listed decision was made.
+    decided_at: str | None
+    #: When the oldest member of its run was made; equal to `decided_at` alone.
+    first_decided_at: str | None
+    #: The dashboard's two-line label. Kept for parity; the typed fields above
+    #: are what a client should render.
     label: str
     #: Consecutive identical outcomes this entry stands for.
     count: int
@@ -475,6 +498,13 @@ class DecisionListOut(Public):
     grouped: bool
     #: A `pin` was requested and this source holds no such decision.
     pin_missing: bool
+    #: The newest decisions grouping considered. Older ones are not listed here;
+    #: `/decisions` pages through all of them.
+    window: int
+    #: When the oldest decision in the window was made.
+    window_since: str | None
+    #: The source holds more decisions than the window.
+    bounded: bool
 
 
 class RuleOut(Public):

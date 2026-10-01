@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -656,6 +657,75 @@ class WorkerEventsTests(unittest.TestCase):
     def test_the_allowlist_excludes_the_known_dangerous_keys(self) -> None:
         for key in ("host", "error", "summary"):
             self.assertNotIn(key, dto.WORKER_DETAIL_ALLOWLIST)
+
+
+class DecisionListContract(unittest.TestCase):
+    """PUI Phase 3: a list row is typed fields, and history is not bounded silently."""
+
+    def setUp(self) -> None:
+        self.client = _frozen_client()
+
+    def grouped(self, view: str = "Everything") -> dict:  # type: ignore[type-arg]
+        return self.client.get(f"/api/v1/decisions/grouped?view={view}").json()["data"]
+
+    def test_entries_carry_instrument_outcome_and_time(self) -> None:
+        for e in self.grouped()["entries"]:
+            with self.subTest(e["snapshot_id"]):
+                self.assertEqual(e["instrument"], "SPY")
+                expected = "position" if e["action"] == "OPTIONS_POSITION" else "refusal"
+                self.assertEqual(e["outcome"], expected)
+                self.assertIsNotNone(e["decided_at"])
+                self.assertLessEqual(e["first_decided_at"], e["decided_at"])
+
+    def test_a_single_entry_spans_only_itself(self) -> None:
+        for e in self.grouped("Notable")["entries"]:
+            if e["count"] == 1:
+                self.assertEqual(e["first_decided_at"], e["decided_at"])
+
+    def test_the_window_is_stated_and_unbounded_on_committed_evidence(self) -> None:
+        data = self.grouped()
+        self.assertEqual((data["window"], data["total"], data["bounded"]), (5, 5, False))
+        oldest = min(e["decided_at"] for e in data["entries"])
+        self.assertEqual(data["window_since"], oldest)
+
+    def test_a_source_larger_than_the_window_says_so(self) -> None:
+        from options_alpha_lab.api import server
+
+        with unittest.mock.patch.object(server, "LIST_LIMIT", 2):
+            data = self.grouped()
+        self.assertEqual((data["window"], data["total"], data["bounded"]), (2, 5, True))
+        self.assertEqual(len(data["entries"]), 2)
+
+    def test_full_history_pages_by_outcome_and_reports_its_total(self) -> None:
+        seen: dict[str, list[str]] = {}
+        for outcome in ("position", "refusal"):
+            ids: list[str] = []
+            cursor = None
+            while True:
+                url = f"/api/v1/decisions?outcome={outcome}&limit=1"
+                page = self.client.get(url + (f"&cursor={cursor}" if cursor else "")).json()["data"]
+                self.assertTrue(all(i["outcome"] == outcome for i in page["items"]))
+                self.assertTrue(all(i["instrument"] == "SPY" for i in page["items"]))
+                ids += [i["decision_id"] for i in page["items"]]
+                cursor = page["next_cursor"]
+                if cursor is None:
+                    break
+            self.assertEqual(len(ids), page["total"])
+            seen[outcome] = ids
+        everything = self.client.get("/api/v1/decisions?limit=200").json()["data"]
+        self.assertEqual(everything["total"], 5)
+        self.assertEqual(sorted(seen["position"] + seen["refusal"]),
+                         sorted(i["decision_id"] for i in everything["items"]))
+
+    def test_an_unknown_outcome_is_refused(self) -> None:
+        self.assertEqual(self.client.get("/api/v1/decisions?outcome=fill").status_code, 422)
+
+    def test_money_fields_state_their_units_in_the_contract(self) -> None:
+        spec = self.client.get("/openapi.json").json()["components"]["schemas"]
+        debit = spec["SpreadCandidateOut"]["properties"]["estimated_debit"]["description"]
+        self.assertIn("per share", debit)
+        loss = spec["AccountingOut"]["properties"]["maximum_loss"]["description"]
+        self.assertIn("whole structure", loss)
 
 
 if __name__ == "__main__":  # pragma: no cover
