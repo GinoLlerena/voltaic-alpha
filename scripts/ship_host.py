@@ -287,15 +287,23 @@ cd {HOST}
 """
 
 #: Pins in requirements.txt the venv does not satisfy; empty means in step.
-PIN_CHECK = f"""set -uo pipefail
-cd {HOST}
-./.venv/bin/python - <<'PY'
+#: A pin whose environment marker excludes this interpreter (emscripten, win32,
+#: an older Python) does not apply; reading past the marker reported three such
+#: pins as off on 1 Oct while the venv was in step.
+PIN_CHECK_PY = """
 import re
+import sys
 from importlib import metadata
+try:
+    from packaging.markers import Marker
+except ImportError:
+    from pip._vendor.packaging.markers import Marker
 off = []
-for line in open("requirements.txt"):
-    m = re.match(r"^([A-Za-z0-9_.-]+)==([^ ;#]+)", line.strip())
+for line in open(sys.argv[1] if len(sys.argv) > 1 else "requirements.txt"):
+    m = re.match(r"^([A-Za-z0-9_.-]+)==([^ ;#]+)\\s*(?:;([^#]*))?", line.strip())
     if not m:
+        continue
+    if m.group(3) and not Marker(m.group(3).strip()).evaluate():
         continue
     try:
         have = metadata.version(m.group(1))
@@ -304,6 +312,12 @@ for line in open("requirements.txt"):
     if have != m.group(2):
         off.append(m.group(1) + " " + have + " (pinned " + m.group(2) + ")")
 print("pins_off=" + ("; ".join(off) or "none"))
+"""
+
+PIN_CHECK = f"""set -uo pipefail
+cd {HOST}
+./.venv/bin/python - <<'PY'
+{PIN_CHECK_PY}
 PY
 """
 
