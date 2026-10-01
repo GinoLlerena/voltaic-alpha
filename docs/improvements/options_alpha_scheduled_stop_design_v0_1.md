@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 29 September 2026, America/Lima |
-| Status | Approved by the owner 29 Sep 2026 (§9 provisioning; §10 answered). Stopping stays disabled until every §8 check passes |
+| Status | **Enabled 30 Sep 2026, 23:13 UTC**, after every mandatory check passed (§12). Approved by the owner 29–30 Sep |
 | Instance | `i-t4n88bkfwsq0lhzmfjii`, `ecs.e-c1m1.large` (2c2g), pay-as-you-go |
 | Owner requirements | 27 Sep 2026: an external failed-start alert; a manual override for demos **and** development that does not change the market-hours schedule and that a scheduled stop never interrupts; show the session check before `StopInstance` and how a forgotten override expires; verify both before enabling |
 | Cost analysis | [§ Option 6 and §7.7](options_alpha_deployment_cost_analysis_v0_1.md) |
@@ -264,6 +264,7 @@ they ship first.
 | Upload cadence | Every 4 h at :30 | Hourly at :10, ten minutes after the hourly dump. The 17:00 ET post-close dump is off-host by about 17:12 ET, before a 17:30 ET stop. |
 | Watchdog freshness | Newest copy under 30 h old | The last completed session's copy is in OSS, checked 3 h after that session's close. A Friday-to-Monday stop leaves a 63-hour-old copy, which is the right one. |
 | Watchdog after a start | Old tick, backup and upload records would fail at once | Boot grace: those checks are excused for 90 min (backup and upload) and 15 min (worker tick) after boot, and say so. Nothing else is excused. |
+| Security updates (added 1 Oct) | Ubuntu's apt timers: daily, randomized, `Persistent=true`. Missed while stopped, then caught up at the next boot, where an upgrade restarted PostgreSQL during the boot-time backup (30 Sep 22:01 UTC) | Drop-ins pin downloads to 08:47 ET and upgrades to 08:50 ET on weekdays, with no random delay and no catch-up. That is after the scheduled start and its backup, before the 09:00 ET backup, and 40 min before the open. The backup also retries once if PostgreSQL drops its connection mid-run; any other failure still fails. |
 
 **Transition.** On the day this deploys, today's session key already exists
 from the old 00:30 UTC upload. That day's post-close copy is skipped, and
@@ -346,14 +347,47 @@ explicit approval:
 | Item | State |
 |---|---|
 | RAM role `oa-scheduler-role`, trusted by Function Compute only | Created |
-| Policy `oa-scheduler-policy` (`deploy/scheduler/ram-policy.json`) | **Blocked on the owner.** The operator user lacks `ram:CreatePolicy`. Confirmed live: the function's first `DescribeInstances` returned `Forbidden.RAM` |
+| Policy `oa-scheduler-policy` (`deploy/scheduler/ram-policy.json`) | Created and attached by the owner in the console (30 Sep); the operator user lacks `ram:CreatePolicy` |
 | CloudMonitor contact `oa-owner` (email) and group `oa-alerts` | Created. Email activated by the owner |
 | CloudMonitor group `oa-scheduler`, custom-event rule `oa-scheduler-alert` | Created |
 | Metric rules `oa-scheduler-errors`, `oa-scheduler-silent` | Created |
 | Function `oa-scheduler` (Python 3.12, 128 MB), `DRY_RUN=1` | Created. Its signing is verified against Alibaba's published example and against the live API |
-| Timer `every-15-min` | Created, then **disabled** until the policy exists, so failing ticks do not email every few minutes |
+| Timer `every-15-min` | **Enabled, live (`DRY_RUN=0`) since 30 Sep 23:13 UTC** |
 
 Commands (`scripts/provision_scheduler.py`): `apply` (create or update),
 `mode dry|live` (the only switch that lets it act), `disable|enable` (the
 timer), `status` (configuration, timer, and the last decisions and alerts,
 logged as CloudMonitor custom events).
+
+## 12. Validation results (30 Sep 2026)
+
+The observation period was shortened at the owner's request; every check the
+owner made mandatory was kept. Times are UTC.
+
+| Check | Evidence |
+|---|---|
+| Backup | 20:17:45 backup verified after the close. A fresh dump was copied to `anchor/`, downloaded, decrypted, and its sha256 matched (28 tables, 6,926 rows). This covers the transition day, when `daily/2026-09-30` held 29 Sep data. |
+| Readiness | `ok: true`: no positions, no working orders, no unresolved incidents, a verified post-close backup, and the session copy off-host. |
+| Lock | Live mode, outside the window, active lock: decision `none` ("dev session lock active"). No stop. |
+| Invalid lock | Expiry set 3 days ahead: held, rewritten to now + 24 h, **exactly one** alert-log entry. |
+| Expiry | One warning entry. A run inside the 15-minute grace did nothing. **First real stop at 21:55:35**; confirmed `StoppedMode: StopCharging`, EIP kept. |
+| Failed start | The function started the server itself (21:56:39). With its health URL on a closed port, it raised "not healthy" **once** (22:20:30); the owner confirmed the email arrived. |
+| Unsafe stop refused | At 22:38 the function refused to stop and alerted once: an unattended upgrade had restarted PostgreSQL at 22:01, so the 22:00 backup was unverified. It stopped by itself at 23:13:22, once the 23:00 backup verified. |
+| One email per alert | Four alerts, four alert-log entries, four emails. Separate incidents each emailed; the function alarms' silence is 1 h. |
+| urllib3 | Upgraded to 2.8.0 at 20:17:45 (CVE-2026-97687/97689). Every service restarted at 21:57 on it. Health PASS, watchdog green, 0 incidents. |
+
+**First automatic day (1 Oct).** Started at 12:43 (the first 15-minute tick in
+the window; 47 min before the open). The 13:13 start check reported "status
+200, worker live". Every backup since boot verified, the watchdog is green, and
+there are no incidents.
+
+**Cost.** Compute and disk drop from $20.37 to about $10.74 a month on 2c2g
+(about $11 with backups, the function and alerts). That is a projection on
+billed unit prices, to be confirmed on the first mostly-stopped day's bill.
+
+**Disable or override.**
+
+- `python3 scripts/provision_scheduler.py mode dry` keeps deciding and logging, but acts on nothing.
+- `python3 scripts/provision_scheduler.py disable` turns the timer off.
+- `python3 scripts/session.py start --hours N --reason demo|dev` holds the server up for at most 24 h (or set the tags from a phone, §4.3); `end` releases it.
+- In the ECS console, Start brings the server up by hand.

@@ -50,6 +50,18 @@ JSON
   exit 1
 }
 
+# A PostgreSQL restart mid-run (an unattended security upgrade restarts it, as
+# it did at 22:01 UTC on 30 Sep, four minutes after a scheduled start) is not a
+# bad backup: it is a dropped connection. Those, and only those, are retried
+# once, after the server answers again. Anything else still fails at once.
+transient() {
+  grep -qiE "server closed the connection|terminating connection|could not connect|connection to server .* failed|the database system is (shutting down|starting up)" "$1"
+}
+wait_for_postgres() {
+  for _ in $(seq 45); do sudo -u postgres pg_isready -q && return 0; sleep 2; done
+  return 1
+}
+
 # The dump is written by `postgres`, not by root, so the directory has to belong
 # to that user. It stays 700: the file is a complete copy of the decision record
 # and the postgres role already holds all of it, but nobody else should.
@@ -57,17 +69,25 @@ mkdir -p "$(dirname "$STATUS")"
 install -d -m 700 -o postgres -g postgres "$DIR"
 
 # --- dump --------------------------------------------------------------------
-sudo -u postgres pg_dump -Fc -d "$DB" -f "$DUMP" 2>/tmp/backup.err \
-  || fail "pg_dump failed: $(tail -3 /tmp/backup.err)"
+dump_once() { sudo -u postgres pg_dump -Fc -d "$DB" -f "$DUMP" 2>/tmp/backup.err; }
+if ! dump_once; then
+  transient /tmp/backup.err && wait_for_postgres && echo "pg_dump: connection lost; retrying once" >&2 \
+    && dump_once || fail "pg_dump failed: $(tail -3 /tmp/backup.err)"
+fi
 chmod 600 "$DUMP"
 bytes=$(stat -c %s "$DUMP")
 [ "$bytes" -gt 0 ] || fail "pg_dump produced an empty file"
 
 # --- restore it, which is the only thing that proves it is a backup ----------
-sudo -u postgres dropdb --if-exists "$SCRATCH" >/dev/null 2>&1 || true
-sudo -u postgres createdb "$SCRATCH" || fail "could not create scratch database"
-sudo -u postgres pg_restore --no-owner --no-privileges -d "$SCRATCH" "$DUMP" \
-  2>/tmp/restore.err || fail "pg_restore failed: $(tail -3 /tmp/restore.err)"
+restore_once() {
+  sudo -u postgres dropdb --if-exists "$SCRATCH" >/dev/null 2>&1 || true
+  sudo -u postgres createdb "$SCRATCH" 2>/tmp/restore.err || return 1
+  sudo -u postgres pg_restore --no-owner --no-privileges -d "$SCRATCH" "$DUMP" 2>/tmp/restore.err
+}
+if ! restore_once; then
+  transient /tmp/restore.err && wait_for_postgres && echo "pg_restore: connection lost; retrying once" >&2 \
+    && restore_once || fail "pg_restore failed: $(tail -3 /tmp/restore.err)"
+fi
 
 tables_src=$(psql_ -d "$DB" -c \
   "select count(*) from information_schema.tables where table_schema='public'")

@@ -35,6 +35,9 @@ ROOT = Path(__file__).resolve().parents[1]
 HOST = "/opt/options-alpha"
 UNIT_DIR = "/etc/systemd/system"
 NEVER_RESTART = {"options-alpha-worker"}
+#: Scripts the units run, shipped with them. Other operator scripts are not
+#: host files and stay out (deploy-hygiene follow-up).
+HOST_SCRIPTS = ("scripts/backup_database.sh",)
 
 DIGESTS = f"""set -uo pipefail
 cd {HOST}
@@ -43,15 +46,27 @@ find src -type f \\( -name '*.py' -o -name '*.json' \\) ! -path '*/__pycache__/*
 for f in {UNIT_DIR}/options-alpha*.service {UNIT_DIR}/options-alpha*.timer; do
   [ -f "$f" ] && echo "$(sha256sum "$f" | cut -d' ' -f1)  deploy/systemd/$(basename "$f")"
 done
+for f in {UNIT_DIR}/*.d/options-alpha.conf; do
+  [ -f "$f" ] || continue
+  d=$(basename "$(dirname "$f")")
+  echo "$(sha256sum "$f" | cut -d' ' -f1)  deploy/systemd/$d/options-alpha.conf"
+done
+for f in {" ".join(HOST_SCRIPTS)}; do
+  [ -f "$f" ] && sha256sum "$f"
+done
 """
 
 
 def local_files() -> dict[str, str]:
     tracked = subprocess.run(  # noqa: S603 - fixed argv
-        ["git", "ls-files", "src", "deploy/systemd"],  # noqa: S607
+        ["git", "ls-files", "src", "deploy/systemd", *HOST_SCRIPTS],  # noqa: S607
         cwd=ROOT, capture_output=True, text=True, check=True,
     ).stdout.split()
-    wanted = [f for f in tracked if f.endswith((".py", ".json", ".service", ".timer"))]
+    wanted = [
+        f for f in tracked
+        if f.endswith((".py", ".json", ".service", ".timer", ".sh"))
+        or (f.startswith("deploy/systemd/") and f.endswith(".d/options-alpha.conf"))
+    ]
     return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in wanted}
 
 
@@ -79,6 +94,29 @@ def tarball(files: list[str]) -> bytes:
     return buf.getvalue()
 
 
+def live_path(f: str) -> str:
+    """Where a shipped file lives on the host."""
+    if f.startswith("deploy/systemd/"):
+        rel = f.removeprefix("deploy/systemd/")
+        return f"{UNIT_DIR}/{rel}"
+    return f"{HOST}/{f}"
+
+
+def timers_touched(files: list[str]) -> list[str]:
+    """Timers to restart: changed timer units, and timers whose drop-in changed."""
+    names = set()
+    for f in files:
+        if not f.startswith("deploy/systemd/"):
+            continue
+        rel = f.removeprefix("deploy/systemd/")
+        head = rel.split("/")[0]
+        if head.endswith(".timer"):
+            names.add(head)
+        elif head.endswith(".timer.d"):
+            names.add(head.removesuffix(".d"))
+    return sorted(names)
+
+
 def install(staged: str, stamp: str, files: list[str], restart: list[str]) -> str:
     backup = f"{HOST}/.deploy-backup/{stamp}"
     units = [f for f in files if f.startswith("deploy/systemd/")]
@@ -90,11 +128,12 @@ def install(staged: str, stamp: str, files: list[str], restart: list[str]) -> st
         f"tar -xzf {staged} -C \"$work\"",
     ]
     for f in files:
-        live = f"{UNIT_DIR}/{Path(f).name}" if f in units else f"{HOST}/{f}"
+        live = live_path(f)
+        mode = "755" if f in HOST_SCRIPTS else "644"
         lines += [
             f"if [ -f {live} ]; then install -D -m 644 {live} {backup}/{f}; "
             f"else echo {f} >> {backup}/absent; fi",
-            f"install -D -m 644 \"$work\"/{f} {live}",
+            f"install -D -m {mode} \"$work\"/{f} {live}",
         ]
         if f not in units:
             # The repository copy of a unit is shipped as well, so the host's
@@ -102,10 +141,8 @@ def install(staged: str, stamp: str, files: list[str], restart: list[str]) -> st
             continue
         lines.append(f"install -D -m 644 \"$work\"/{f} {HOST}/{f}")
     lines += [f"rm -rf \"$work\" {staged}", "systemctl daemon-reload"]
-    for unit in units:
-        name = Path(unit).name
-        if name.endswith(".timer"):
-            lines.append(f"systemctl restart {name}")
+    for timer in timers_touched(files):
+        lines.append(f"systemctl restart {timer}")
     for service in restart:
         lines.append(f"systemctl restart {service}")
     lines.append(f"echo \"shipped {len(files)} file(s); previous copies in {backup}\"")
