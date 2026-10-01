@@ -185,9 +185,18 @@ def make_plan() -> Plan:
     return plan
 
 
-def tarball(files: list[str]) -> bytes:
+MANIFEST = "__ship_manifest__"
+
+
+def tarball(files: list[str], manifest: str = "") -> bytes:
+    """The files, plus the install manifest, so the remote script stays small."""
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        if manifest:
+            data = manifest.encode()
+            info = tarfile.TarInfo(MANIFEST)
+            info.size, info.mode = len(data), 0o644
+            tar.addfile(info, io.BytesIO(data))
         for f in files:
             info = tar.gettarinfo(str(ROOT / f), arcname=f)
             info.uid = info.gid = 0
@@ -219,16 +228,25 @@ def timers_touched(files: list[str]) -> list[str]:
     return sorted(names)
 
 
-def _keep_and_put(src: str, dest: str, backup: str, mode: str) -> list[str]:
-    return [
-        f"if [ -f {dest} ]; then install -D -m 644 {dest} {backup}/{dest.lstrip('/')}; "
-        f"else echo {dest} >> {backup}/absent; fi",
-        f"install -D -m {mode} \"$work\"/{src} {dest}",
-    ]
+def manifest(plan: Plan) -> str:
+    """One `mode source destination` line per file, read by the remote loop.
+
+    Shipped inside the checksummed tarball rather than spelled out in the
+    command: Cloud Assistant refuses a command over about 18 KB, and 41 files
+    written out one install pair each exceeded it (CmdContent.ExceedLimit).
+    """
+    spaced = [f for f in plan.changed + plan.units if any(c.isspace() for c in f)]
+    if spaced:
+        raise rt.Stop(f"paths with whitespace cannot be shipped by the manifest: {spaced}")
+    rows = [
+        f"{'755' if f.endswith('.sh') else '644'} {f} {HOST}/{f}" for f in plan.changed
+    ] + [f"644 {f} {live_path(f)}" for f in plan.units]
+    return "\n".join(rows) + "\n"
 
 
 def install(staged: str, stamp: str, plan: Plan, restart: list[str],
             *, prune_junk: bool = False) -> str:
+    """A fixed-size script: the per-file work comes from the shipped manifest."""
     backup = f"{HOST}/.deploy-backup/{stamp}"
     lines = [
         "set -euo pipefail",
@@ -236,11 +254,12 @@ def install(staged: str, stamp: str, plan: Plan, restart: list[str],
         f"install -d -m 700 {backup}",
         "work=$(mktemp -d)",
         f"tar -xzf {staged} -C \"$work\"",
+        "while read -r mode src dest; do",
+        f'  if [ -f "$dest" ]; then install -D -m 644 "$dest" "{backup}${{dest}}"; '
+        f'else echo "$dest" >> {backup}/absent; fi',
+        '  install -D -m "$mode" "$work/$src" "$dest"',
+        f'done < "$work/{MANIFEST}"',
     ]
-    for f in plan.changed:
-        lines += _keep_and_put(f, f"{HOST}/{f}", backup, "755" if f.endswith(".sh") else "644")
-    for f in plan.units:
-        lines += _keep_and_put(f, live_path(f), backup, "644")
     if prune_junk:
         lines += [f"rm -f {HOST}/{j}" for j in plan.junk]
     lines += [f"rm -rf \"$work\" {staged}"]
@@ -371,7 +390,7 @@ def main() -> int:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         files = sorted(set(plan.changed) | set(plan.units))
         if files:
-            staged = dr.ship(tarball(files), stamp)
+            staged = dr.ship(tarball(files, manifest(plan)), stamp)
             restart = list(args.restart)
             if args.restart_worker and not args.migrate:
                 restart.append(WORKER)

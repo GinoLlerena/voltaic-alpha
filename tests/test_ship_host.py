@@ -8,9 +8,11 @@ refused, without touching a host.
 
 from __future__ import annotations
 
+import io
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -107,10 +109,35 @@ class InstallScript(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
 
     def test_shell_scripts_stay_executable_and_units_restart_their_timer(self) -> None:
-        s = self.script()
-        self.assertIn('install -D -m 755 "$work"/scripts/backup_database.sh', s)
-        self.assertIn('install -D -m 644 "$work"/src/a.py', s)
-        self.assertIn("systemctl restart apt-daily.timer", s)
+        rows = sh.manifest(self.plan()).splitlines()
+        self.assertIn(
+            "755 scripts/backup_database.sh /opt/options-alpha/scripts/backup_database.sh", rows
+        )
+        self.assertIn("644 src/a.py /opt/options-alpha/src/a.py", rows)
+        self.assertIn(
+            "644 deploy/systemd/apt-daily.timer.d/options-alpha.conf "
+            "/etc/systemd/system/apt-daily.timer.d/options-alpha.conf", rows,
+        )
+        self.assertIn("systemctl restart apt-daily.timer", self.script())
+
+    def test_the_command_stays_small_however_many_files_ship(self) -> None:
+        # Cloud Assistant refuses commands over about 18 KB (CmdContent.ExceedLimit,
+        # hit on 1 Oct with 41 files written out one by one).
+        many = sh.Plan(changed=[f"fixtures/f{i:04}.json" for i in range(2000)])
+        self.assertLess(len(sh.install("/root/t.tgz", "S", many, [])), 2000)
+
+    def test_a_path_with_whitespace_is_refused(self) -> None:
+        with self.assertRaises(sh.rt.Stop):
+            sh.manifest(sh.Plan(changed=["docs/a file.md"]))
+
+    def test_the_manifest_travels_inside_the_tarball(self) -> None:
+        plan = sh.Plan(changed=["pyproject.toml"])
+        data = sh.tarball(plan.changed, sh.manifest(plan))
+        with tarfile.open(fileobj=io.BytesIO(data)) as tar:
+            names = tar.getnames()
+            body = tar.extractfile(sh.MANIFEST).read().decode()  # type: ignore[union-attr]
+        self.assertEqual(names, [sh.MANIFEST, "pyproject.toml"])
+        self.assertEqual(body, "644 pyproject.toml /opt/options-alpha/pyproject.toml\n")
 
     def test_junk_is_removed_only_when_asked_and_the_worker_is_never_implied(self) -> None:
         self.assertNotIn("._x.json", self.script())
