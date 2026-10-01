@@ -1,20 +1,34 @@
 #!/usr/bin/env python3
-"""Ship the package source and systemd units that differ from the host, and nothing else.
+"""The one way to deploy host code: ship exactly what differs, and say so first.
 
-    python3 scripts/ship_host.py                      # dry run: what differs
+    python3 scripts/ship_host.py                         # dry run: every difference
+    python3 scripts/ship_host.py --apply                 # ship; restart nothing
     python3 scripts/ship_host.py --apply --restart options-alpha-api
+    python3 scripts/ship_host.py --apply --restart-worker   # outside the trading day only
+    python3 scripts/ship_host.py --apply --migrate          # schema change; outside the day
+    python3 scripts/ship_host.py --apply --install-deps     # requirements.txt changed
+    python3 scripts/ship_host.py --apply --prune-junk       # remove macOS ._* files
 
-Runs on the operator machine over Cloud Assistant, reusing `deploy_react.ship`
-(checksummed chunks) and `resize_trial`'s redacting `aliyun` layer.
+Runs on the operator machine over Cloud Assistant (no SSH, no inbound port),
+reusing `deploy_react.ship` (checksummed chunks) and `resize_trial`'s
+redacting `aliyun` layer.
 
-The payload is computed, not chosen: every tracked file under `src/` and
-`deploy/systemd/` whose digest differs from the host's copy, or that the host
-lacks. The dry run lists it, so what is reviewed is what ships. Old copies are
-kept under /opt/options-alpha/.deploy-backup/<stamp>/.
+What belongs on the host is a list, `HOST_PATHS`, not a habit. It replaced
+`deploy_worker.sh`, whose payload had no `migrations/` or `scripts/`: the host
+once ran revision 0007 with 0008's file absent entirely, and drifted from the
+release freeze in a dozen files (deploy-hygiene follow-ups, 21 Sep 2026).
 
-Only the named services are restarted. The worker is never restarted by this
-tool: its source changes take effect at its next start, which the scheduled
-stop makes routine.
+Two layers are compared, both by sha256:
+
+* the checkout under /opt/options-alpha, against every tracked file in
+  `HOST_PATHS`;
+* the installed systemd units and drop-ins under /etc/systemd/system, against
+  `deploy/systemd/`.
+
+Old copies are kept under /opt/options-alpha/.deploy-backup/<stamp>/. Files
+only the host has are reported, never deleted, except macOS `._*` junk with
+`--prune-junk`. Nothing is restarted unless asked; the worker and schema
+migrations need their own flags and are refused during the trading day.
 """
 
 from __future__ import annotations
@@ -22,9 +36,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import io
+import re
 import subprocess
 import sys
 import tarfile
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,51 +50,139 @@ import resize_trial as rt
 ROOT = Path(__file__).resolve().parents[1]
 HOST = "/opt/options-alpha"
 UNIT_DIR = "/etc/systemd/system"
-NEVER_RESTART = {"options-alpha-worker"}
-#: Scripts the units run, shipped with them. Other operator scripts are not
-#: host files and stay out (deploy-hygiene follow-up).
+
+#: Everything the host runs or serves from its checkout. Repository-only files
+#: (CI, Docker, docs, tests, the frontend source) stay out; the built UI ships
+#: with `deploy_react.py`.
+HOST_PATHS = (
+    "src", "migrations", "scripts", "deploy", "demo", "artifacts", "fixtures", ".streamlit",
+    "app.py", "alembic.ini", "pyproject.toml", "requirements.txt", "README.md",
+)
+#: Restarted only with --restart-worker, and only outside the trading day.
+WORKER = "options-alpha-worker"
+#: Kept for callers of the older interface and its tests.
 HOST_SCRIPTS = ("scripts/backup_database.sh",)
+
+
+def tracked() -> list[str]:
+    out = subprocess.run(  # noqa: S603 - fixed argv
+        ["git", "ls-files", *HOST_PATHS],  # noqa: S607
+        cwd=ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    return out.split()
+
+
+def is_unit(f: str) -> bool:
+    """A file installed into /etc/systemd/system as well as kept in the checkout."""
+    if not f.startswith("deploy/systemd/"):
+        return False
+    rel = f.removeprefix("deploy/systemd/")
+    return rel.endswith((".service", ".timer")) and "/" not in rel or (
+        rel.endswith(".d/options-alpha.conf")
+    )
+
+
+def local_files() -> dict[str, str]:
+    """Checkout files by path, plus installed units under the key `unit:<path>`."""
+    out: dict[str, str] = {}
+    for f in tracked():
+        digest = hashlib.sha256((ROOT / f).read_bytes()).hexdigest()
+        out[f] = digest
+        if is_unit(f):
+            out[f"unit:{f}"] = digest
+    return out
+
+
+#: The schema revision the host's database is at.
+REVISION_QUERY = "select version_num from alembic_version"
 
 DIGESTS = f"""set -uo pipefail
 cd {HOST}
-find src -type f \\( -name '*.py' -o -name '*.json' \\) ! -path '*/__pycache__/*' \\
-  ! -path '*.egg-info/*' -exec sha256sum {{}} + | sort -k2
+find {" ".join(HOST_PATHS)} -type f ! -path '*/__pycache__/*' ! -path '*.egg-info/*' \\
+  -exec sha256sum {{}} + 2>/dev/null | sort -k2
 for f in {UNIT_DIR}/options-alpha*.service {UNIT_DIR}/options-alpha*.timer; do
-  [ -f "$f" ] && echo "$(sha256sum "$f" | cut -d' ' -f1)  deploy/systemd/$(basename "$f")"
+  [ -f "$f" ] || continue
+  b=$(basename "$f")
+  echo "$(sha256sum "$f" | cut -d' ' -f1)  unit:deploy/systemd/$b"
 done
 for f in {UNIT_DIR}/*.d/options-alpha.conf; do
   [ -f "$f" ] || continue
   d=$(basename "$(dirname "$f")")
-  echo "$(sha256sum "$f" | cut -d' ' -f1)  deploy/systemd/$d/options-alpha.conf"
+  echo "$(sha256sum "$f" | cut -d' ' -f1)  unit:deploy/systemd/$d/options-alpha.conf"
 done
-for f in {" ".join(HOST_SCRIPTS)}; do
-  [ -f "$f" ] && sha256sum "$f"
-done
+echo "@alembic $(sudo -u postgres psql -d options_alpha -tAc '{REVISION_QUERY}')"
 """
 
 
-def local_files() -> dict[str, str]:
-    tracked = subprocess.run(  # noqa: S603 - fixed argv
-        ["git", "ls-files", "src", "deploy/systemd", *HOST_SCRIPTS],  # noqa: S607
-        cwd=ROOT, capture_output=True, text=True, check=True,
-    ).stdout.split()
-    wanted = [
-        f for f in tracked
-        if f.endswith((".py", ".json", ".service", ".timer", ".sh"))
-        or (f.startswith("deploy/systemd/") and f.endswith(".d/options-alpha.conf"))
-    ]
-    return {f: hashlib.sha256((ROOT / f).read_bytes()).hexdigest() for f in wanted}
+@dataclass
+class Plan:
+    changed: list[str] = field(default_factory=list)  # checkout files to write
+    units: list[str] = field(default_factory=list)  # repo paths to install into /etc
+    host_only: list[str] = field(default_factory=list)
+    junk: list[str] = field(default_factory=list)
+    host_revision: str = ""
+    repo_head: str = ""
+
+    @property
+    def needs_migration(self) -> bool:
+        return bool(self.repo_head) and self.host_revision != self.repo_head
+
+    @property
+    def deps_changed(self) -> bool:
+        return "requirements.txt" in self.changed
 
 
-def host_files() -> dict[str, str]:
-    out = rt.remote(DIGESTS, timeout=120)
-    pairs = (line.split(maxsplit=1) for line in out.splitlines() if line.strip())
-    return {path: digest for digest, path in pairs}
+def repo_head(root: Path = ROOT) -> str:
+    """The single Alembic head: a revision no other revision names as its parent."""
+    revisions, parents = set(), set()
+    for path in (root / "migrations" / "versions").glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        rev = re.search(r'^revision\s*[:=][^"\']*["\']([^"\']+)', text, re.M)
+        down = re.search(r'^down_revision\s*[:=][^"\'\n]*["\']([^"\']+)', text, re.M)
+        if rev:
+            revisions.add(rev.group(1))
+        if down:
+            parents.add(down.group(1))
+    heads = sorted(revisions - parents)
+    if len(heads) != 1:
+        raise rt.Stop(f"expected one migration head, found {heads}")
+    return heads[0]
 
 
-def plan() -> list[str]:
-    local, host = local_files(), host_files()
-    return sorted(f for f, digest in local.items() if host.get(f) != digest)
+def compare(local: dict[str, str], host: dict[str, str]) -> Plan:
+    plan = Plan()
+    for key, digest in sorted(local.items()):
+        if host.get(key) == digest:
+            continue
+        if key.startswith("unit:"):
+            plan.units.append(key.removeprefix("unit:"))
+        else:
+            plan.changed.append(key)
+    for key in sorted(host):
+        if key.startswith("unit:") or key in local:
+            continue
+        (plan.junk if Path(key).name.startswith("._") else plan.host_only).append(key)
+    return plan
+
+
+def host_state() -> tuple[dict[str, str], str]:
+    out = rt.remote(DIGESTS, timeout=180)
+    files: dict[str, str] = {}
+    revision = ""
+    for line in out.splitlines():
+        if line.startswith("@alembic "):
+            revision = line.removeprefix("@alembic ").strip()
+        elif line.strip():
+            digest, path = line.split(maxsplit=1)
+            files[path] = digest
+    return files, revision
+
+
+def make_plan() -> Plan:
+    files, revision = host_state()
+    plan = compare(local_files(), files)
+    plan.host_revision, plan.repo_head = revision, repo_head()
+    return plan
 
 
 def tarball(files: list[str]) -> bytes:
@@ -95,10 +199,9 @@ def tarball(files: list[str]) -> bytes:
 
 
 def live_path(f: str) -> str:
-    """Where a shipped file lives on the host."""
-    if f.startswith("deploy/systemd/"):
-        rel = f.removeprefix("deploy/systemd/")
-        return f"{UNIT_DIR}/{rel}"
+    """Where an installed unit lives (or, for anything else, its checkout path)."""
+    if is_unit(f):
+        return f"{UNIT_DIR}/{f.removeprefix('deploy/systemd/')}"
     return f"{HOST}/{f}"
 
 
@@ -108,8 +211,7 @@ def timers_touched(files: list[str]) -> list[str]:
     for f in files:
         if not f.startswith("deploy/systemd/"):
             continue
-        rel = f.removeprefix("deploy/systemd/")
-        head = rel.split("/")[0]
+        head = f.removeprefix("deploy/systemd/").split("/")[0]
         if head.endswith(".timer"):
             names.add(head)
         elif head.endswith(".timer.d"):
@@ -117,9 +219,17 @@ def timers_touched(files: list[str]) -> list[str]:
     return sorted(names)
 
 
-def install(staged: str, stamp: str, files: list[str], restart: list[str]) -> str:
+def _keep_and_put(src: str, dest: str, backup: str, mode: str) -> list[str]:
+    return [
+        f"if [ -f {dest} ]; then install -D -m 644 {dest} {backup}/{dest.lstrip('/')}; "
+        f"else echo {dest} >> {backup}/absent; fi",
+        f"install -D -m {mode} \"$work\"/{src} {dest}",
+    ]
+
+
+def install(staged: str, stamp: str, plan: Plan, restart: list[str],
+            *, prune_junk: bool = False) -> str:
     backup = f"{HOST}/.deploy-backup/{stamp}"
-    units = [f for f in files if f.startswith("deploy/systemd/")]
     lines = [
         "set -euo pipefail",
         f"cd {HOST}",
@@ -127,27 +237,56 @@ def install(staged: str, stamp: str, files: list[str], restart: list[str]) -> st
         "work=$(mktemp -d)",
         f"tar -xzf {staged} -C \"$work\"",
     ]
-    for f in files:
-        live = live_path(f)
-        mode = "755" if f in HOST_SCRIPTS else "644"
-        lines += [
-            f"if [ -f {live} ]; then install -D -m 644 {live} {backup}/{f}; "
-            f"else echo {f} >> {backup}/absent; fi",
-            f"install -D -m {mode} \"$work\"/{f} {live}",
-        ]
-        if f not in units:
-            # The repository copy of a unit is shipped as well, so the host's
-            # checkout matches the tree it was installed from.
-            continue
-        lines.append(f"install -D -m 644 \"$work\"/{f} {HOST}/{f}")
-    lines += [f"rm -rf \"$work\" {staged}", "systemctl daemon-reload"]
-    for timer in timers_touched(files):
-        lines.append(f"systemctl restart {timer}")
-    for service in restart:
-        lines.append(f"systemctl restart {service}")
-    lines.append(f"echo \"shipped {len(files)} file(s); previous copies in {backup}\"")
+    for f in plan.changed:
+        lines += _keep_and_put(f, f"{HOST}/{f}", backup, "755" if f.endswith(".sh") else "644")
+    for f in plan.units:
+        lines += _keep_and_put(f, live_path(f), backup, "644")
+    if prune_junk:
+        lines += [f"rm -f {HOST}/{j}" for j in plan.junk]
+    lines += [f"rm -rf \"$work\" {staged}"]
+    if plan.units:
+        lines.append("systemctl daemon-reload")
+        lines += [f"systemctl restart {t}" for t in timers_touched(plan.units)]
+    lines += [f"systemctl restart {s}" for s in restart]
+    count = len(plan.changed) + len(plan.units)
+    lines.append(f"echo \"shipped {count} file(s); previous copies in {backup}\"")
     return "\n".join(lines) + "\n"
 
+
+MIGRATE = f"""set -euo pipefail
+cd {HOST}
+systemctl stop {WORKER}
+set -a; . /etc/options-alpha.env; set +a
+./.venv/bin/alembic upgrade head 2>&1 | tail -5
+echo "revision=$(sudo -u postgres psql -d options_alpha -tAc '{REVISION_QUERY}')"
+systemctl start {WORKER}
+"""
+
+DEPS = f"""set -euo pipefail
+cd {HOST}
+./.venv/bin/pip install -q -r requirements.txt 2>&1 | tail -3
+"""
+
+#: Pins in requirements.txt the venv does not satisfy; empty means in step.
+PIN_CHECK = f"""set -uo pipefail
+cd {HOST}
+./.venv/bin/python - <<'PY'
+import re
+from importlib import metadata
+off = []
+for line in open("requirements.txt"):
+    m = re.match(r"^([A-Za-z0-9_.-]+)==([^ ;#]+)", line.strip())
+    if not m:
+        continue
+    try:
+        have = metadata.version(m.group(1))
+    except metadata.PackageNotFoundError:
+        have = "absent"
+    if have != m.group(2):
+        off.append(m.group(1) + " " + have + " (pinned " + m.group(2) + ")")
+print("pins_off=" + ("; ".join(off) or "none"))
+PY
+"""
 
 VERIFY = """set -uo pipefail
 sleep 5
@@ -157,8 +296,6 @@ echo "stop_readiness=$(code http://127.0.0.1:8600/api/v1/system/stop-readiness)"
 echo "worker=$(systemctl is-active options-alpha-worker)"
 echo "api=$(systemctl is-active options-alpha-api)"
 echo "streamlit=$(code http://127.0.0.1:8501/)"
-timer=options-alpha-backup-offsite.timer
-echo "offsite_timer_next=$(systemctl show -p NextElapseUSecRealtime --value $timer)"
 systemctl start options-alpha-watchdog.service || true
 python3 - <<'PY'
 import json
@@ -171,13 +308,46 @@ PY
 """
 
 
+def report(plan: Plan) -> None:
+    if not (plan.changed or plan.units or plan.junk):
+        print("the host matches this checkout")
+    for title, items in (
+        ("checkout files that differ or are missing", plan.changed),
+        ("installed units / drop-ins that differ", plan.units),
+        ("macOS junk on the host (--prune-junk removes)", plan.junk),
+        ("files only the host has (reported, never deleted)", plan.host_only),
+    ):
+        if items:
+            print(f"{title}:")
+            for f in items:
+                print("   ", f)
+    print(f"schema: host {plan.host_revision or '?'}, repository head {plan.repo_head}"
+          + ("  <- MIGRATION NEEDED (--migrate)" if plan.needs_migration else ""))
+    if plan.deps_changed:
+        print("requirements.txt changes: pins are checked after shipping; --install-deps installs")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--restart", action="append", default=[], help="a service to restart")
+    parser.add_argument("--restart-worker", action="store_true",
+                        help="restart the worker (refused during the trading day)")
+    parser.add_argument("--migrate", action="store_true",
+                        help="stop the worker, alembic upgrade head, start it (outside the day)")
+    parser.add_argument("--install-deps", action="store_true",
+                        help="pip install -r requirements.txt")
+    parser.add_argument("--prune-junk", action="store_true", help="delete macOS ._* files")
+    parser.add_argument("--ignore-window", action="store_true",
+                        help="allow the worker restart / migration during the day")
     args = parser.parse_args()
-    if set(args.restart) & NEVER_RESTART:
-        print("refusing: this tool never restarts the worker", file=sys.stderr)
+
+    if WORKER in args.restart:
+        print("refusing: use --restart-worker for the worker", file=sys.stderr)
+        return 2
+    window = dr.market_window_reason(datetime.now(UTC))
+    if (args.restart_worker or args.migrate) and window and not args.ignore_window:
+        print(f"refusing the worker restart / migration: {window}", file=sys.stderr)
         return 2
     dirty = subprocess.run(  # noqa: S603 - fixed argv
         ["git", "status", "--porcelain", "--untracked-files=no"],  # noqa: S607
@@ -187,17 +357,32 @@ def main() -> int:
         print(f"refusing: tracked changes in the working tree\n{dirty}", file=sys.stderr)
         return 2
     try:
-        files = plan()
-        print("differs from the host:" if files else "the host already matches this checkout")
-        for f in files:
-            print("   ", f)
-        if not files or not args.apply:
-            if files:
+        plan = make_plan()
+        report(plan)
+        if plan.needs_migration and not args.migrate:
+            print("\nrefusing to ship code ahead of its schema; re-run with --migrate",
+                  file=sys.stderr)
+            return 2 if args.apply else 0
+        nothing = not (plan.changed or plan.units or (args.prune_junk and plan.junk))
+        if not args.apply or (nothing and not (args.migrate and plan.needs_migration)):
+            if not args.apply and not nothing:
                 print("\nDry run. Re-run with --apply to ship these.")
             return 0
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        staged = dr.ship(tarball(files), stamp)
-        print(rt.remote(install(staged, stamp, files, args.restart), timeout=300).strip())
+        files = sorted(set(plan.changed) | set(plan.units))
+        if files:
+            staged = dr.ship(tarball(files), stamp)
+            restart = list(args.restart)
+            if args.restart_worker and not args.migrate:
+                restart.append(WORKER)
+            print(rt.remote(install(staged, stamp, plan, restart, prune_junk=args.prune_junk),
+                            timeout=600).strip())
+        if args.migrate and plan.needs_migration:
+            print(rt.remote(MIGRATE, timeout=600).strip())
+        if args.install_deps:
+            print(rt.remote(DEPS, timeout=600).strip())
+        if plan.deps_changed or args.install_deps:
+            print(rt.remote(PIN_CHECK, timeout=120).strip())
         print(rt.remote(VERIFY, timeout=300).strip())
     except rt.Stop as exc:
         print(f"STOPPED: {exc}", file=sys.stderr)
