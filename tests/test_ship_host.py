@@ -145,6 +145,33 @@ class InstallScript(unittest.TestCase):
         self.assertNotIn("options-alpha-worker", self.script())
 
 
+class PinCheck(unittest.TestCase):
+    def off(self, requirements: str) -> str:
+        with tempfile.TemporaryDirectory() as tmp:
+            req = Path(tmp) / "requirements.txt"
+            req.write_text(requirements)
+            done = subprocess.run(  # noqa: S603 - fixed argv, the script is ours
+                [sys.executable, "-", str(req)], input=sh.PIN_CHECK_PY,
+                capture_output=True, text=True, check=True,
+            )
+        return done.stdout.strip()
+
+    def test_pins_for_another_platform_or_python_do_not_apply(self) -> None:
+        # The three false alarms of 1 Oct 2026.
+        reqs = (
+            "httpx2-jsfetch==1.0 ; sys_platform == 'emscripten'\n"
+            "tzdata==2026.3 ; sys_platform == 'emscripten' or sys_platform == 'win32'\n"
+            "numpy==2.4.6 ; python_full_version < '3.0'\n"
+        )
+        self.assertEqual(self.off(reqs), "pins_off=none")
+
+    def test_a_pin_that_applies_is_still_checked(self) -> None:
+        self.assertEqual(
+            self.off("not-installed-pkg==1.0 ; python_full_version >= '3.0'\n"),
+            "pins_off=not-installed-pkg absent (pinned 1.0)",
+        )
+
+
 class Refusals(unittest.TestCase):
     def run_main(self, *argv: str, window: str | None = None) -> int:
         with (
