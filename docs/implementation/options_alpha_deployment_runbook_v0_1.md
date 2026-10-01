@@ -677,3 +677,46 @@ same by hand at any time and never stops the instance.
 
 After cutover: recheck memory and latency on the next full session against
 the 25 September baseline (`resize_trial.py evaluate` without `--apply`).
+
+## 12. Deploying host code (1 October 2026)
+
+`scripts/ship_host.py` is the one way to put repository code on the host. It
+replaces `scripts/deploy_worker.sh`, which is retired and now only prints how
+to use the replacement. That script shipped five fixed paths over SSH and never
+shipped `migrations/` or `scripts/`. The host ran schema revision 0007 with
+0008's file absent, and drifted from the release freeze in a dozen files.
+
+```
+python3 scripts/ship_host.py                            # dry run: every difference
+python3 scripts/ship_host.py --apply                    # ship; restart nothing
+python3 scripts/ship_host.py --apply --restart options-alpha-api
+python3 scripts/ship_host.py --apply --restart-worker   # outside the trading day only
+python3 scripts/ship_host.py --apply --migrate          # schema change; outside the day
+python3 scripts/ship_host.py --apply --install-deps     # requirements.txt changed
+python3 scripts/ship_host.py --apply --prune-junk       # remove macOS ._* files
+```
+
+- **What belongs on the host** is the list `HOST_PATHS`: `src`, `migrations`,
+  `scripts`, `deploy`, `demo`, `artifacts`, `fixtures`, `.streamlit`, `app.py`,
+  `alembic.ini`, `pyproject.toml`, `requirements.txt` and `README.md`.
+  Repository-only files (CI, Docker, docs, tests, frontend source) stay out. The
+  built UI ships with `scripts/deploy_react.py`.
+- **Two layers are compared by sha256:** the checkout under `/opt/options-alpha`,
+  and the installed units and `options-alpha.conf` drop-ins under
+  `/etc/systemd/system`. The dry run lists every difference, so what is reviewed
+  is what ships.
+- **Old copies** are kept under `/opt/options-alpha/.deploy-backup/<stamp>/`.
+  Files only the host has are reported, never deleted, except macOS `._*` junk
+  with `--prune-junk`.
+- **Schema:** the dry run compares the repository's single Alembic head with the
+  host's revision. It refuses to ship code ahead of its schema unless
+  `--migrate` is given. That flag stops the worker, runs `alembic upgrade head`,
+  and starts it again.
+- **Restarts:** nothing restarts unless named. The worker needs
+  `--restart-worker`, and a worker restart or a migration is refused during the
+  trading day (08:30–17:15 ET on weekdays) unless `--ignore-window` is given. A
+  changed timer or timer drop-in restarts that timer.
+- **Dependencies:** if `requirements.txt` changes, the installed versions are
+  checked against its pins after shipping; `--install-deps` installs them.
+
+No SSH rule is opened: everything goes over Cloud Assistant in checksummed chunks.
