@@ -1,8 +1,6 @@
-import { useState } from "react";
 import type { Schemas } from "../api/client";
 import { api } from "../api/client";
-import { get } from "../api/client";
-import { dataOf, useResource } from "../api/useResource";
+import { useCursorPage } from "../api/useCursorPage";
 import { Matrix, Panel } from "./Panel";
 
 type Page = Schemas["ActivityPage"];
@@ -20,43 +18,14 @@ type Event = Schemas["ActivityEventOut"];
  * `PUI-009`: page one refreshes on its own only while it is all that is shown.
  * Once older pages are appended, a refresh of page one could shift it past the
  * cursor they were fetched with and open a silent gap, so the view holds still
- * and offers to start again from the newest instead.
+ * and offers to start again from the newest instead. The paging itself is
+ * `useCursorPage`, shared with the decision history (`CSA-006`).
  */
 export function ActivityFeed() {
-  const [extra, setExtra] = useState<Event[]>([]);
-  const browsing = extra.length > 0;
-  const first = useResource<Page>(api.activity(), 15_000, { paused: browsing });
-  const [cursor, setCursor] = useState<string | null | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-
-  const page = dataOf(first);
-  const ready = page !== null;
-  const items = page ? [...page.items, ...extra] : [];
-  // `undefined` means "not paged yet", so the server's own first cursor stands.
-  const nextCursor = cursor === undefined ? (page ? page.next_cursor : null) : cursor;
-
-  function newest(): void {
-    setExtra([]);
-    setCursor(undefined);
-    setFailed(null);
-    first.retry();
-  }
-
-  async function more(): Promise<void> {
-    if (nextCursor === null || loading) return;
-    setLoading(true);
-    setFailed(null);
-    try {
-      const page = await get<Page>(api.activity(nextCursor));
-      setExtra((seen) => [...seen, ...page.data.items]);
-      setCursor(page.data.next_cursor);
-    } catch (error) {
-      setFailed(error instanceof Error ? error.message : "the request failed");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const list = useCursorPage<Page, Event>(api.activity);
+  const { first, nextCursor, loading, failed, browsing, more, newest } = list;
+  const items = list.items ?? [];
+  const ready = list.items !== null;
 
   return (
     <Panel
@@ -105,7 +74,7 @@ export function ActivityFeed() {
           {nextCursor === null ? ", and the feed ends here" : ", more available"}
         </span>
         {nextCursor === null ? null : (
-          <button type="button" onClick={() => void more()} disabled={loading} data-testid="activity-more">
+          <button type="button" onClick={more} disabled={loading} data-testid="activity-more">
             {loading ? "Loading…" : "Show more"}
           </button>
         )}
