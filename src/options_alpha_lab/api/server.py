@@ -132,6 +132,7 @@ def create_app(
         chosen: Source = db.info["source"]
         return {
             "source_mode": chosen.mode,
+            "source_id": chosen.id,
             "source_label": chosen.label,
             "observed_at": dto.utc(clock()),
             "correlation_id": correlation_id,

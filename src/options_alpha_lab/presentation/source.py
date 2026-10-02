@@ -32,12 +32,20 @@ from ..persistence.models import Decision
 #: whether by configuration or by fallback; the label says which.
 SourceMode = Literal["LIVE", "FROZEN_REPLAY"]
 
+#: Which evidence a response was read from, stable across requests. `CSA-007`:
+#: the label carries the live decision count, so it changes whenever the worker
+#: records a decision and cannot say whether two responses share a source. The
+#: identity names the database, never its URL: `live` is the worker database,
+#: `committed` the evidence in the repository, however it came to be chosen.
+SourceId = Literal["live", "committed"]
+
 
 @dataclass(frozen=True)
 class Source:
     engine: Engine
     mode: SourceMode
     label: str
+    id: SourceId
 
 
 class Resolver:
@@ -55,11 +63,11 @@ class Resolver:
                 self._live_error = type(exc).__name__
 
     def _fallback(self, why: str) -> Source:
-        return Source(self._frozen, "FROZEN_REPLAY", f"committed evidence ({why})")
+        return Source(self._frozen, "FROZEN_REPLAY", f"committed evidence ({why})", "committed")
 
     def current(self) -> Source:
         if not self._configured:
-            return Source(self._frozen, "FROZEN_REPLAY", "committed evidence")
+            return Source(self._frozen, "FROZEN_REPLAY", "committed evidence", "committed")
         if self._live is None:
             return self._fallback(f"live source unavailable: {self._live_error}")
         try:
@@ -68,7 +76,9 @@ class Resolver:
         except Exception as exc:  # noqa: BLE001 - a broken live source must not break the surface
             return self._fallback(f"live source unavailable: {type(exc).__name__}")
         if count:
-            return Source(self._live, "LIVE", f"live worker database ({count} decisions)")
+            return Source(
+                self._live, "LIVE", f"live worker database ({count} decisions)", "live"
+            )
         return self._fallback("live worker has decided nothing yet")
 
 

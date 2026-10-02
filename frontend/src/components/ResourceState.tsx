@@ -61,6 +61,11 @@ export function StaleNote({ what, resources }: { what: string; resources: AnyRes
  * `expectedSource` names the source the page's primary record came from. A
  * panel answered from a different one says so rather than being read as part of
  * one coherent record: the API does not promise an atomic snapshot across calls.
+ *
+ * `CSA-007`: sources are compared by `source_id`. The label carries the live
+ * decision count, so comparing labels reported a panel refreshed after the
+ * worker's next decision as coming from another source. The label is still
+ * what the warning shows a reader.
  */
 export function Loaded<R extends Record<string, AnyResource>>({
   what,
@@ -70,7 +75,7 @@ export function Loaded<R extends Record<string, AnyResource>>({
 }: {
   what: string;
   resources: R;
-  expectedSource?: string | undefined;
+  expectedSource?: { id: string; label: string } | undefined;
   children: (data: { [K in keyof R]: DataOf<R[K]> }) => ReactNode;
 }) {
   const list = Object.values(resources);
@@ -87,7 +92,7 @@ export function Loaded<R extends Record<string, AnyResource>>({
     expectedSource === undefined
       ? []
       : list.flatMap((r) =>
-          (r.state === "ready" || r.state === "stale") && r.envelope.source_label !== expectedSource
+          (r.state === "ready" || r.state === "stale") && r.envelope.source_id !== expectedSource.id
             ? [r.envelope.source_label]
             : [],
         );
@@ -96,7 +101,7 @@ export function Loaded<R extends Record<string, AnyResource>>({
       {foreign.length > 0 ? (
         <p className="stale-note" role="status" data-testid="source-mismatch" data-resource={what}>
           The {what} came from a different source ({[...new Set(foreign)].join(", ")}) than this
-          decision ({expectedSource}). It may not describe the same record.
+          decision ({expectedSource?.label}). It may not describe the same record.
         </p>
       ) : null}
       <StaleNote what={what} resources={list} />

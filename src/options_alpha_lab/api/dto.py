@@ -42,6 +42,9 @@ class Public(BaseModel):
 class Envelope(Public, Generic[T]):
     schema_version: Literal["public.v1"] = SCHEMA_VERSION
     source_mode: Literal["LIVE", "FROZEN_REPLAY"]
+    #: Stable identity of the evidence read (`live` or `committed`). Compare
+    #: this, not the label: the label carries a count that moves (CSA-007).
+    source_id: Literal["live", "committed"]
     source_label: str
     observed_at: str
     #: The decision a response is scoped to, when it is scoped to one.

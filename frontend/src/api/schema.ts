@@ -571,6 +571,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -592,6 +597,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -613,6 +623,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -634,6 +649,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -655,6 +675,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -676,6 +701,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -697,6 +727,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -718,6 +753,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -739,6 +779,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -760,6 +805,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -781,6 +831,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -802,6 +857,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -823,6 +883,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -844,6 +909,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -866,6 +936,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -888,6 +963,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -910,6 +990,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -932,6 +1017,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**
@@ -954,6 +1044,11 @@ export interface components {
              * @constant
              */
             schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
             /** Source Label */
             source_label: string;
             /**

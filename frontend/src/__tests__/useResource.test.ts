@@ -13,7 +13,7 @@ const A = "/api/v1/decisions/aaaa/summary" as ApiUrl;
 const B = "/api/v1/decisions/bbbb/summary" as ApiUrl;
 
 const body = (label: string) => ({
-  schema_version: "public.v1", source_mode: "LIVE", source_label: "live",
+  schema_version: "public.v1", source_mode: "LIVE", source_id: "live", source_label: "live",
   observed_at: "2026-09-29T12:00:00+00:00", correlation_id: null, data: { label },
 });
 

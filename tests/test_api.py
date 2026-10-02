@@ -201,6 +201,7 @@ class EnvelopeContractTests(unittest.TestCase):
             self.assertEqual(body["schema_version"], "public.v1", path)
             self.assertEqual(body["source_mode"], "FROZEN_REPLAY", path)
             self.assertEqual(body["source_label"], "committed evidence", path)
+            self.assertEqual(body["source_id"], "committed", path)
             self.assertEqual(body["observed_at"], NOW.isoformat(), path)
 
     def test_decision_scoped_responses_carry_the_correlation(self) -> None:
@@ -447,6 +448,35 @@ class PerRequestSourceTests(unittest.TestCase):
         self.assertEqual(first, "live worker database (5 decisions)")
         self.assertEqual(second, "live worker database (4 decisions)")
 
+    def test_the_identity_holds_while_the_count_moves(self) -> None:
+        """CSA-007: a new decision changed the label, and the page compared labels,
+        so panels refreshed on either side of it were reported as another source."""
+        with tempfile.TemporaryDirectory() as tmp:
+            live = Path(tmp) / "live.db"
+            shutil.copy(DB, live)
+            client = TestClient(create_app(Resolver(f"sqlite+pysqlite:///{live}", DB)))
+            first = client.get("/api/v1/system/status").json()
+            with sqlite3.connect(live) as conn:
+                conn.execute("delete from decisions where snapshot_id='spy-refusal-2026-08-27'")
+            second = client.get("/api/v1/system/status").json()
+        self.assertNotEqual(first["source_label"], second["source_label"])
+        self.assertEqual((first["source_id"], second["source_id"]), ("live", "live"))
+
+    def test_the_identity_changes_when_the_source_does(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            live = Path(tmp) / "live.db"
+            shutil.copy(DB, live)
+            client = TestClient(create_app(Resolver(f"sqlite+pysqlite:///{live}", DB)))
+            before = client.get("/api/v1/system/status").json()
+            with sqlite3.connect(live) as conn:
+                conn.execute("delete from decisions")
+            after = client.get("/api/v1/system/status").json()
+        self.assertEqual(before["source_id"], "live")
+        self.assertEqual(after["source_id"], "committed")
+        # A fallback names the same committed evidence as a configured replay.
+        broken = resolve("postgresql+psycopg://nobody@127.0.0.1:1/none", DB)
+        self.assertEqual(broken.id, "committed")
+
     def test_a_live_source_that_gains_its_first_decision_is_picked_up(self) -> None:
         """Previously a surface started before the worker's first decision stayed
         on committed evidence until it was restarted."""
@@ -610,7 +640,8 @@ class WorkerEventsTests(unittest.TestCase):
         with sqlite3.connect(old) as conn:
             conn.execute("drop table if exists worker_events")
         client = TestClient(create_app(Source(
-            create_engine(f"sqlite+pysqlite:///{old}", future=True), "FROZEN_REPLAY", "test"
+            create_engine(f"sqlite+pysqlite:///{old}", future=True), "FROZEN_REPLAY", "test",
+            "committed",
         )))
         data = client.get("/api/v1/worker/events").json()["data"]
         self.assertFalse(data["available"])
@@ -641,7 +672,7 @@ class WorkerEventsTests(unittest.TestCase):
                                detail={"error": "OperationalError: password=hunter2"},
                                occurred_at=NOW, recorded_at=NOW, schema_version="t"))
             db.commit()
-        client = TestClient(create_app(Source(engine, "LIVE", "test")))
+        client = TestClient(create_app(Source(engine, "LIVE", "test", "live")))
         response = client.get("/api/v1/worker/events")
         self.assertNotIn("hunter2", response.text)
         self.assertNotIn("options-alpha", response.text)
