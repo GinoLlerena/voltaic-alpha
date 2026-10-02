@@ -122,20 +122,29 @@ test("views: switching the decision view changes the list and the URL", async ({
   await page.waitForLoadState("networkidle");
   const nav = page.getByRole("navigation", { name: "Decision views" });
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Notable");
+  await expect(page.getByTestId("decision-list").locator("li").first()).toBeVisible();
   const notable = await page.getByTestId("decision-list").locator("li").count();
 
   await nav.getByRole("link", { name: "Everything" }).click();
   await expect(page).toHaveURL(/\?view=Everything/);
-  await page.waitForLoadState("networkidle");
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Everything");
-  const everything = await page.getByTestId("decision-list").locator("li").count();
-  // On live data the default view groups most decisions away; Everything must
-  // show at least as many rows, or the control changes nothing.
-  expect(everything).toBeGreaterThanOrEqual(notable);
+  // Wait for the rows themselves. A client-side navigation does not reset the
+  // load state, so `networkidle` returned before the history request answered
+  // and the count read 0 (2 Oct 2026, PUI Phase 3 cutover, reverted).
+  const rows = page.getByTestId("decision-list").locator("li");
+  await expect(rows.first()).toBeVisible();
+  // PUI-008: Everything is the full history, paged; its scope line states
+  // "N of T decisions". On live data the default view groups most decisions
+  // away, so the history must show at least as many rows, and hold them all.
+  const scope = await page.getByTestId("decision-scope").textContent();
+  const [, shown, total] = /(\d+) of (\d+) decisions/.exec(scope ?? "") ?? [];
+  expect(Number(shown)).toBe(await rows.count());
+  expect(Number(total)).toBeGreaterThanOrEqual(Number(shown));
+  expect(Number(shown)).toBeGreaterThanOrEqual(Math.min(notable, Number(total)));
 
   // The view survives a fresh load: it lives in the URL, so it can be shared.
   await page.reload();
-  await page.waitForLoadState("networkidle");
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Everything");
+  await expect(rows.first()).toBeVisible();
   expect(failures).toEqual([]);
 });
