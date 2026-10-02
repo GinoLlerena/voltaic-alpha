@@ -664,6 +664,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -679,6 +687,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -713,6 +722,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -728,6 +745,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -762,6 +780,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -777,6 +803,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -811,6 +838,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -826,6 +861,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -860,6 +896,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -875,6 +919,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -909,6 +954,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -924,6 +977,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -958,6 +1012,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -973,6 +1035,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1007,6 +1070,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1022,6 +1093,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1056,6 +1128,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1071,6 +1151,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1105,6 +1186,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1120,6 +1209,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1154,6 +1244,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1169,6 +1267,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1203,6 +1302,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1218,6 +1325,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1252,6 +1360,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1267,6 +1383,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1301,6 +1418,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1316,6 +1441,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1354,6 +1480,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1369,6 +1503,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1407,6 +1542,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1422,6 +1565,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1460,6 +1604,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1475,6 +1627,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1513,6 +1666,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1528,6 +1689,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"
@@ -1566,6 +1728,14 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
           "source_label": {
             "title": "Source Label",
             "type": "string"
@@ -1581,6 +1751,7 @@
         },
         "required": [
           "source_mode",
+          "source_id",
           "source_label",
           "observed_at",
           "data"

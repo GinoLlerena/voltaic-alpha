@@ -28,7 +28,7 @@ def document() -> dict:
     # The schema does not depend on the data, so an engine that is never queried
     # is enough -- and keeps this runnable without a database.
     engine = create_engine(f"sqlite+pysqlite:///{root / 'demo' / 'h0_demo.db'}", future=True)
-    app = create_app(Source(engine, "FROZEN_REPLAY", "schema export"), root=root)
+    app = create_app(Source(engine, "FROZEN_REPLAY", "schema export", "committed"), root=root)
     return app.openapi()
 
 

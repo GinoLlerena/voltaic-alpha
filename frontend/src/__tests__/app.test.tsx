@@ -11,6 +11,7 @@ const DIGEST = "a".repeat(64);
 const envelope = <T,>(data: T, over: Record<string, unknown> = {}) => ({
   schema_version: "public.v1",
   source_mode: "LIVE",
+  source_id: "live",
   source_label: "live worker database (201 decisions)",
   observed_at: "2026-09-17T08:00:00+00:00",
   correlation_id: null,
@@ -793,6 +794,7 @@ describe("truthful state (PUI phase 1)", () => {
       "fetch",
       respond(new Set(), {
         [`/api/v1/decisions/${QUALIFIED}/market`]: envelope(qualifiedMarket, {
+          source_id: "committed",
           source_label: "committed evidence (5 decisions)",
         }),
       }),
@@ -801,6 +803,22 @@ describe("truthful state (PUI phase 1)", () => {
     const notes = await screen.findAllByTestId("source-mismatch");
     expect(notes[0]).toHaveTextContent("committed evidence (5 decisions)");
     expect(notes[0]).toHaveTextContent("live worker database (201 decisions)");
+  });
+
+  it("does not flag a panel refreshed after the worker's next decision (CSA-007)", async () => {
+    // Same database, one more decision: the label's count moved, the source did not.
+    vi.stubGlobal(
+      "fetch",
+      respond(new Set(), {
+        [`/api/v1/decisions/${QUALIFIED}/market`]: envelope(qualifiedMarket, {
+          source_label: "live worker database (202 decisions)",
+        }),
+      }),
+    );
+    render(at(`/decisions/${QUALIFIED}`));
+    await screen.findByTestId("structure-selected");
+    await screen.findByTestId("observation");
+    expect(screen.queryByTestId("source-mismatch")).toBeNull();
   });
 
   it("heads the setup reading by the recorded outcome", async () => {

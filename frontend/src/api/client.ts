@@ -7,6 +7,8 @@ export type SourceMode = Schemas["Envelope_DecisionListOut_"]["source_mode"];
 export interface Envelope<T> {
   schema_version: string;
   source_mode: SourceMode;
+  /** Stable identity of the evidence read; compare this, not the label (CSA-007). */
+  source_id: Schemas["Envelope_DecisionListOut_"]["source_id"];
   source_label: string;
   observed_at: string;
   correlation_id: string | null;

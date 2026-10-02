@@ -81,7 +81,7 @@ export function Decision({ digest }: { digest: string }) {
     );
   }
 
-  const source = summary.envelope.source_label;
+  const source = { id: summary.envelope.source_id, label: summary.envelope.source_label };
   const data = summary.envelope.data;
   return (
     <>
