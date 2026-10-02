@@ -1,8 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback } from "react";
 import type { Schemas } from "../api/client";
-import { api, get } from "../api/client";
-import { dataOf, useResource } from "../api/useResource";
+import { api } from "../api/client";
+import { useCursorPage } from "../api/useCursorPage";
+import { useResource } from "../api/useResource";
 import { DEFAULT_VIEW, type View } from "../api/views";
 import { DecisionList } from "../components/DecisionList";
 import { Loaded } from "../components/ResourceState";
@@ -72,50 +73,21 @@ function Grouped() {
 }
 
 /**
- * Full history, page by page, in the server's order.
- *
- * The same rule as the activity feed (`PUI-009`): page one refreshes on its own
- * only while it is all that is shown. Once older pages are appended the list
- * holds still, because a refreshed page one could shift past the cursor they
- * were fetched with and open a silent gap; the reader is offered the newest instead.
+ * Full history, page by page, in the server's order, through the same
+ * `useCursorPage` as the activity feed (`CSA-006`): page one holds still while
+ * older pages are shown, and the reader is offered the newest instead.
  */
 function History({ outcome }: { outcome: Item["outcome"] | null }) {
-  const [extra, setExtra] = useState<Item[]>([]);
-  const browsing = extra.length > 0;
-  const first = useResource<Page>(api.decisions(outcome), 15_000, { paused: browsing });
-  const [cursor, setCursor] = useState<string | null | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState<string | null>(null);
-
-  const page = dataOf(first);
-  const nextCursor = cursor === undefined ? (page ? page.next_cursor : null) : cursor;
-
-  function newest(): void {
-    setExtra([]);
-    setCursor(undefined);
-    setFailed(null);
-    first.retry();
-  }
-
-  async function more(): Promise<void> {
-    if (nextCursor === null || loading) return;
-    setLoading(true);
-    setFailed(null);
-    try {
-      const older = await get<Page>(api.decisions(outcome, nextCursor));
-      setExtra((seen) => [...seen, ...older.data.items]);
-      setCursor(older.data.next_cursor);
-    } catch (error) {
-      setFailed(error instanceof Error ? error.message : "the request failed");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const urlFor = useCallback((cursor: string | null) => api.decisions(outcome, cursor), [outcome]);
+  const { first, items, nextCursor, loading, failed, browsing, more, newest } = useCursorPage<
+    Page,
+    Item
+  >(urlFor);
 
   return (
     <Loaded what="decision history" resources={{ first }}>
       {(d) => {
-        const rows = [...d.first.items, ...extra];
+        const rows = items ?? d.first.items;
         return (
           <>
             {first.state === "ready" || first.state === "stale" ? (
@@ -139,7 +111,7 @@ function History({ outcome }: { outcome: Item["outcome"] | null }) {
                 {nextCursor === null ? "The history ends here." : "Older decisions are available."}
               </span>
               {nextCursor === null ? null : (
-                <button type="button" onClick={() => void more()} disabled={loading} data-testid="history-more">
+                <button type="button" onClick={more} disabled={loading} data-testid="history-more">
                   {loading ? "Loading…" : "Show older"}
                 </button>
               )}
