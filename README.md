@@ -267,7 +267,8 @@ so they remain free and deterministic.
 ## Run the agent
 
 ```bash
-# Full decision cycle against live data, writes disabled
+# One full decision cycle against live data, writes disabled. This command is
+# one-shot only; the continuous runtime is `python -m options_alpha_lab.worker`.
 uv run python -m options_alpha_lab.agent --mode recommend --ticks 1
 
 # Paper-write configuration exists, but autonomous entry is not release-approved.

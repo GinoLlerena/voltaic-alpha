@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Protocol
 
 from .contracts import (
-    DecisionOutcome,
     DecisionSnapshot,
     RiskDecision,
     SetupCandidate,
@@ -12,10 +10,6 @@ from .contracts import (
     Thesis,
     WorkflowTransition,
 )
-
-
-class MarketDataGateway(Protocol):
-    def decision_snapshot(self, symbol: str, as_of: datetime) -> DecisionSnapshot: ...
 
 
 class SetupClassifier(Protocol):
@@ -59,7 +53,3 @@ class RiskGovernor(Protocol):
 
 class AuditSink(Protocol):
     def record(self, snapshot_id: str, transition: WorkflowTransition) -> None: ...
-
-
-class DecisionRepository(Protocol):
-    def save(self, outcome: DecisionOutcome) -> None: ...

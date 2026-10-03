@@ -71,7 +71,6 @@ from .exits import (
 )
 from .providers.alpaca_readonly import ProviderError, ProviderRead, ReadOnlyAlpacaClient
 
-DEFAULT_TICK_SECONDS = 300
 #: The order clock's cadence. Must be well inside the shortest deadline it
 #: enforces (90 seconds), with room for a slow broker read.
 DEFAULT_ORDER_CLOCK_SECONDS = 5
@@ -1287,32 +1286,6 @@ class TradingAgent:
         self.history.append(result)
         return result
 
-    # -- scheduling --------------------------------------------------------
-    def run(
-        self,
-        *,
-        interval_seconds: int = DEFAULT_TICK_SECONDS,
-        max_ticks: int | None = None,
-    ) -> Any:
-        """Run the cycle on a fixed cadence until interrupted."""
-        from apscheduler.schedulers.background import BackgroundScheduler
-
-        scheduler = BackgroundScheduler(timezone="UTC")
-        ticks = {"n": 0}
-
-        def job() -> None:
-            result = self.tick()
-            print(result.line(), flush=True)
-            ticks["n"] += 1
-            if max_ticks is not None and ticks["n"] >= max_ticks:
-                scheduler.shutdown(wait=False)
-
-        scheduler.add_job(
-            job, "interval", seconds=interval_seconds, next_run_time=datetime.now(UTC)
-        )
-        scheduler.start()
-        return scheduler
-
 
 def halt_state_for(snapshot: DecisionSnapshot) -> ExecutionState:
     """Stale or unusable data halts new risk without trapping an open position."""
@@ -1330,13 +1303,12 @@ def main(argv: Any = None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="python -m options_alpha_lab.agent",
-        description="Run the autonomous decision cycle. Writes require paper_execute "
+        description="Run the decision cycle once (or N times). Writes require paper_execute "
         "mode AND an explicit --approve token unless approval is disabled.",
     )
     parser.add_argument("--mode", choices=[m.value for m in BotMode], default="recommend")
     parser.add_argument("--symbol", default="SPY")
-    parser.add_argument("--interval", type=int, default=DEFAULT_TICK_SECONDS)
-    parser.add_argument("--ticks", type=int, default=1, help="0 runs until interrupted")
+    parser.add_argument("--ticks", type=int, default=1, help="cycles to run, back to back")
     parser.add_argument("--database-url", default=None)
     parser.add_argument(
         "--approve",
@@ -1346,6 +1318,16 @@ def main(argv: Any = None) -> int:
         "whenever REQUIRE_OPERATOR_APPROVAL is set.",
     )
     args = parser.parse_args(argv)
+    if args.ticks < 1:
+        # `CSA-001`: this command used to loop forever on `--ticks 0`, without
+        # the worker's lease, heartbeat, or the order, position and review
+        # clocks it runs between ticks. One continuous runtime is supported.
+        print(
+            "the agent command runs one-shot cycles only (--ticks N, N >= 1).\n"
+            "The continuous runtime is the worker: python -m options_alpha_lab.worker",
+            file=sys.stderr,
+        )
+        return 2
 
     env = dict(resolved_env())
     env["BOT_MODE"] = args.mode
@@ -1435,18 +1417,8 @@ def main(argv: Any = None) -> int:
         print("WARNING: fully autonomous writes are enabled for this run.")
 
     try:
-        if args.ticks == 0:
-            scheduler = agent.run(interval_seconds=args.interval)
-            try:
-                import time
-
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                scheduler.shutdown(wait=False)
-        else:
-            for _ in range(args.ticks):
-                print(agent.tick().line(), flush=True)
+        for _ in range(args.ticks):
+            print(agent.tick().line(), flush=True)
     finally:
         recorder.end_run(agent.run_id, "ok")
         client.close()

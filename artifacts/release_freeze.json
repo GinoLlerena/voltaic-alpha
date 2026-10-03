@@ -26,9 +26,9 @@
       "scripts/run_h0_validation.sh": "sha256:15269f3d9ada84f7c5aff93bde84024e35315f5ead7764dc7274c88ab51054fd",
       "scripts/session.py": "sha256:c2024af22611c5a121bb3ef7e1819112e82c65a59dde9c862e22cfd91eec688f",
       "scripts/ship_host.py": "sha256:964730496b7c09ce9bc5545d4cfe528a517f7734c3e5888233d97b833b02d794",
-      "src/options_alpha_lab/__init__.py": "sha256:dbcf1d6180ae5bd78b04786746c7f7735dd043e738aaab2bef618392a30d2e67",
+      "src/options_alpha_lab/__init__.py": "sha256:e3aad86846fe4e3d86929adfd25c2a46c78de3349a59ef586beb8990d886d9b4",
       "src/options_alpha_lab/ablation.py": "sha256:25172bdf16d4de7b095d20beedb268a8ccdacd50d14c7e4ab3746460fb764196",
-      "src/options_alpha_lab/agent.py": "sha256:0db1040bf12e3f2766102119054c02bf3ee91ab6f48ce49fa44baf2e7e8de9c6",
+      "src/options_alpha_lab/agent.py": "sha256:0c5c7bb8b514f558ad24641ee57aafc17943b49b0545964be9fd32ec3bda669e",
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
       "src/options_alpha_lab/api/__init__.py": "sha256:4430b1f87ec17e889ded8dac44683c16c6906d0862b33cc14a02bfa9008f3e0c",
       "src/options_alpha_lab/api/__main__.py": "sha256:20571ffdb01f5602a76937e71794f135c38ab8cd9fcf0a995ebf0a41d4b6152f",
@@ -38,7 +38,7 @@
       "src/options_alpha_lab/api/views.py": "sha256:f91198ca8135380fb0a1109f9e08a58079fad23b91e99ea9b6aae57e4d9439f5",
       "src/options_alpha_lab/architecture/__init__.py": "sha256:b9ec27fa878d4c68c402434339bad7a35db69868d14fad68ecb67b086b540d1a",
       "src/options_alpha_lab/architecture/contracts.py": "sha256:ae85b7100b48ee9dd4d5baa2e4745f352296109dbb3ad22d0818dc17c82e4be7",
-      "src/options_alpha_lab/architecture/ports.py": "sha256:979fe77c8f82bb7df30af834f35e3277e70ea83577d0f66a4129efeeed624097",
+      "src/options_alpha_lab/architecture/ports.py": "sha256:14d7ed75b364acb8b7be20fe8902b0007cec9423048bce3bee6fd5fe2719ab8f",
       "src/options_alpha_lab/architecture/workflow.py": "sha256:00a3651fe2d1e981f8980d7f4325a4e2f9e5bf8f0e17eaf4e8e1448a73e51ada",
       "src/options_alpha_lab/calendar.py": "sha256:977198e5ba670d10abdecd249088814edde50f672abbfd8761c6f74906cce02f",
       "src/options_alpha_lab/catalog.py": "sha256:af86b6c247bd9114e16975edabc9e502ddd63754fb878157cb69300fb530b347",
@@ -106,8 +106,8 @@
       ".streamlit/config.toml": "sha256:9316ec439ba62ee2166bdfa271731d49460f9f7ccf421d9ba72a59ef580f7955",
       "Dockerfile": "sha256:7678c301df3c3883197b5ddadb2ebb0111649552ade3fa6a0c37186be9c8abd9",
       "docker-compose.yml": "sha256:9b0ab104722d8c14fa8336e2cf24f68950719a389cfbf198d72c7b63aa564127",
-      "pyproject.toml": "sha256:256678a8e9c7e4e8a14d7bf2b4dd2c411a6d036f68cb112de4dbebbb40217b33",
-      "uv.lock": "sha256:ba21f5b854770562e7f1e7be61a78fd49f0348f9bde5a7eb802cf7de14f0a131"
+      "pyproject.toml": "sha256:05c89f3f005416b520bb5f3d32d82c3e156aeaa8c1d981235f52db0f5b90c724",
+      "uv.lock": "sha256:24527fd38c48595cec811f075a570c22df35d843e2f29e817934cf1922f4f29a"
     },
     "demo_data": {
       "artifacts/h0_paper_lifecycle.json": "sha256:a09aea77c418e7d53d12ba2db1b6e77274cdfd58d01654245f73c8336713bf4c",
@@ -134,8 +134,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:6abc35d6c403134c44a574744921481736e00878",
-  "freeze_digest": "sha256:54da6c07f6cb2221185f006bcec7c787d72028ac7f2f5fa1ea52593661520dfc",
-  "frozen_at": "2026-10-03T15:13:43.191973+00:00",
+  "commit": "git:01283a0cede32432a80b516b36c71e96468c36ed",
+  "freeze_digest": "sha256:7ce6a4f8ec5f1cf73c3d579fec30f63d3702cc4b6261f7cdbcaa925d7f55c751",
+  "frozen_at": "2026-10-03T15:28:45.517545+00:00",
   "manifest_version": "release_freeze.v1"
 }
