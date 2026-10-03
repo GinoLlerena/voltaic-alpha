@@ -21,14 +21,10 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "apscheduler>=3.11",
     "alpaca-py>=0.33",
-    "openai>=1.55",
     # Runtime, not dev: the read-only Alpaca adapter and the model transport both
-    # import it at module scope. It was declared dev-only, which worked until the
+    # import it at module scope (the model is called over HTTPX; no vendor SDK). It was declared dev-only, which worked until the
     # worker was deployed without dev extras.
     "httpx>=0.27",
-    "jinja2>=3.1",
-    "plotly>=5.24",
-    "python-json-logger>=2.0",
     "streamlit>=1.62.0",
 ]
 
@@ -37,6 +33,9 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "httpx>=0.27",
+    # Starlette's TestClient prefers it and warns without it. It used to arrive
+    # with the unused `openai` SDK (CSA-009); tests only, never on a host.
+    "httpx2>=2.12",
     "ruff>=0.8",
     "mypy>=1.13",
     "coverage>=7.6",
