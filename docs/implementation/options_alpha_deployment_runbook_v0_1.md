@@ -680,6 +680,24 @@ the 25 September baseline (`resize_trial.py evaluate` without `--apply`).
 
 ## 12. Deploying host code (1 October 2026)
 
+**One command (5 October 2026).** `scripts/deploy_all.py` runs the steps below
+in order and adds no deploy logic of its own:
+
+```sh
+python3 scripts/deploy_all.py           # dry run: what differs, what would run
+python3 scripts/deploy_all.py --apply   # session if needed, host code, UI, confirm, end session
+```
+
+It reads the differences and chooses `ship_host.py`'s flags: `--install-deps`
+when `requirements.txt` differs, `--migrate` when the schema is behind,
+`--restart-worker` when source the worker runs differs, and an API and
+dashboard restart for any source change. It opens a one-hour session only when
+the server is stopped, or running outside market hours without a lock, and ends
+only a session it opened. A deploy that restarts the worker, and the UI deploy,
+are refused during the trading day, as the underlying commands refuse them.
+`--skip-ui` ships host code only. The individual commands remain available.
+
+
 `scripts/ship_host.py` is the one way to put repository code on the host. It
 replaces `scripts/deploy_worker.sh`, which is retired and now only prints how
 to use the replacement. That script shipped five fixed paths over SSH and never
