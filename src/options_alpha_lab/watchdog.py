@@ -40,6 +40,7 @@ from .offsite import (
     OssConfig,
     StoredObject,
     subprocess_runner,
+    system_uptime,
 )
 from .persistence.models import Incident, WorkerLease
 
@@ -363,14 +364,6 @@ def _boot_grace(check: Check, uptime: timedelta) -> Check:
         return check
     minutes = int(uptime.total_seconds() // 60)
     return Check(check.name, True, f"{check.detail} (excused: up {minutes} min, boot grace)")
-
-
-def system_uptime(path: str = "/proc/uptime") -> timedelta | None:
-    """Seconds since boot, or None where the platform does not say."""
-    try:
-        return timedelta(seconds=float(Path(path).read_text().split()[0]))
-    except (OSError, ValueError, IndexError):
-        return None
 
 
 def _notify(url: str, result: WatchdogResult) -> Check:
