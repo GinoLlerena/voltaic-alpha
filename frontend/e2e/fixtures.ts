@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 type Captured = Record<string, unknown>;
 
@@ -67,3 +67,19 @@ export const servedCursors: string[] = Object.entries(captured)
   .filter(([path]) => path.startsWith("/api/v1/activity"))
   .map(([, body]) => (body as { data?: { next_cursor?: string | null } }).data?.next_cursor)
   .filter((cursor): cursor is string => typeof cursor === "string");
+
+/**
+ * Wait until the page has finished answering, not merely gone quiet.
+ *
+ * `networkidle` alone is not that: it can pass between two of a page's
+ * requests, and a client-side navigation does not reset it. A decision page
+ * makes eight requests, and on 5 October 2026 a screenshot was taken with one
+ * panel still loading (about 1% of pixels different; it passed on rerun). The
+ * app marks every unanswered panel, so the wait is for none to remain.
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.waitForLoadState("networkidle");
+  await expect(
+    page.locator('[data-state="loading"], [data-testid="decision-loading"]'),
+  ).toHaveCount(0);
+}

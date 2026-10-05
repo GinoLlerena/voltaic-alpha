@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { names, replayApi, routes } from "./fixtures";
+import { names, replayApi, routes, settled } from "./fixtures";
 
 /** Injected rather than imported: axe must run inside the page, not the runner. */
 const axeSource = readFileSync(
@@ -33,7 +33,7 @@ for (const [index, route] of routes.entries()) {
       const missed = await replayApi(page);
       await page.setViewportSize({ width, height: 900 });
       await page.goto(route);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       expect(missed, "every request must have a fixture").toEqual([]);
 
       await page.addScriptTag({ content: axeSource });
@@ -61,7 +61,7 @@ for (const width of [360, 400, 736]) {
     await page.setViewportSize({ width, height: 800 });
     for (const route of routes) {
       await page.goto(route);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
@@ -73,7 +73,7 @@ for (const width of [360, 400, 736]) {
 test("every decision is reachable and openable from the keyboard alone", async ({ page }) => {
   await replayApi(page);
   await page.goto("/decisions");
-  await page.waitForLoadState("networkidle");
+  await settled(page);
 
   const reached = new Set<string>();
   let opened: string | null = null;
@@ -93,7 +93,7 @@ test("every decision is reachable and openable from the keyboard alone", async (
 
   const first = [...reached][0];
   await page.goto("/decisions");
-  await page.waitForLoadState("networkidle");
+  await settled(page);
   for (let i = 0; i < 12 && opened === null; i += 1) {
     await page.keyboard.press("Tab");
     const isTarget = await page.evaluate(
@@ -102,7 +102,7 @@ test("every decision is reachable and openable from the keyboard alone", async (
     );
     if (isTarget) {
       await page.keyboard.press("Enter");
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       opened = new URL(page.url()).pathname;
     }
   }
@@ -118,7 +118,7 @@ test("no text is squeezed into a vertical column at phone width", async ({ page 
   await page.setViewportSize({ width: 400, height: 800 });
   for (const route of routes) {
     await page.goto(route);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
     const squeezed = await page.evaluate(() =>
       [...document.querySelectorAll("body *")]
         .filter((el) => {
