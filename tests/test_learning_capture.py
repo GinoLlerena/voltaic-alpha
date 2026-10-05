@@ -17,6 +17,7 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
+from agent_support import LONG, NOW, SHORT, WRITE_ENV, DurableAgentCase, FakeClient
 from options_alpha_lab.architecture.contracts import PriceSource
 from options_alpha_lab.execution.lifecycle import PositionState
 from options_alpha_lab.persistence.models import ExitDecisionRecord, PositionObservation
@@ -25,7 +26,6 @@ from options_alpha_lab.persistence.repository import (
     create_schema,
     upgrade_schema,
 )
-from test_agent import LONG, NOW, SHORT, WRITE_ENV, DurableAgentCase, FakeClient
 
 STOP_QUOTES = {LONG: ("1.00", "1.10"), SHORT: ("0.20", "0.30")}
 

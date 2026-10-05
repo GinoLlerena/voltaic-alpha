@@ -24,6 +24,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from agent_support import (
+    NOW,
+    WRITE_ENV,
+    DurableAgentCase,
+    FakeBroker,
+    FakeClient,
+    occ,
+)
 from options_alpha_lab.architecture.contracts import Direction, ExecutionState, PriceSource
 from options_alpha_lab.execution.intent import IntentLeg, OrderIntent
 from options_alpha_lab.execution.lifecycle import (
@@ -35,14 +43,6 @@ from options_alpha_lab.execution.reconcile import Reconciler
 from options_alpha_lab.execution.request import prepare_mleg_request
 from options_alpha_lab.persistence.models import Incident
 from options_alpha_lab.persistence.models import Position as PositionRow
-from test_agent import (
-    NOW,
-    WRITE_ENV,
-    DurableAgentCase,
-    FakeBroker,
-    FakeClient,
-    occ,
-)
 
 #: A second, disjoint vertical. Different strikes, so nothing about it overlaps
 #: the first: these are two independent strategies, not two lots of one.
@@ -67,7 +67,7 @@ class TwoSpreadClient(FakeClient):
 
     def option_chain(self, symbol: str, *, expiration_gte: str, expiration_lte: str
                      ) -> Any:
-        from test_agent import read
+        from agent_support import read
 
         deltas = {LONG_A: 0.60, SHORT_A: 0.32, LONG_B: 0.60, SHORT_B: 0.32}
         return read({"underlying": symbol, "snapshots": {
@@ -275,7 +275,7 @@ class OverlappingContractsTests(unittest.TestCase):
     """
 
     def setUp(self) -> None:
-        from test_reconcile import ReconcileCase
+        from reconcile_support import ReconcileCase
 
         self.case = ReconcileCase("run")
         self.case.setUp()
@@ -284,14 +284,14 @@ class OverlappingContractsTests(unittest.TestCase):
         self.case.tearDown()
 
     def two_live_rows(self) -> tuple[str, str]:
-        from test_reconcile import entry_intent
+        from reconcile_support import entry_intent
 
         a, _ = self.case.open_position(entry_intent(decision_hash="sha256:a"), "brk-a")
         b, _ = self.case.open_position(entry_intent(decision_hash="sha256:b"), "brk-b")
         return a, b
 
     def reconcile(self, long_qty: str, short_qty: str) -> Any:
-        from test_reconcile import LONG, SHORT, FakeBroker
+        from reconcile_support import LONG, SHORT, FakeBroker
 
         broker = FakeBroker(positions=[{"symbol": LONG, "qty": long_qty},
                                        {"symbol": SHORT, "qty": short_qty}])
@@ -342,7 +342,7 @@ class OverlappingContractsTests(unittest.TestCase):
 
     def test_t1_ac_10_a_late_fill_with_no_live_claimant_is_still_caught(self) -> None:
         """Passes today. Pinned so `T1-05` cannot silence it while generalising."""
-        from test_reconcile import LONG, SHORT, FakeBroker, entry_intent
+        from reconcile_support import LONG, SHORT, FakeBroker, entry_intent
 
         order_id, position_id, _ = self.case.prepare(entry_intent())
         self.case.store.record_submission(
@@ -367,7 +367,7 @@ class OverlappingContractsTests(unittest.TestCase):
 
     def test_t1_ac_05_every_row_is_reconciled_before_entry_is_considered(self) -> None:
         """Passes today: reconciliation already iterates the whole set."""
-        from test_reconcile import entry_intent
+        from reconcile_support import entry_intent
 
         self.case.open_position(entry_intent(decision_hash="sha256:a"), "brk-a")
         self.case.open_position(entry_intent(decision_hash="sha256:b"), "brk-b")

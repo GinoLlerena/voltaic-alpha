@@ -20,19 +20,22 @@ IMPORT = re.compile(r"^\s*(?:from|import)\s+(?:tests\.)?(\w+)", re.MULTILINE)
 
 
 def on_the_harness() -> set[str]:
-    """Test files that reach `pgsupport`, through any chain of test imports."""
+    """Test files that reach `pgsupport`, through any chain of imports in tests/.
+
+    The chain runs through the shared support modules as well as other suites.
+    """
     imports = {
         path.name: set(IMPORT.findall(path.read_text(encoding="utf-8")))
-        for path in (ROOT / "tests").glob("test_*.py")
+        for path in (ROOT / "tests").glob("*.py")
     }
-    reached = {name for name, mods in imports.items() if "pgsupport" in mods}
+    reached = {"pgsupport.py"}
     while True:
         more = {
             name for name, mods in imports.items()
             if name not in reached and any(f"{mod}.py" in reached for mod in mods)
         }
         if not more:
-            return reached
+            return {name for name in reached if name.startswith("test_")}
         reached |= more
 
 
