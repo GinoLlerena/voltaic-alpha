@@ -19,9 +19,9 @@ reading.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from functools import cached_property
+from typing import Any, Literal, TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -44,28 +44,104 @@ from ..persistence.models import (
     ThesisRecord,
 )
 
+_Row = TypeVar("_Row")
 
-@dataclass(frozen=True)
+
 class DecisionView:
-    """Everything one decision produced, and nothing another decision produced."""
+    """Everything one decision produced, and nothing another decision produced.
 
-    decision: Decision
-    snapshot: MarketSnapshot | None
-    signals: list[SignalRecord] = field(default_factory=list)
-    packs: list[EvidencePack] = field(default_factory=list)
-    theses: list[ThesisRecord] = field(default_factory=list)
-    spreads: list[SpreadCandidateRecord] = field(default_factory=list)
-    risks: list[RiskDecisionRecord] = field(default_factory=list)
-    intents: list[OrderIntent] = field(default_factory=list)
-    requests: list[PreparedOrderRequest] = field(default_factory=list)
-    orders: list[BrokerOrder] = field(default_factory=list)
-    fills: list[Fill] = field(default_factory=list)
-    positions: list[Position] = field(default_factory=list)
-    exits: list[ExitDecisionRecord] = field(default_factory=list)
-    model_calls: list[ModelCall] = field(default_factory=list)
-    #: `CIIP-VAL-012`. Absent for a decision recorded before the reading
-    #: existed, or replayed from a fixture that carries no bars.
-    structure: StructureReadingRecord | None = None
+    `CSA-005`: each part is read from the database the first time it is asked
+    for, and kept. The decision page asks eight endpoints about one decision,
+    and each used to load all thirteen record sets to map two or three of
+    them: 78 statements a page view on a plain decision, 107 on one with a
+    lifecycle, repeated every refresh on a host that also runs the worker. A
+    part nobody reads is now never queried.
+
+    `load` still returns a fully read view, for callers that keep it after
+    their session ends; `lazy` is for a caller that maps a view inside one.
+    """
+
+    def __init__(self, session: Session, decision: Decision) -> None:
+        self._session = session
+        self.decision = decision
+
+    def _all(self, model: type[_Row], *where: Any) -> list[_Row]:
+        return list(self._session.scalars(select(model).where(*where)).all())
+
+    @cached_property
+    def snapshot(self) -> MarketSnapshot | None:
+        return self._session.get(MarketSnapshot, self.decision.market_snapshot_id)
+
+    @cached_property
+    def signals(self) -> list[SignalRecord]:
+        return self._all(
+            SignalRecord, SignalRecord.market_snapshot_id == self.decision.market_snapshot_id
+        )
+
+    @cached_property
+    def packs(self) -> list[EvidencePack]:
+        return self._all(
+            EvidencePack, EvidencePack.market_snapshot_id == self.decision.market_snapshot_id
+        )
+
+    @cached_property
+    def theses(self) -> list[ThesisRecord]:
+        return self._all(ThesisRecord, ThesisRecord.decision_id == self.decision.id)
+
+    @cached_property
+    def spreads(self) -> list[SpreadCandidateRecord]:
+        return self._all(
+            SpreadCandidateRecord, SpreadCandidateRecord.decision_id == self.decision.id
+        )
+
+    @cached_property
+    def risks(self) -> list[RiskDecisionRecord]:
+        return self._all(RiskDecisionRecord, RiskDecisionRecord.decision_id == self.decision.id)
+
+    @cached_property
+    def intents(self) -> list[OrderIntent]:
+        return self._all(OrderIntent, OrderIntent.decision_id == self.decision.id)
+
+    @cached_property
+    def requests(self) -> list[PreparedOrderRequest]:
+        ids = [i.id for i in self.intents]
+        if not ids:
+            return []
+        return self._all(PreparedOrderRequest, PreparedOrderRequest.order_intent_id.in_(ids))
+
+    @cached_property
+    def orders(self) -> list[BrokerOrder]:
+        ids = [i.id for i in self.intents]
+        return self._all(BrokerOrder, BrokerOrder.order_intent_id.in_(ids)) if ids else []
+
+    @cached_property
+    def fills(self) -> list[Fill]:
+        ids = [o.id for o in self.orders]
+        return self._all(Fill, Fill.broker_order_id.in_(ids)) if ids else []
+
+    @cached_property
+    def positions(self) -> list[Position]:
+        return self._all(Position, Position.decision_id == self.decision.id)
+
+    @cached_property
+    def exits(self) -> list[ExitDecisionRecord]:
+        ids = [p.id for p in self.positions]
+        return self._all(ExitDecisionRecord, ExitDecisionRecord.position_id.in_(ids)) if ids else []
+
+    @cached_property
+    def model_calls(self) -> list[ModelCall]:
+        ids = [t.model_call_id for t in self.theses if t.model_call_id]
+        return self._all(ModelCall, ModelCall.id.in_(ids)) if ids else []
+
+    @cached_property
+    def structure(self) -> StructureReadingRecord | None:
+        """`CIIP-VAL-012`. Absent for a decision recorded before the reading
+        existed, or replayed from a fixture that carries no bars."""
+        return self._session.scalars(
+            select(StructureReadingRecord).where(
+                StructureReadingRecord.decision_id == self.decision.id
+            )
+        ).one_or_none()
 
     # -- questions the tabs ask, answered here rather than re-derived ----------
 
@@ -91,121 +167,24 @@ class DecisionView:
         return [r for r in self.requests if r.order_intent_id == intent.id]
 
 
+#: Every part of a view, in dependency order.
+PARTS = (
+    "snapshot", "signals", "packs", "theses", "spreads", "risks", "intents", "requests",
+    "orders", "fills", "positions", "exits", "model_calls", "structure",
+)
+
+
+def lazy(session: Session, decision: Decision) -> DecisionView:
+    """A view that reads each part on first use. Map it before `session` closes."""
+    return DecisionView(session, decision)
+
+
 def load(session: Session, decision: Decision) -> DecisionView:
-    """Resolve one decision's lineage. The only constructor for a view."""
-    snapshot = session.get(MarketSnapshot, decision.market_snapshot_id)
-
-    intents = list(
-        session.scalars(
-            select(OrderIntent).where(OrderIntent.decision_id == decision.id)
-        ).all()
-    )
-    intent_ids = [i.id for i in intents]
-
-    orders = (
-        list(
-            session.scalars(
-                select(BrokerOrder).where(BrokerOrder.order_intent_id.in_(intent_ids))
-            ).all()
-        )
-        if intent_ids
-        else []
-    )
-    order_ids = [o.id for o in orders]
-    fills = (
-        list(
-            session.scalars(
-                select(Fill).where(Fill.broker_order_id.in_(order_ids))
-            ).all()
-        )
-        if order_ids
-        else []
-    )
-    requests = (
-        list(
-            session.scalars(
-                select(PreparedOrderRequest).where(
-                    PreparedOrderRequest.order_intent_id.in_(intent_ids)
-                )
-            ).all()
-        )
-        if intent_ids
-        else []
-    )
-    positions = list(
-        session.scalars(
-            select(Position).where(Position.decision_id == decision.id)
-        ).all()
-    )
-    position_ids = [p.id for p in positions]
-    exits = (
-        list(
-            session.scalars(
-                select(ExitDecisionRecord).where(
-                    ExitDecisionRecord.position_id.in_(position_ids)
-                )
-            ).all()
-        )
-        if position_ids
-        else []
-    )
-
-    theses = list(
-        session.scalars(select(ThesisRecord).where(ThesisRecord.decision_id == decision.id)).all()
-    )
-    call_ids = [t.model_call_id for t in theses if t.model_call_id]
-    model_calls = (
-        list(session.scalars(select(ModelCall).where(ModelCall.id.in_(call_ids))).all())
-        if call_ids
-        else []
-    )
-
-    structure = session.scalars(
-        select(StructureReadingRecord).where(
-            StructureReadingRecord.decision_id == decision.id
-        )
-    ).one_or_none()
-
-    snapshot_id = decision.market_snapshot_id
-    return DecisionView(
-        decision=decision,
-        snapshot=snapshot,
-        signals=list(
-            session.scalars(
-                select(SignalRecord).where(
-                    SignalRecord.market_snapshot_id == snapshot_id
-                )
-            ).all()
-        ),
-        packs=list(
-            session.scalars(
-                select(EvidencePack).where(
-                    EvidencePack.market_snapshot_id == snapshot_id
-                )
-            ).all()
-        ),
-        theses=theses,
-        spreads=list(
-            session.scalars(
-                select(SpreadCandidateRecord).where(
-                    SpreadCandidateRecord.decision_id == decision.id
-                )
-            ).all()
-        ),
-        risks=list(
-            session.scalars(
-                select(RiskDecisionRecord).where(RiskDecisionRecord.decision_id == decision.id)
-            ).all()
-        ),
-        intents=intents,
-        requests=requests,
-        orders=orders,
-        fills=fills,
-        positions=positions,
-        exits=exits,
-        model_calls=model_calls,
-        structure=structure,
-    )
+    """Resolve one decision's whole lineage now; safe to keep after the session."""
+    view = DecisionView(session, decision)
+    for part in PARTS:
+        getattr(view, part)
+    return view
 
 
 SignalRole = Literal["cited", "counter-evidence", "observed, unused"]
