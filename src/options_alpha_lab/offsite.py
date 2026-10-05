@@ -84,6 +84,26 @@ class OffsiteError(Exception):
     """A reason to upload nothing. The message ends up in the status record."""
 
 
+class StaleDump(OffsiteError):
+    """The newest verified dump is older than this cycle's. Still a refusal."""
+
+
+#: After a scheduled start, both the backup and this job catch up at once, and
+#: this one can run a minute before the boot-time backup has finished. The
+#: newest dump is then last night's: correctly refused, and expected. Inside
+#: this window that refusal is "not yet" rather than a failed run; the hourly
+#: timer retries. Past it, a stale dump means the backup itself is not running.
+BOOT_WAIT = timedelta(minutes=15)
+
+
+def system_uptime(path: str = "/proc/uptime") -> timedelta | None:
+    """Seconds since boot, or None where the platform does not say."""
+    try:
+        return timedelta(seconds=float(Path(path).read_text().split()[0]))
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 @dataclass(frozen=True)
 class OssConfig:
     bucket: str
@@ -170,7 +190,7 @@ def verify_source(status: dict[str, Any] | None, now: datetime) -> SourceDump:
         raise OffsiteError(f"unparseable dump timestamp {raw_at!r}") from exc
     age = (now - at).total_seconds()
     if age > MAX_DUMP_AGE_SECONDS:
-        raise OffsiteError(
+        raise StaleDump(
             f"latest verified dump is {age / 3600:.1f}h old "
             f"(limit {MAX_DUMP_AGE_SECONDS / 3600:.1f}h); refusing a stale record"
         )
@@ -394,8 +414,13 @@ def write_status(path: str | Path, record: dict[str, Any]) -> None:
     os.replace(temporary, target)
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Exit 0 when every destination holds today's dump, 1 otherwise."""
+def main(argv: list[str] | None = None, *, uptime: timedelta | None = None) -> int:
+    """Exit 0 when every destination holds today's dump, 1 otherwise.
+
+    One exception: just after boot, a stale dump exits 0 as "waiting" (see
+    `BOOT_WAIT`). The status record still says `ok: false`, so nothing reads
+    the wait as a copy having been made.
+    """
     import argparse
     import sys
 
@@ -425,6 +450,13 @@ def main(argv: list[str] | None = None) -> int:
         else:
             detail = "all destinations already hold this dump"
         outcome = {**base, "ok": True, **record, "detail": detail}
+    except StaleDump as exc:
+        up = uptime if uptime is not None else system_uptime()
+        waiting = up is not None and up < BOOT_WAIT
+        outcome = {**base, "ok": False, "detail": str(exc)}
+        if waiting:
+            outcome["waiting"] = True
+            outcome["detail"] = f"waiting for the boot-time backup: {exc}"
     except OffsiteError as exc:
         outcome = {**base, "ok": False, "detail": str(exc)}
     except Exception as exc:  # noqa: BLE001 - anything unforeseen is still a failed run
@@ -435,7 +467,7 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as exc:
         print(f"could not write {args.status_file}: {exc}", file=sys.stderr)
     print(json.dumps(outcome, indent=2))
-    return 0 if outcome["ok"] else 1
+    return 0 if outcome["ok"] or outcome.get("waiting") else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

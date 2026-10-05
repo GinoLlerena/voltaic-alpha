@@ -313,5 +313,60 @@ class Config(unittest.TestCase):
             Path(handle.name).unlink()
 
 
+class BootWait(OffsiteCase):
+    """The off-host job can run a minute before the boot-time backup finishes.
+
+    Every scheduled start logged a failed unit for it (seen 1, 2 and 5 Oct
+    2026): both timers catch up at boot, and this one found last night's dump.
+    Refusing it is right; calling that a failed run was noise that would hide a
+    real one. Just after boot it is a wait. At any other time it still fails.
+    """
+
+    def run_main(self, *, dump_age: timedelta, uptime: timedelta, **status: object) -> int:
+        env = self.dir / "backup.env"
+        env.write_text("OSS_BUCKET=test-bucket\nOSS_REGION=r\nOSS_ENDPOINT=e.example\n")
+        self.out = self.dir / "offsite.json"
+        backup = self.status(datetime.now(UTC) - dump_age, **status)
+        import contextlib
+        import io
+
+        with contextlib.redirect_stdout(io.StringIO()):
+            return offsite.main(
+                ["--env-file", str(env), "--backup-file", str(backup),
+                 "--status-file", str(self.out), "--recipient-file",
+                 str(self.dir / "recipient.pub"), "--staging-dir", str(self.staging)],
+                uptime=uptime,
+            )
+
+    def record(self) -> dict[str, object]:
+        loaded: dict[str, object] = json.loads(self.out.read_text())
+        return loaded
+
+    def test_last_nights_dump_just_after_boot_is_a_wait_not_a_failure(self) -> None:
+        code = self.run_main(dump_age=timedelta(hours=12), uptime=timedelta(minutes=1))
+        self.assertEqual(code, 0)
+        record = self.record()
+        # Still not a copy: nothing may read the wait as the dump being off-host.
+        self.assertIs(record["ok"], False)
+        self.assertIs(record["waiting"], True)
+        self.assertIn("waiting for the boot-time backup", str(record["detail"]))
+
+    def test_the_same_stale_dump_later_is_a_failure(self) -> None:
+        code = self.run_main(dump_age=timedelta(hours=12), uptime=offsite.BOOT_WAIT)
+        self.assertEqual(code, 1)
+        self.assertNotIn("waiting", self.record())
+
+    def test_only_staleness_is_excused_at_boot(self) -> None:
+        code = self.run_main(
+            dump_age=timedelta(minutes=5), uptime=timedelta(minutes=1),
+            verified=False, detail="pg_restore failed",
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("not verified", str(self.record()["detail"]))
+
+    def test_the_wait_ends_before_the_watchdogs_grace_for_this_check(self) -> None:
+        self.assertLess(offsite.BOOT_WAIT, watchdog.BOOT_GRACE_PERIODIC)
+
+
 if __name__ == "__main__":
     unittest.main()
