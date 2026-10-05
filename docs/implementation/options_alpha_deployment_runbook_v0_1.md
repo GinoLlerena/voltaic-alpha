@@ -691,9 +691,12 @@ python3 scripts/deploy_all.py --apply   # session if needed, host code, UI, conf
 It reads the differences and chooses `ship_host.py`'s flags: `--install-deps`
 when `requirements.txt` differs, `--migrate` when the schema is behind,
 `--restart-worker` when source the worker runs differs, and an API and
-dashboard restart for any source change. It opens a one-hour session only when
-the server is stopped, or running outside market hours without a lock, and ends
-only a session it opened. A deploy that restarts the worker, and the UI deploy,
+dashboard restart for any source change. It opens a one-hour session whenever no
+session lock is held, so the scheduler cannot stop the server mid-deploy (a
+deploy started at 17:15 ET is otherwise still running when the run window
+closes at 17:30), and ends only a session it opened; an owner's lock about to
+expire is extended and left to them. A refusal states when to run it, in New
+York time and on the operator machine's clock. A deploy that restarts the worker, and the UI deploy,
 are refused during the trading day, as the underlying commands refuse them.
 `--skip-ui` ships host code only. The individual commands remain available.
 

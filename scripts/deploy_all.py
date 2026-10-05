@@ -8,9 +8,9 @@ It adds no deploy logic of its own. It reads what differs between this
 checkout and the host, then runs the existing commands in order, each with its
 own checks and refusals intact:
 
-  1. `session.py start`     only when the server is stopped, or is running
-                            outside market hours with no lock (the scheduler
-                            would otherwise stop it mid-deploy)
+  1. `session.py start`     whenever no session lock is held, so the scheduler
+                            cannot stop the server mid-deploy - including at
+                            17:15-17:30 ET, as its run window closes
   2. `ship_host.py --apply` with the flags the differences call for
   3. `deploy_react.py deploy --apply --verify-on-port-80`   (skip: --skip-ui)
   4. `ship_host.py`         a dry run, to show the host now matches
@@ -24,7 +24,8 @@ Which flags step 2 gets is decided here, by `steps_for`:
   - any source differs                -> restart the API and the dashboard
 
 A worker restart or a migration is refused during the trading day by
-`ship_host.py`; this script says so up front instead of failing at step 2.
+`ship_host.py`; this script says so up front, with the time it may run, in New
+York time and on this computer's clock, instead of failing at step 2.
 `--ignore-window` is passed through for the rare case that is intended.
 """
 
@@ -36,8 +37,9 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import deploy_react as dr
 import resize_trial as rt
@@ -50,6 +52,8 @@ PACKAGE = "src/options_alpha_lab/"
 READ_ONLY = (f"{PACKAGE}api/", f"{PACKAGE}presentation/")
 API, DASHBOARD = "options-alpha-api", "options-alpha"
 SESSION_HOURS = "1"
+#: A lock with less than this left is extended: a full deploy takes about ten minutes.
+DEPLOY_COVER = timedelta(minutes=30)
 
 
 @dataclass
@@ -62,7 +66,9 @@ class Steps:
     """Why this cannot run now, in the terms the operator can act on."""
 
 
-def steps_for(plan: sh.Plan, window: str | None, *, ignore_window: bool = False) -> Steps:
+def steps_for(
+    plan: sh.Plan, window: str | None, *, ignore_window: bool = False, after: str = "17:15 ET",
+) -> Steps:
     """The `ship_host.py` invocation a set of differences calls for."""
     if not (plan.changed or plan.units or plan.needs_migration):
         return Steps()
@@ -81,19 +87,44 @@ def steps_for(plan: sh.Plan, window: str | None, *, ignore_window: bool = False)
     blocked = None
     if worker and window and not ignore_window:
         blocked = (
-            f"this deploy restarts the worker, and {window}. "
-            "Run it after 17:15 ET, or on a weekend."
+            f"this deploy restarts the trading worker, and the market day is not over "
+            f"({window}).\nRUN IT AT OR AFTER {after}. Any later time tonight works, "
+            "and so does any time on a weekend."
         )
     if worker and ignore_window:
         args.append("--ignore-window")
     return Steps(ship=args, worker=worker, blocked=blocked)
 
 
-def needs_session(status: dict[str, object]) -> bool:
-    """Whether the scheduler could stop the server under this deploy."""
-    if status.get("instance") != "Running":
-        return True
-    return not status.get("inside_market_run_window") and status.get("lock") != "active"
+def session_action(status: dict[str, object], now: datetime) -> str | None:
+    """How to keep the scheduler from stopping the server under this deploy.
+
+    `open`: no lock is held, so take one and end it afterwards. That includes a
+    server running in market hours: a deploy started at 17:15 ET would otherwise
+    still be running when the run window closes at 17:30 and the scheduler
+    stops the server. `extend`: the owner's own lock is about to expire; push
+    it out and leave ending it to them. `None`: their lock already covers it.
+    """
+    if status.get("instance") != "Running" or status.get("lock") != "active":
+        return "open"
+    until = status.get("lock_until")
+    if isinstance(until, str) and datetime.fromisoformat(until) - now < DEPLOY_COVER:
+        return "extend"
+    return None
+
+
+def clear_from(now: datetime) -> datetime | None:
+    """When the trading-day refusal lifts today, or None if nothing is refused now."""
+    if dr.market_window_reason(now) is None:
+        return None
+    et = now.astimezone(ZoneInfo("America/New_York"))
+    return et.replace(hour=17, minute=15, second=0, microsecond=0)
+
+
+def when(at: datetime) -> str:
+    """A time the owner can act on: New York, and this machine's own clock."""
+    local = at.astimezone()
+    return f"{at:%H:%M} ET today ({local:%H:%M} on this computer's clock, {local:%Z})"
 
 
 def run(*argv: str) -> int:
@@ -135,11 +166,14 @@ def main() -> int:
                         help="allow a worker restart and the UI deploy during the trading day")
     args = parser.parse_args()
 
-    window = dr.market_window_reason(datetime.now(UTC))
+    now = datetime.now(UTC)
+    window = dr.market_window_reason(now)
+    clear = clear_from(now)
+    after = when(clear) if clear else "now"
     opened = False
     try:
         status = session_status()
-        session = needs_session(status)
+        session = session_action(status, now)
         print(f"server: {status.get('instance')}, lock {status.get('lock')}, "
               f"{'inside' if status.get('inside_market_run_window') else 'outside'} market hours")
         if status.get("instance") != "Running" and not args.apply:
@@ -147,36 +181,47 @@ def main() -> int:
             print(f"--apply would: open a {SESSION_HOURS}-hour session (starts the server), "
                   "deploy what differs, deploy the UI, end the session.")
             return 0
-        if session and args.apply:
+        # A stopped server has to be started before its differences can be read,
+        # and starting it during the trading day is what the scheduler does anyway.
+        if status.get("instance") != "Running":
             if run("session.py", "start", "--hours", SESSION_HOURS, "--reason", "dev") != 0:
                 return 1
             opened = True
 
         plan = wait_for_host()
         sh.report(plan)
-        steps = steps_for(plan, window, ignore_window=args.ignore_window)
+        steps = steps_for(plan, window, ignore_window=args.ignore_window, after=after)
         ui = not args.skip_ui
         ui_blocked = ui and bool(window) and not args.ignore_window
 
         print("\nplan:")
         if session:
-            print(f"  1. open a {SESSION_HOURS}-hour session, so the scheduler "
-                  "does not stop the server")
+            print(f"  1. {session} a {SESSION_HOURS}-hour session, so the scheduler "
+                  "does not stop the server mid-deploy")
         print("  2. ship_host.py " + (" ".join(steps.ship) or "(nothing to ship)"))
         print("  3. " + ("deploy_react.py deploy --apply --verify-on-port-80"
                          if ui else "(UI skipped)"))
-        print("  4. confirm the host matches" + ("; end the session" if session else ""))
+        print("  4. confirm the host matches"
+              + ("; end the session" if session == "open" else ""))
         if steps.blocked:
             print(f"\nNOT NOW: {steps.blocked}", file=sys.stderr)
             return 2
         if ui_blocked:
-            print(f"\nNOT NOW: the UI deploy waits for the close ({window}). "
-                  "Re-run after 17:15 ET, or pass --skip-ui to ship only the host code now.",
-                  file=sys.stderr)
+            print(f"\nNOT NOW: the UI deploy waits for the market day to end ({window}).\n"
+                  f"RUN IT AT OR AFTER {after}, or pass --skip-ui to ship only the "
+                  "host code now.", file=sys.stderr)
             return 2
         if not args.apply:
-            print("\nDry run. Re-run with --apply to deploy.")
+            print("\nDry run. Nothing is refused right now: re-run with --apply to deploy.")
             return 0
+        # Held from here to the end: nothing was refused, so the deploy will run.
+        if session == "extend":
+            if run("session.py", "extend", "--hours", SESSION_HOURS) != 0:
+                return 1
+        elif session == "open" and not opened:
+            if run("session.py", "start", "--hours", SESSION_HOURS, "--reason", "dev") != 0:
+                return 1
+            opened = True
 
         if steps.ship and run("ship_host.py", *steps.ship) != 0:
             print("\nSTOPPED: ship_host.py failed; the UI was not deployed.", file=sys.stderr)

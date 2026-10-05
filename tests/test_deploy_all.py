@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +39,7 @@ class StepsFor(unittest.TestCase):
         plan = sh.Plan(changed=["src/options_alpha_lab/agent.py"])
         blocked = da.steps_for(plan, DAY)
         self.assertEqual(blocked.ship, ["--apply", "--restart-worker", *RESTARTS])
-        self.assertIn("after 17:15 ET", blocked.blocked or "")
+        self.assertIn("RUN IT AT OR AFTER 17:15 ET", blocked.blocked or "")
         self.assertIsNone(da.steps_for(plan, None).blocked)
 
     def test_changed_requirements_install_and_restart_everything(self) -> None:
@@ -65,20 +66,54 @@ class StepsFor(unittest.TestCase):
         self.assertIn("--ignore-window", steps.ship)
 
 
-class NeedsSession(unittest.TestCase):
-    def status(self, instance: str, inside: bool, lock: str) -> dict[str, object]:
-        return {"instance": instance, "inside_market_run_window": inside, "lock": lock}
+class SessionAction(unittest.TestCase):
+    NOW = datetime(2026, 10, 5, 21, 20, tzinfo=UTC)  # 17:20 ET, a Monday
 
-    def test_a_stopped_server_needs_one(self) -> None:
-        self.assertTrue(da.needs_session(self.status("Stopped", False, "expired")))
+    def status(
+        self, instance: str, lock: str, minutes_left: int | None = None
+    ) -> dict[str, object]:
+        until = None if minutes_left is None else self.NOW + timedelta(minutes=minutes_left)
+        return {
+            "instance": instance, "lock": lock, "inside_market_run_window": True,
+            "lock_until": until.isoformat() if until else None,
+        }
 
-    def test_a_server_running_in_market_hours_does_not(self) -> None:
-        self.assertFalse(da.needs_session(self.status("Running", True, "expired")))
+    def test_a_stopped_server_gets_a_session(self) -> None:
+        self.assertEqual(da.session_action(self.status("Stopped", "expired"), self.NOW), "open")
 
-    def test_running_after_hours_without_a_lock_needs_one(self) -> None:
-        # The scheduler stops such a server on its next tick, mid-deploy.
-        self.assertTrue(da.needs_session(self.status("Running", False, "expired")))
-        self.assertFalse(da.needs_session(self.status("Running", False, "active")))
+    def test_a_running_server_with_no_lock_gets_one_even_in_market_hours(self) -> None:
+        # 17:15 ET clears the trading-day refusal, and the run window closes at
+        # 17:30: without a lock the scheduler would stop the server mid-deploy.
+        self.assertEqual(da.session_action(self.status("Running", "expired"), self.NOW), "open")
+
+    def test_the_owners_long_lock_is_left_alone(self) -> None:
+        self.assertIsNone(da.session_action(self.status("Running", "active", 120), self.NOW))
+
+    def test_the_owners_lock_about_to_expire_is_extended_not_replaced(self) -> None:
+        soon = self.status("Running", "active", 10)
+        self.assertEqual(da.session_action(soon, self.NOW), "extend")
+
+
+class WhenToRun(unittest.TestCase):
+    def test_during_the_trading_day_the_time_is_stated_in_new_york_and_local_time(self) -> None:
+        midday = datetime(2026, 10, 5, 19, 6, tzinfo=UTC)  # Mon 15:06 ET
+        clear = da.clear_from(midday)
+        assert clear is not None
+        self.assertEqual((clear.hour, clear.minute), (17, 15))
+        self.assertEqual(str(clear.tzinfo), "America/New_York")
+        text = da.when(clear)
+        self.assertIn("17:15 ET today", text)
+        self.assertIn(f"{clear.astimezone():%H:%M} on this computer's clock", text)
+
+    def test_nothing_is_refused_in_the_evening_or_at_the_weekend(self) -> None:
+        self.assertIsNone(da.clear_from(datetime(2026, 10, 5, 21, 20, tzinfo=UTC)))  # Mon 17:20 ET
+        self.assertIsNone(da.clear_from(datetime(2026, 10, 3, 15, 0, tzinfo=UTC)))   # Saturday
+
+    def test_the_refusal_says_when(self) -> None:
+        plan = sh.Plan(changed=["src/options_alpha_lab/agent.py"])
+        after = "17:15 ET today (16:15 on this computer's clock, -05)"
+        steps = da.steps_for(plan, DAY, after=after)
+        self.assertIn("RUN IT AT OR AFTER 17:15 ET today (16:15", steps.blocked or "")
 
 
 if __name__ == "__main__":  # pragma: no cover
