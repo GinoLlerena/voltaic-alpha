@@ -276,7 +276,7 @@ def create_app(
     @api.get("/decisions/{digest}/summary", response_model=dto.Envelope[dto.DecisionSummary])
     def decision_summary(db: Db, digest: Digest) -> dict[str, Any]:
         row = found(db, digest)
-        view = decision.load(db, row)
+        view = decision.lazy(db, row)
         snap = view.snapshot
         return envelope(db,
             dto.DecisionSummary(
@@ -305,7 +305,7 @@ def create_app(
 
     def scoped(db: Session, digest: str) -> tuple[Any, decision.DecisionView]:
         row = found(db, digest)
-        return row, decision.load(db, row)
+        return row, decision.lazy(db, row)
 
     @api.get("/outcomes", response_model=dto.Envelope[dto.ReviewOverviewOut])
     def review_overview(db: Db) -> dict[str, Any]:
@@ -395,7 +395,7 @@ def create_app(
     @api.get("/decisions/{digest}/proof", response_model=dto.Envelope[dto.ProofOut])
     def decision_proof(db: Db, digest: Digest) -> dict[str, Any]:
         row = found(db, digest)
-        view = decision.load(db, row)
+        view = decision.lazy(db, row)
         return envelope(db,
             dto.ProofOut(manifest_digest=export.digest(view), manifest=export.manifest(view)),
             correlation_id=row.decision_hash,
@@ -412,7 +412,7 @@ def create_app(
         Deliberately not enveloped: wrapping would change the bytes and so the
         digest, and the digest is the thing a reviewer checks.
         """
-        view = decision.load(db, found(db, digest))
+        view = decision.lazy(db, found(db, digest))
         return Response(
             content=export.render(view),
             media_type="application/json",
