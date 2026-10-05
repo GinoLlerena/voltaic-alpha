@@ -8,8 +8,9 @@ would be silent on the property it exists to check.
 
 Set `OPTIONS_ALPHA_TEST_DATABASE_URL` to a PostgreSQL URL and every harness that
 calls `database_url` gets its own fresh database. Unset - which is the default,
-and what CI and the validation gate run - nothing changes and the suite stays
-on SQLite with no server required.
+and what CI's `check` job and the validation gate run - nothing changes and the
+suite stays on SQLite with no server required. CI's `lifecycle-postgres` job
+sets it against its own disposable service (`CSA-011`).
 """
 
 from __future__ import annotations

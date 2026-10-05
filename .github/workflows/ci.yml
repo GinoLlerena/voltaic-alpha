@@ -174,3 +174,52 @@ jobs:
           git ls-files -z \
             | grep -zvE '^(uv\.lock|frontend/pnpm-lock\.yaml|\.secrets\.baseline)$' \
             | xargs -0 uv run detect-secrets-hook --baseline .secrets.baseline
+
+  lifecycle-postgres:
+    # CSA-011. The lifecycle, reconciliation and multi-position suites assert on
+    # row order and locking, the two things SQLite and PostgreSQL disagree
+    # about. `check` runs them on SQLite, and its PostgreSQL service was used by
+    # the replay only: `tests/pgsupport.py` switches engines on its own variable,
+    # which nothing set. This job sets it. Each test creates its own database on
+    # this disposable service; the helper must never be pointed anywhere else.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: options_alpha
+          POSTGRES_PASSWORD: options_alpha
+          POSTGRES_DB: options_alpha
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U options_alpha -d options_alpha"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      OPTIONS_ALPHA_TEST_DATABASE_URL: postgresql+psycopg://options_alpha:options_alpha@localhost:5432/options_alpha
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Lifecycle suites on PostgreSQL
+        # The list is held complete by tests/test_ci_postgres_lane.py.
+        run: >-
+          uv run pytest
+          tests/test_agent.py
+          tests/test_reconcile.py
+          tests/test_task1_acceptance.py
+          tests/test_lifecycle_e2e.py
+          tests/test_learning_capture.py
