@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { replayApi } from "./fixtures";
+import { replayApi, settled } from "./fixtures";
 
 /**
  * Visual regression over the screens an evaluator actually sees.
@@ -40,7 +40,7 @@ for (const screen of SCREENS) {
       await page.clock.setFixedTime(new Date("2026-09-17T12:00:00Z"));
       await page.setViewportSize({ width, height: 900 });
       await page.goto(screen.path);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       // Web fonts are not used, but layout still settles a frame late at 400px.
       await page.evaluate(async () => {
         await document.fonts.ready;

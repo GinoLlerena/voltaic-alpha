@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { digests, replayApi } from "./fixtures";
+import { digests, replayApi, settled } from "./fixtures";
 
 /**
  * What the page actually renders, asserted against a real cascade.
@@ -21,7 +21,7 @@ test.describe("the proof tiles", () => {
   test("are laid out, rather than a bulleted list of same-sized text", async ({ page }) => {
     await replayApi(page);
     await page.goto("/evidence");
-    await page.waitForLoadState("networkidle");
+    await settled(page);
 
     const tiles = await page.evaluate(() => {
       const list = document.querySelector(".proof");
@@ -61,7 +61,7 @@ test.describe("the proof tiles", () => {
     // different. The mode is carried on `data-mode`, not inferred here.
     await replayApi(page);
     await page.goto("/evidence");
-    await page.waitForLoadState("networkidle");
+    await settled(page);
 
     const byMode = await page.evaluate(() => {
       const entries: [string, string][] = [];
@@ -85,7 +85,7 @@ test.describe("the authority spine", () => {
 
     const memo = async (digest: string) => {
       await page.goto(`/decisions/${digest}`);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       return page.evaluate(() => {
         const li = document.querySelector('[data-stage="03"]');
         const label = li?.querySelector(".l");
@@ -113,7 +113,7 @@ test.describe("the authority spine", () => {
   test("never expresses a stage's state through opacity", async ({ page }) => {
     await replayApi(page);
     await page.goto(`/decisions/${REFUSAL}`);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
     const faded = await page.evaluate(() =>
       [...document.querySelectorAll(".spine li")]
         .filter((li) => Number(getComputedStyle(li).opacity) < 1)
@@ -130,7 +130,7 @@ test.describe("the decision ticket", () => {
     await replayApi(page);
     for (const digest of digests) {
       await page.goto(`/decisions/${digest}`);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       const section = page.getByTestId("structure-reading");
       await expect(section, `${digest.slice(0, 12)} dropped the section entirely`).toBeVisible();
       if ((await section.getAttribute("data-present")) === "false") {
@@ -144,7 +144,7 @@ test.describe("the decision ticket", () => {
     await replayApi(page);
     for (const digest of digests) {
       await page.goto(`/decisions/${digest}`);
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       const missing = await page.evaluate(() =>
         [...document.querySelectorAll('[data-testid="why-decision"] li')]
           .filter((li) => !li.querySelector(".src")?.textContent?.trim())
@@ -162,7 +162,7 @@ test.describe("the depth panels (RUI-4)", () => {
     // that does not look like a data row.
     await replayApi(page);
     await page.goto(`/decisions/${MODEL_WROTE_THE_MEMO}`);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
 
     const tables = await page.evaluate(() =>
       [...document.querySelectorAll("table.matrix")].map((table) => {
@@ -193,7 +193,7 @@ test.describe("the depth panels (RUI-4)", () => {
   test("answer the five questions, and link each to its evidence", async ({ page }) => {
     await replayApi(page);
     await page.goto(`/decisions/${MODEL_WROTE_THE_MEMO}`);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
 
     const summary = await page.evaluate(() => {
       const rows = [...document.querySelectorAll(".five > div")];
@@ -219,7 +219,7 @@ test.describe("the depth panels (RUI-4)", () => {
   test("a refusal answers none of them, and says so in every panel", async ({ page }) => {
     await replayApi(page);
     await page.goto(`/decisions/${REFUSAL}`);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
 
     const state = await page.evaluate(() => ({
       unanswered: document.querySelectorAll('.five > div[data-answered="false"]').length,
@@ -239,7 +239,7 @@ test.describe("the depth panels (RUI-4)", () => {
   test("offers the manifest as a download the reader can verify", async ({ page }) => {
     await replayApi(page);
     await page.goto(`/decisions/${MODEL_WROTE_THE_MEMO}`);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
     const link = page.getByTestId("proof-download");
     await expect(link).toBeVisible();
     // Same origin and a real published path: the client never assembles the
@@ -257,7 +257,7 @@ test.describe("the depth panels (RUI-4)", () => {
     // evaluation of the same snapshot, and the page must not imply otherwise.
     await replayApi(page);
     await page.goto(`/decisions/${MODEL_WROTE_THE_MEMO}`);
-    await page.waitForLoadState("networkidle");
+    await settled(page);
     const lineage = page.getByTestId("proof-lineage");
     await expect(lineage).toBeVisible();
     const foreign = lineage.locator('[data-belongs="false"]');
@@ -274,7 +274,7 @@ test.describe("Today's first screen", () => {
       await replayApi(page);
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
-      await page.waitForLoadState("networkidle");
+      await settled(page);
       for (const id of ["source-banner", "status-strip", "attention"]) {
         const box = await page.getByTestId(id).boundingBox();
         expect(box, `${id} did not render`).not.toBeNull();

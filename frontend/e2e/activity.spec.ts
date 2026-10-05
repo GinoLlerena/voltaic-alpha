@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { replayApi, servedCursors } from "./fixtures";
+import { replayApi, servedCursors, settled } from "./fixtures";
 
 /**
  * The audit feed, paged the way the server says and no other way.
@@ -20,7 +20,7 @@ test("pages the whole feed without inventing a cursor", async ({ page }) => {
   });
 
   await page.goto("/activity");
-  await page.waitForLoadState("networkidle");
+  await settled(page);
 
   const more = page.getByTestId("activity-more");
   let clicks = 0;
@@ -61,7 +61,7 @@ test("tells an empty source apart from one that cannot answer", async ({ page })
   // `available: false` carries a reason and is not an empty feed.
   await replayApi(page);
   await page.goto("/activity");
-  await page.waitForLoadState("networkidle");
+  await settled(page);
 
   const worker = page.getByTestId("worker-events");
   await expect(worker).toHaveAttribute("data-present", "false");
@@ -76,7 +76,7 @@ test("tells an empty source apart from one that cannot answer", async ({ page })
 test("keeps the incident filter usable when the list is empty", async ({ page }) => {
   await replayApi(page);
   await page.goto("/activity");
-  await page.waitForLoadState("networkidle");
+  await settled(page);
   await expect(page.getByTestId("incidents-open")).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("incidents-all").click();
   await expect(page.getByTestId("incidents-all")).toHaveAttribute("aria-pressed", "true");
