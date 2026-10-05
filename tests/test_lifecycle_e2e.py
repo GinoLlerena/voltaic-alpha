@@ -20,6 +20,7 @@ sys.path.insert(0, "tests")
 from sqlalchemy import select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
+from agent_support import LONG, NOW, SHORT, WRITE_ENV, FakeClient  # noqa: E402
 from options_alpha_lab.agent import TradingAgent  # noqa: E402
 from options_alpha_lab.architecture.contracts import ExecutionState  # noqa: E402
 from options_alpha_lab.config import load_settings  # noqa: E402
@@ -36,7 +37,6 @@ from options_alpha_lab.persistence.repository import (  # noqa: E402
     build_engine,
     create_schema,
 )
-from test_agent import LONG, NOW, SHORT, WRITE_ENV, FakeClient  # noqa: E402
 
 
 class ScriptedBroker(BrokerPort):
