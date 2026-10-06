@@ -48,9 +48,15 @@ export const api = {
    * The full history, newest first, paged by the server's opaque cursor
    * (PUI-008). The grouped list is bounded; this is not.
    */
-  decisions: (outcome: Schemas["DecisionListItem"]["outcome"] | null, cursor?: string | null) => {
+  decisions: (
+    outcome: Schemas["DecisionListItem"]["outcome"] | null,
+    cursor?: string | null,
+    day?: string | null,
+  ) => {
     const query = new URLSearchParams();
     if (outcome) query.set("outcome", outcome);
+    // One New York market day: what a review journal row links to (PUI4).
+    if (day) query.set("day", day);
     query.set("limit", "50");
     if (cursor) query.set("cursor", cursor);
     return `${published("/api/v1/decisions")}?${query.toString()}` as ApiUrl;
@@ -95,6 +101,18 @@ export const api = {
   workerFaults: () => `${published("/api/v1/worker/events")}?faults_only=true` as ApiUrl,
   proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
   reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
+  /** Execution outcomes: positions no longer held (PUI4 §4.2 A). */
+  reviewExecutions: (kind: "closed" | "abandoned") =>
+    `${published("/api/v1/review/executions")}?kind=${kind}` as ApiUrl,
+  /**
+   * The research journal, one row per market session (PUI4 §4.2 B). `before`
+   * is the server's own continuation value, passed back untouched.
+   */
+  reviewSessions: (horizon: string, before?: string | null) => {
+    const query = new URLSearchParams({ horizon });
+    if (before) query.set("before", before);
+    return `${published("/api/v1/review/sessions")}?${query.toString()}` as ApiUrl;
+  },
   tour: () => published("/api/v1/tour") as ApiUrl,
 };
 

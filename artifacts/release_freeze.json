@@ -82,6 +82,7 @@
       "src/options_alpha_lab/presentation/positions.py": "sha256:3b50952947a8dde1addac580b3170a5d6d1eafcf3abd3fc198694f287a1cb4d7",
       "src/options_alpha_lab/presentation/proof.py": "sha256:2ea1942d0ba4be8d6625057185c88e2fe8ddea192430bb3902a1671a54a15ed4",
       "src/options_alpha_lab/presentation/readiness.py": "sha256:42a32555d720ff6c1f0152df9f86c22268086ae4de2f61d309e20df4c288d78b",
+      "src/options_alpha_lab/presentation/review.py": "sha256:2de479e131fd945bcfacfb05feb332d0b6dc71ecfa15953a2986667cadd936ea",
       "src/options_alpha_lab/presentation/source.py": "sha256:d4cdff8c0c403c4d22be51de26483f5b41bb4ed47d6329c5c82bd1c3a1c1dad9",
       "src/options_alpha_lab/presentation/status.py": "sha256:ae381b9ba8012d884ea11763b43f2f0a99f4179345aacb979913125843d639e7",
       "src/options_alpha_lab/presentation/tour.py": "sha256:eaa73eef805bcbc7e20d35ffb3b88ce97ff45193c4485f10412bbeab086e7a2f",
@@ -136,8 +137,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:6a5bc2d63d40fff2a2a5646f51ca907718028ff3",
-  "freeze_digest": "sha256:fdbf6fa20956c071520cd8949ac426ae1e181d86066c263575498be4679bcde3",
-  "frozen_at": "2026-10-06T17:54:44.439415+00:00",
+  "commit": "git:403038d5946631860bc4eb75e31d07387c9e0c91",
+  "freeze_digest": "sha256:af917f070d75b50bd2976df3f40c59059fb253ea5ab1152162808823576dc86e",
+  "frozen_at": "2026-10-06T23:29:06.718615+00:00",
   "manifest_version": "release_freeze.v1"
 }

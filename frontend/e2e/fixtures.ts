@@ -48,6 +48,7 @@ export const routes = [
   "/evidence?tour=1",
   "/evidence?tour=4",
   "/activity",
+  "/review",
   ...digests.map((d) => `/decisions/${d}`),
 ];
 
@@ -59,6 +60,7 @@ export const names = [
   "tour-1",
   "tour-4",
   "activity",
+  "review",
   ...digests.map((d) => `decision-${d.slice(0, 12)}`),
 ];
 

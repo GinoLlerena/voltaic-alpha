@@ -21,6 +21,7 @@ const SCREENS = [
   { name: "decisions", path: "/decisions" },
   { name: "tour-step", path: "/evidence?tour=4" },
   { name: "activity", path: "/activity" },
+  { name: "review", path: "/review" },
   {
     name: "decision-refusal",
     path: "/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
@@ -45,6 +46,13 @@ for (const screen of SCREENS) {
       await page.evaluate(async () => {
         await document.fonts.ready;
       });
+      // A full-page capture is stitched while the page scrolls, and a sticky
+      // element is drawn wherever it happens to sit at each step: the decision
+      // page's section bar moved by a pixel row between identical runs (PR #69,
+      // PR #82: 554 to 1,034 pixels, always `decision-refusal` at 400px). In
+      // the image it is laid out in place; its stickiness is behaviour, covered
+      // by the rendering tests, not appearance.
+      await page.addStyleTag({ content: "nav.sections { position: static !important; }" });
       await expect(page).toHaveScreenshot(`${screen.name}-${width}.png`, {
         fullPage: true,
         animations: "disabled",

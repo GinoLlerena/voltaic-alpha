@@ -8,7 +8,7 @@ import { DEFAULT_VIEW, type View } from "../api/views";
 import { DecisionList } from "../components/DecisionList";
 import { Loaded } from "../components/ResourceState";
 import { SourceBanner } from "../components/SourceBanner";
-import { marketTime } from "../components/time";
+import { marketDay, marketTime } from "../components/time";
 import { ViewPicker } from "../components/ViewPicker";
 
 type Listing = Schemas["DecisionListOut"];
@@ -31,12 +31,26 @@ const OUTCOME: Record<Exclude<View, "Notable">, Item["outcome"] | null> = {
  * reading as the whole history. Every other view pages through the full
  * history on the server's cursor.
  */
-export function Decisions({ view = DEFAULT_VIEW }: { view?: View }) {
+export function Decisions({
+  view = DEFAULT_VIEW,
+  day = null,
+}: {
+  view?: View;
+  /** One market day, from a review journal row. It applies to the ungrouped views. */
+  day?: string | null;
+}) {
+  // A day asks for that session's decisions, which only the full history can
+  // answer: the grouped view covers a window, not a day.
+  const shown: View = day !== null && view === "Notable" ? "Everything" : view;
   return (
     <section>
       <h2>Recorded decisions</h2>
-      <ViewPicker current={view} />
-      {view === "Notable" ? <Grouped /> : <History key={view} outcome={OUTCOME[view]} />}
+      <ViewPicker current={shown} />
+      {shown === "Notable" ? (
+        <Grouped />
+      ) : (
+        <History key={`${shown}-${day ?? ""}`} outcome={OUTCOME[shown]} day={day} />
+      )}
     </section>
   );
 }
@@ -77,8 +91,11 @@ function Grouped() {
  * `useCursorPage` as the activity feed (`CSA-006`): page one holds still while
  * older pages are shown, and the reader is offered the newest instead.
  */
-function History({ outcome }: { outcome: Item["outcome"] | null }) {
-  const urlFor = useCallback((cursor: string | null) => api.decisions(outcome, cursor), [outcome]);
+function History({ outcome, day }: { outcome: Item["outcome"] | null; day: string | null }) {
+  const urlFor = useCallback(
+    (cursor: string | null) => api.decisions(outcome, cursor, day),
+    [outcome, day],
+  );
   const { first, items, nextCursor, loading, failed, browsing, more, newest } = useCursorPage<
     Page,
     Item
@@ -94,7 +111,17 @@ function History({ outcome }: { outcome: Item["outcome"] | null }) {
               <SourceBanner envelope={first.envelope} />
             ) : null}
             <p className="scope" data-testid="decision-scope">
-              {rows.length} of {d.first.total} decisions, newest first, ungrouped.
+              {rows.length} of {d.first.total} decisions
+              {day === null ? "" : ` on ${marketDay(day)} (New York market day)`}, newest first,
+              ungrouped.
+              {day === null ? null : (
+                <>
+                  {" "}
+                  <Link to="/decisions" search={{ view: "Everything" }}>
+                    Show every day
+                  </Link>
+                </>
+              )}
             </p>
             <DecisionList
               rows={rows}

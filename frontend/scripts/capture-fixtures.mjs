@@ -34,6 +34,11 @@ const paths = [
   "/api/v1/decisions/grouped?view=Notable",
   // PUI Phase 3: the full history, as the Everything view asks for it.
   "/api/v1/decisions?limit=50",
+  // PUI Phase 4: Review. The journal runs to the capture date, so its rows
+  // are the sessions between the committed evidence and that day.
+  "/api/v1/review/executions?kind=closed",
+  "/api/v1/review/executions?kind=abandoned",
+  "/api/v1/review/sessions?horizon=T%2B1",
 ];
 
 const captured = {};
