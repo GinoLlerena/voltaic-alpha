@@ -15,7 +15,7 @@ from typing import Any, Literal
 from sqlalchemy.orm import Session
 
 from ..persistence.models import ExitDecisionRecord, Incident, PositionObservation
-from ..presentation import activity, positions
+from ..presentation import activity, positions, review
 from ..presentation.artifacts import ArtifactLink, correlate_ablation, correlate_receipt
 from ..presentation.decision import DecisionView, signal_role
 from . import dto
@@ -322,4 +322,45 @@ def position_summary(v: positions.PositionView) -> dto.PositionSummaryOut:
         latest_mark=mark(v.observation) if v.observation is not None else None,
         unrealized=dto.decimal(v.exit.unrealized) if v.exit is not None else None,
         realized=dto.decimal(v.realized), open_incidents=v.open_incidents,
+    )
+
+
+def execution(e: review.Execution) -> dto.ExecutionOutcomeOut:
+    closed = e.view.position.lifecycle_status == "CLOSED"
+    return dto.ExecutionOutcomeOut(
+        position=position_summary(e.view),
+        result="closed" if closed else "no_exposure",
+        close_price=dto.decimal(e.close_price),
+        exit_trigger=e.exit.trigger if e.exit else None,
+        exit_reason=e.exit.reason if e.exit else None,
+        held_seconds=int(e.held.total_seconds()) if e.held is not None else None,
+        sessions_held=e.sessions_held,
+    )
+
+
+def review_session(s: review.ReviewSession) -> dto.ReviewSessionOut:
+    h = s.horizon
+    return dto.ReviewSessionOut(
+        day=s.day.isoformat(), open_at=dto.utc(s.open_at), close_at=dto.utc(s.close_at),
+        decisions=s.decisions,
+        closes_read=[str(c) for c in s.closes_read],
+        verdicts=[
+            dto.VerdictCountOut(
+                outcome=v.outcome, direction=v.direction,
+                reason_codes=list(v.reason_codes), count=v.count,
+            )
+            for v in s.verdicts
+        ],
+        horizon=None if h is None else dto.SessionHorizonOut(
+            horizon=h.label, sessions=h.sessions, resolved=h.resolved, pending=h.pending,
+            unresolvable=h.unresolvable, unscheduled=h.unscheduled, agreed=h.agreed,
+            disagreed=h.disagreed, unanswerable=h.unanswerable,
+            at_horizon=[str(p) for p in h.at_horizon],
+            smallest_move=dto.decimal(h.smallest_move), largest_move=dto.decimal(h.largest_move),
+            observed_at=dto.utc(h.observed_at),
+        ),
+        first_decided_at=dto.utc(s.first_decided_at), last_decided_at=dto.utc(s.last_decided_at),
+        latest_decision_id=(
+            s.latest_decision_hash.removeprefix("sha256:") if s.latest_decision_hash else None
+        ),
     )

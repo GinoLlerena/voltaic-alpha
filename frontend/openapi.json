@@ -927,6 +927,64 @@
         "title": "Envelope[DecisionSummary]",
         "type": "object"
       },
+      "Envelope_ExecutionPage_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExecutionPage"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_id",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[ExecutionPage]",
+        "type": "object"
+      },
       "Envelope_LifecycleOut_": {
         "additionalProperties": false,
         "properties": {
@@ -1389,6 +1447,64 @@
           "data"
         ],
         "title": "Envelope[ReviewOverviewOut]",
+        "type": "object"
+      },
+      "Envelope_ReviewSessionPage_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReviewSessionPage"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_id",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[ReviewSessionPage]",
         "type": "object"
       },
       "Envelope_RiskOut_": {
@@ -1931,6 +2047,138 @@
           "data"
         ],
         "title": "Envelope[list[StatusItemOut]]",
+        "type": "object"
+      },
+      "ExecutionOutcomeOut": {
+        "additionalProperties": false,
+        "description": "A position that is no longer held. Not research: this one traded.",
+        "properties": {
+          "close_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The close order's reconciled average price, per share. Null for an entry that never filled.",
+            "title": "Close Price"
+          },
+          "exit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Reason"
+          },
+          "exit_trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Trigger"
+          },
+          "held_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Seconds"
+          },
+          "position": {
+            "$ref": "#/components/schemas/PositionSummaryOut"
+          },
+          "result": {
+            "enum": [
+              "closed",
+              "no_exposure"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "sessions_held": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions Held"
+          }
+        },
+        "required": [
+          "position",
+          "result",
+          "close_price",
+          "exit_trigger",
+          "exit_reason",
+          "held_seconds",
+          "sessions_held"
+        ],
+        "title": "ExecutionOutcomeOut",
+        "type": "object"
+      },
+      "ExecutionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "abandoned": {
+            "title": "Abandoned",
+            "type": "integer"
+          },
+          "closed": {
+            "title": "Closed",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionOutcomeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "closed",
+              "abandoned"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "kind",
+          "closed",
+          "abandoned"
+        ],
+        "title": "ExecutionPage",
         "type": "object"
       },
       "ExitOut": {
@@ -3847,6 +4095,160 @@
         "title": "ReviewOverviewOut",
         "type": "object"
       },
+      "ReviewSessionOut": {
+        "additionalProperties": false,
+        "description": "One market session: what was decided on it and what the underlying did after.",
+        "properties": {
+          "close_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close At"
+          },
+          "closes_read": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Closes Read",
+            "type": "array"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "decisions": {
+            "title": "Decisions",
+            "type": "integer"
+          },
+          "first_decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Decided At"
+          },
+          "horizon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionHorizonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Decided At"
+          },
+          "latest_decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Decision Id"
+          },
+          "open_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open At"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/VerdictCountOut"
+            },
+            "title": "Verdicts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "day",
+          "open_at",
+          "close_at",
+          "decisions",
+          "closes_read",
+          "verdicts",
+          "horizon",
+          "first_decided_at",
+          "last_decided_at",
+          "latest_decision_id"
+        ],
+        "title": "ReviewSessionOut",
+        "type": "object"
+      },
+      "ReviewSessionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "horizons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Horizons",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewSessionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total",
+          "horizon",
+          "horizons"
+        ],
+        "title": "ReviewSessionPage",
+        "type": "object"
+      },
       "RiskDecisionOut": {
         "additionalProperties": false,
         "properties": {
@@ -4030,6 +4432,105 @@
           "decision_id"
         ],
         "title": "SceneOut",
+        "type": "object"
+      },
+      "SessionHorizonOut": {
+        "additionalProperties": false,
+        "description": "Counts only. No rate: a sample this size cannot support one.",
+        "properties": {
+          "agreed": {
+            "title": "Agreed",
+            "type": "integer"
+          },
+          "at_horizon": {
+            "items": {
+              "type": "string"
+            },
+            "title": "At Horizon",
+            "type": "array"
+          },
+          "disagreed": {
+            "title": "Disagreed",
+            "type": "integer"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "string"
+          },
+          "largest_move": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Move"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "resolved": {
+            "title": "Resolved",
+            "type": "integer"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "smallest_move": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smallest Move"
+          },
+          "unanswerable": {
+            "title": "Unanswerable",
+            "type": "integer"
+          },
+          "unresolvable": {
+            "title": "Unresolvable",
+            "type": "integer"
+          },
+          "unscheduled": {
+            "title": "Unscheduled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "horizon",
+          "sessions",
+          "resolved",
+          "pending",
+          "unresolvable",
+          "unscheduled",
+          "agreed",
+          "disagreed",
+          "unanswerable",
+          "at_horizon",
+          "smallest_move",
+          "largest_move",
+          "observed_at"
+        ],
+        "title": "SessionHorizonOut",
         "type": "object"
       },
       "SignalOut": {
@@ -4601,6 +5102,42 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VerdictCountOut": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "position",
+              "refusal"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reason Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outcome",
+          "direction",
+          "reason_codes",
+          "count"
+        ],
+        "title": "VerdictCountOut",
+        "type": "object"
+      },
       "WorkerEventOut": {
         "additionalProperties": false,
         "properties": {
@@ -4830,6 +5367,25 @@
                 }
               ],
               "title": "Outcome"
+            }
+          },
+          {
+            "description": "A New York market day",
+            "in": "query",
+            "name": "day",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A New York market day",
+              "title": "Day"
             }
           },
           {
@@ -5561,6 +6117,149 @@
           }
         },
         "summary": "Proof File"
+      }
+    },
+    "/api/v1/review/executions": {
+      "get": {
+        "description": "Execution outcomes: closed positions, apart from any research (PUI4 \u00a74.2 A).",
+        "operationId": "review_executions_api_v1_review_executions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "closed",
+              "pattern": "^(closed|abandoned)$",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ExecutionPage_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Executions"
+      }
+    },
+    "/api/v1/review/sessions": {
+      "get": {
+        "description": "The research journal: one row per market session (PUI4 \u00a74.2 B).",
+        "operationId": "review_sessions_api_v1_review_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "horizon",
+            "required": false,
+            "schema": {
+              "default": "T+1",
+              "pattern": "^(T\\+1|T\\+3)$",
+              "title": "Horizon",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Continue before this day",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Continue before this day",
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ReviewSessionPage_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Sessions"
       }
     },
     "/api/v1/system/proof": {

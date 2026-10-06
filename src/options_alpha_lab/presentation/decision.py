@@ -229,7 +229,12 @@ POSITION_ACTION = "OPTIONS_POSITION"
 ListOutcome = Literal["position", "refusal"]
 
 
-def _filtered(stmt: Any, action: str | None, outcome: ListOutcome | None) -> Any:
+def _filtered(
+    stmt: Any, action: str | None, outcome: ListOutcome | None,
+    within: tuple[datetime, datetime] | None = None,
+) -> Any:
+    if within is not None:
+        stmt = stmt.where(Decision.decided_at >= within[0], Decision.decided_at < within[1])
     if action:
         stmt = stmt.where(Decision.action == action)
     if outcome == "position":
@@ -240,9 +245,10 @@ def _filtered(stmt: Any, action: str | None, outcome: ListOutcome | None) -> Any
 
 
 def count(
-    session: Session, *, action: str | None = None, outcome: ListOutcome | None = None
+    session: Session, *, action: str | None = None, outcome: ListOutcome | None = None,
+    within: tuple[datetime, datetime] | None = None,
 ) -> int:
-    stmt = _filtered(select(func.count()).select_from(Decision), action, outcome)
+    stmt = _filtered(select(func.count()).select_from(Decision), action, outcome, within)
     return int(session.scalar(stmt) or 0)
 
 
@@ -269,12 +275,17 @@ def listing(
     *,
     action: str | None = None,
     outcome: ListOutcome | None = None,
+    within: tuple[datetime, datetime] | None = None,
     limit: int = 50,
     before: DecisionCursor | None = None,
 ) -> tuple[list[Decision], DecisionCursor | None]:
-    """Decisions newest first, one page at a time, keyed on a total order."""
+    """Decisions newest first, one page at a time, keyed on a total order.
+
+    `within` bounds `decided_at` to a half-open interval: one market session's
+    decisions, for the review journal's rows to link to.
+    """
     stmt = select(Decision).order_by(Decision.decided_at.desc(), Decision.decision_hash.desc())
-    stmt = _filtered(stmt, action, outcome)
+    stmt = _filtered(stmt, action, outcome, within)
     if before is not None:
         at, key = before
         stmt = stmt.where(

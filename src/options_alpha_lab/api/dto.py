@@ -550,6 +550,84 @@ class ObservationPage(Public):
     total: int
 
 
+class ExecutionOutcomeOut(Public):
+    """A position that is no longer held. Not research: this one traded."""
+
+    position: PositionSummaryOut
+    result: Literal["closed", "no_exposure"]
+    close_price: str | None = Field(
+        description="The close order's reconciled average price, per share. Null for an "
+        "entry that never filled."
+    )
+    #: The exit trigger that produced the close order, when one is recorded.
+    exit_trigger: str | None
+    exit_reason: str | None
+    held_seconds: int | None
+    sessions_held: int | None
+
+
+class ExecutionPage(Public):
+    items: list[ExecutionOutcomeOut]
+    next_cursor: str | None
+    kind: Literal["closed", "abandoned"]
+    #: Round trips the broker confirmed flat, in this source.
+    closed: int
+    #: Entries that ended without a fill. Listed apart: they are not zero results.
+    abandoned: int
+
+
+class VerdictCountOut(Public):
+    outcome: Outcome
+    direction: str
+    reason_codes: list[str]
+    count: int
+
+
+class SessionHorizonOut(Public):
+    """Counts only. No rate: a sample this size cannot support one."""
+
+    horizon: str
+    sessions: int
+    resolved: int
+    pending: int
+    unresolvable: int
+    #: Decisions with no review job at this horizon.
+    unscheduled: int
+    agreed: int
+    disagreed: int
+    unanswerable: int
+    at_horizon: list[str]
+    smallest_move: str | None
+    largest_move: str | None
+    observed_at: str | None
+
+
+class ReviewSessionOut(Public):
+    """One market session: what was decided on it and what the underlying did after."""
+
+    day: str
+    open_at: str | None
+    close_at: str | None
+    decisions: int
+    #: Distinct completed closes those decisions read. Usually one.
+    closes_read: list[str]
+    verdicts: list[VerdictCountOut]
+    #: None for a session on which no decision was recorded.
+    horizon: SessionHorizonOut | None
+    first_decided_at: str | None
+    last_decided_at: str | None
+    latest_decision_id: str | None
+
+
+class ReviewSessionPage(Public):
+    items: list[ReviewSessionOut]
+    next_cursor: str | None
+    #: Market sessions from the first recorded decision to now.
+    total: int
+    horizon: str
+    horizons: list[str]
+
+
 class SceneOut(Public):
     number: int
     title: str
