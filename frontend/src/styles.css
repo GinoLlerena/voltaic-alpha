@@ -276,3 +276,22 @@ nav.sections a:hover, nav.sections a:focus-visible { color: var(--cool); }
 .part { scroll-margin-top: 3rem; }
 .part > h2 { margin-top: 2rem; padding-bottom: .3rem; border-bottom: 1px solid var(--edge); }
 .part .note, #horizons .note, [data-testid="horizons"] > .note { color: var(--dim); font-size: var(--fs-data); }
+
+/* PUI Phase 4: Review. "Nothing recorded" and "waiting" are said in words and
+   dimmed; a refusal's research row is never coloured like a result. */
+.matrix .src { color: var(--dim); }
+.matrix .t.na { color: var(--dim); font-family: system-ui, sans-serif; white-space: normal; }
+[data-testid="review-executions"], [data-testid="review-journal"] { margin-top: 1.6rem; }
+[data-testid="review-executions"] > .note, [data-testid="review-journal"] > .note,
+[data-testid="executions-abandoned"] > .note { color: var(--dim); font-size: var(--fs-data); max-width: 70ch; }
+tr[data-decisions="0"] td { color: var(--dim); }
+/* Five primary destinations no longer fit one line at 360px; wrap rather than
+   push the page sideways. */
+header nav { flex-wrap: wrap; row-gap: .35rem; }
+/* The review tables have five columns of prose and figures. At phone width
+   they keep a readable width and scroll inside their own labelled region,
+   rather than squeezing a cell to one word per line. */
+.matrix.wide { min-width: 44rem; }
+.matrix.wide td:first-child, .matrix.wide th:first-child { min-width: 11rem; }
+.matrix.wide td:nth-child(2) { min-width: 9rem; }
+.matrix.wide .src { overflow-wrap: normal; }

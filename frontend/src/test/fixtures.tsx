@@ -244,7 +244,84 @@ export const refusalRisk = { decisions: [], accounting: null };
 export const refusalLifecycle = { ...lifecycle, receipt: lifecycle.receipt, trail: { complete: true, gaps: [], events: [] } };
 export const refusalProof = { manifest_digest: "sha256:refusal-manifest", manifest: { manifest_version: "proof-manifest-2", disclosures: [] } };
 
+const verdictRefusal = {
+  outcome: "refusal", direction: "neutral", reason_codes: ["no_qualified_setup"], count: 65,
+};
+const journalRow = (day: string, over: Record<string, unknown> = {}) => ({
+  day, open_at: `${day}T13:30:00+00:00`, close_at: `${day}T20:00:00+00:00`, decisions: 65,
+  closes_read: ["769.640000"], verdicts: [verdictRefusal],
+  horizon: {
+    horizon: "T+1", sessions: 1, resolved: 65, pending: 0, unresolvable: 0, unscheduled: 0,
+    agreed: 0, disagreed: 0, unanswerable: 65, at_horizon: ["774.830000"],
+    smallest_move: "5.190000", largest_move: "5.190000",
+    observed_at: "2026-10-06T13:40:00+00:00",
+  },
+  first_decided_at: `${day}T13:45:00+00:00`, last_decided_at: `${day}T19:45:00+00:00`,
+  latest_decision_id: DIGEST,
+  ...over,
+});
+export const journalPage1 = {
+  items: [
+    journalRow("2026-10-06", {
+      closes_read: ["774.830000"],
+      horizon: {
+        horizon: "T+1", sessions: 1, resolved: 0, pending: 65, unresolvable: 0, unscheduled: 0,
+        agreed: 0, disagreed: 0, unanswerable: 0, at_horizon: [], smallest_move: null,
+        largest_move: null, observed_at: null,
+      },
+    }),
+    journalRow("2026-10-05"),
+    journalRow("2026-10-02", {
+      decisions: 0, closes_read: [], verdicts: [], horizon: null, first_decided_at: null,
+      last_decided_at: null, latest_decision_id: null,
+    }),
+  ],
+  next_cursor: "2026-10-02", total: 4, horizon: "T+1", horizons: ["T+1", "T+3"],
+};
+export const journalPage2 = {
+  items: [
+    journalRow("2026-10-01", {
+      decisions: 2, closes_read: ["762.630000"],
+      verdicts: [
+        { outcome: "position", direction: "bullish", reason_codes: [], count: 1 },
+        { ...verdictRefusal, count: 1 },
+      ],
+      horizon: {
+        horizon: "T+1", sessions: 1, resolved: 2, pending: 0, unresolvable: 0, unscheduled: 0,
+        agreed: 1, disagreed: 0, unanswerable: 1, at_horizon: ["763.990000"],
+        smallest_move: "1.360000", largest_move: "1.360000",
+        observed_at: "2026-10-02T13:40:00+00:00",
+      },
+    }),
+  ],
+  next_cursor: null, total: 4, horizon: "T+1", horizons: ["T+1", "T+3"],
+};
+export const executionRow = {
+  position: {
+    position_id: "p".repeat(32), decision_id: QUALIFIED, instrument: "SPY",
+    strategy: "bull_call_debit_spread", direction: "bullish", state: "CLOSED",
+    state_meaning: "The broker confirms flat.", open: false,
+    long_symbol: "SPY260911C00772000", short_symbol: "SPY260911C00778000",
+    expiration: "2026-09-11T00:00:00+00:00", width: "6.000000", requested_quantity: 1,
+    filled_quantity: 1, entry_debit: "3.130000", open_risk: "339.000000",
+    invalidation_level: "759.530000", invalidation_direction: "bullish",
+    invalidation_source: "completed_daily_close", opened_at: "2026-08-28T15:30:00+00:00",
+    entry_filled_at: "2026-08-28T15:30:00+00:00", closed_at: "2026-08-28T16:30:00+00:00",
+    close_reason: "stop_loss", mark_state: "final", latest_mark: null, unrealized: null,
+    realized: "-33.00", open_incidents: 0,
+  },
+  result: "closed", close_price: "2.800000", exit_trigger: "stop_loss",
+  exit_reason: "spread value fell through the stop", held_seconds: 3600, sessions_held: 0,
+};
+export const noExecutions = (kind: string) => ({
+  items: [], next_cursor: null, kind, closed: 0, abandoned: 0,
+});
+
 export const routes: Record<string, unknown> = {
+  "/api/v1/review/executions?kind=closed": envelope(noExecutions("closed")),
+  "/api/v1/review/executions?kind=abandoned": envelope(noExecutions("abandoned")),
+  "/api/v1/review/sessions?horizon=T%2B1&before=2026-10-02": envelope(journalPage2),
+  "/api/v1/review/sessions?": envelope(journalPage1),
   "/api/v1/system/status": envelope(status),
   "/api/v1/system/proof": envelope(tiles),
   "/api/v1/decisions/grouped": envelope(listing),

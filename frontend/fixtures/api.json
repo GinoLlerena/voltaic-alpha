@@ -462,6 +462,302 @@
    "total": 5
   }
  },
+ "/api/v1/review/executions?kind=closed": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "position": {
+      "position_id": "f8a7b24910d34d66870640c4394ca9d3",
+      "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+      "instrument": "SPY",
+      "strategy": "bull_call_debit_spread",
+      "direction": "bullish",
+      "state": "CLOSED",
+      "state_meaning": "The broker confirms flat.",
+      "open": false,
+      "long_symbol": "SPY260911C00772000",
+      "short_symbol": "SPY260911C00778000",
+      "expiration": "2026-08-28T15:50:00+00:00",
+      "width": "6.000000",
+      "requested_quantity": 1,
+      "filled_quantity": 0,
+      "entry_debit": "3.130000",
+      "open_risk": "339.000000",
+      "invalidation_level": null,
+      "invalidation_direction": null,
+      "invalidation_source": null,
+      "opened_at": "2026-08-28T15:50:00+00:00",
+      "entry_filled_at": "2026-08-28T15:50:00+00:00",
+      "closed_at": "2026-08-28T15:50:00+00:00",
+      "close_reason": "manual_demo_close",
+      "mark_state": "never_observed",
+      "latest_mark": null,
+      "unrealized": null,
+      "realized": "-7.00",
+      "open_incidents": 0
+     },
+     "result": "closed",
+     "close_price": "3.060000",
+     "exit_trigger": null,
+     "exit_reason": null,
+     "held_seconds": 0,
+     "sessions_held": 0
+    }
+   ],
+   "next_cursor": null,
+   "kind": "closed",
+   "closed": 1,
+   "abandoned": 0
+  }
+ },
+ "/api/v1/review/executions?kind=abandoned": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [],
+   "next_cursor": null,
+   "kind": "abandoned",
+   "closed": 1,
+   "abandoned": 0
+  }
+ },
+ "/api/v1/review/sessions?horizon=T%2B1": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "day": "2026-10-06",
+     "open_at": "2026-10-06T13:30:00+00:00",
+     "close_at": "2026-10-06T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-10-05",
+     "open_at": "2026-10-05T13:30:00+00:00",
+     "close_at": "2026-10-05T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-10-02",
+     "open_at": "2026-10-02T13:30:00+00:00",
+     "close_at": "2026-10-02T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-10-01",
+     "open_at": "2026-10-01T13:30:00+00:00",
+     "close_at": "2026-10-01T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-30",
+     "open_at": "2026-09-30T13:30:00+00:00",
+     "close_at": "2026-09-30T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-29",
+     "open_at": "2026-09-29T13:30:00+00:00",
+     "close_at": "2026-09-29T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-28",
+     "open_at": "2026-09-28T13:30:00+00:00",
+     "close_at": "2026-09-28T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-25",
+     "open_at": "2026-09-25T13:30:00+00:00",
+     "close_at": "2026-09-25T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-24",
+     "open_at": "2026-09-24T13:30:00+00:00",
+     "close_at": "2026-09-24T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-23",
+     "open_at": "2026-09-23T13:30:00+00:00",
+     "close_at": "2026-09-23T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-22",
+     "open_at": "2026-09-22T13:30:00+00:00",
+     "close_at": "2026-09-22T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-21",
+     "open_at": "2026-09-21T13:30:00+00:00",
+     "close_at": "2026-09-21T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-18",
+     "open_at": "2026-09-18T13:30:00+00:00",
+     "close_at": "2026-09-18T20:00:00+00:00",
+     "decisions": 0,
+     "closes_read": [],
+     "verdicts": [],
+     "horizon": null,
+     "first_decided_at": null,
+     "last_decided_at": null,
+     "latest_decision_id": null
+    },
+    {
+     "day": "2026-09-17",
+     "open_at": "2026-09-17T13:30:00+00:00",
+     "close_at": "2026-09-17T20:00:00+00:00",
+     "decisions": 5,
+     "closes_read": [
+      "617.400000",
+      "638.400000",
+      "641.250000",
+      "771.100000"
+     ],
+     "verdicts": [
+      {
+       "outcome": "position",
+       "direction": "bullish",
+       "reason_codes": [],
+       "count": 3
+      },
+      {
+       "outcome": "refusal",
+       "direction": "neutral",
+       "reason_codes": [
+        "no_qualified_setup"
+       ],
+       "count": 1
+      },
+      {
+       "outcome": "position",
+       "direction": "bearish",
+       "reason_codes": [],
+       "count": 1
+      }
+     ],
+     "horizon": {
+      "horizon": "T+1",
+      "sessions": 1,
+      "resolved": 0,
+      "pending": 5,
+      "unresolvable": 0,
+      "unscheduled": 0,
+      "agreed": 0,
+      "disagreed": 0,
+      "unanswerable": 0,
+      "at_horizon": [],
+      "smallest_move": null,
+      "largest_move": null,
+      "observed_at": null
+     },
+     "first_decided_at": "2026-09-17T11:47:21.063587+00:00",
+     "last_decided_at": "2026-09-17T11:47:21.352701+00:00",
+     "latest_decision_id": "ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5"
+    }
+   ],
+   "next_cursor": null,
+   "total": 14,
+   "horizon": "T+1",
+   "horizons": [
+    "T+1",
+    "T+3"
+   ]
+  }
+ },
  "/api/v1/decisions/ab04de4520ee8b1da53e54a2b8f1dcc0850109b69170b313a83f23c52b9992d5/summary": {
   "schema_version": "public.v1",
   "source_mode": "FROZEN_REPLAY",

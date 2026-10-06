@@ -15,6 +15,7 @@ import { Activity } from "./routes/Activity";
 import { Decision } from "./routes/Decision";
 import { Decisions } from "./routes/Decisions";
 import { Evidence } from "./routes/Evidence";
+import { asHorizon, DEFAULT_HORIZON, type Horizon, Review } from "./routes/Review";
 import { Today } from "./routes/Today";
 
 /**
@@ -42,6 +43,7 @@ const rootRoute = createRootRoute({
           </Link>
           <Link to="/decisions">Decisions</Link>
           <Link to="/activity">Activity</Link>
+          <Link to="/review">Review</Link>
           <Link to="/evidence" className="secondary">
             Evidence
           </Link>
@@ -87,19 +89,25 @@ const indexRoute = createRoute({
 
 export interface DecisionsSearch {
   view?: View | undefined;
+  /** One New York market day (YYYY-MM-DD): what a review journal row links to. */
+  day?: string | undefined;
 }
+
+const marketDate = (raw: unknown): string | undefined =>
+  typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
 
 const decisionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/decisions",
   validateSearch: (search: Record<string, unknown>): DecisionsSearch => ({
     view: asView(search["view"]),
+    day: marketDate(search["day"]),
   }),
   component: function DecisionsRoute() {
-    const { view } = useSearch({ from: "/decisions" });
+    const { view, day } = useSearch({ from: "/decisions" });
     // Re-checked where it is used: a view the server rejects would turn a
     // mistyped link into an error panel instead of the default list.
-    return <Decisions view={asView(view) ?? DEFAULT_VIEW} />;
+    return <Decisions view={asView(view) ?? DEFAULT_VIEW} day={marketDate(day) ?? null} />;
   },
 });
 
@@ -134,11 +142,28 @@ const evidenceRoute = createRoute({
   },
 });
 
+export interface ReviewSearch {
+  horizon?: Horizon | undefined;
+}
+
+const reviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/review",
+  validateSearch: (search: Record<string, unknown>): ReviewSearch => ({
+    horizon: asHorizon(search["horizon"]),
+  }),
+  component: function ReviewRoute() {
+    const { horizon } = useSearch({ from: "/review" });
+    return <Review horizon={asHorizon(horizon) ?? DEFAULT_HORIZON} />;
+  },
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   decisionsRoute,
   decisionRoute,
   activityRoute,
+  reviewRoute,
   evidenceRoute,
 ]);
 

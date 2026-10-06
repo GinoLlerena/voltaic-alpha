@@ -21,6 +21,7 @@ const SCREENS = [
   { name: "decisions", path: "/decisions" },
   { name: "tour-step", path: "/evidence?tour=4" },
   { name: "activity", path: "/activity" },
+  { name: "review", path: "/review" },
   {
     name: "decision-refusal",
     path: "/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",
