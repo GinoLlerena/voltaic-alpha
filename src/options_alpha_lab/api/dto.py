@@ -462,6 +462,94 @@ class IncidentOut(Public):
     withheld: list[str]
 
 
+MarkState = Literal["never_observed", "unreadable", "current", "last_session", "stale", "final"]
+
+
+class MarkOut(Public):
+    """A recorded observation of a position. Never a live price."""
+
+    observed_at: str | None
+    #: The provider's own time, distinct from when the worker noticed it.
+    source_time: str | None
+    spread_value: str | None = Field(
+        description="What the spread could conservatively be closed for, per share. "
+        "Null when it could not be read, which is a recorded fact, not a zero."
+    )
+    long_bid: str | None
+    short_ask: str | None
+    underlying_price: str | None
+    underlying_source: str
+    dte: int
+    sessions_elapsed: int
+    data_quality: list[str]
+    snapshot_id: str | None
+
+
+class PositionSummaryOut(Public):
+    position_id: str
+    #: The owning decision's hash, hex without prefix; None if it cannot be found.
+    decision_id: str | None
+    instrument: str | None
+    strategy: str
+    direction: str
+    state: str
+    state_meaning: str
+    #: Exposure exists or is unconfirmed: PENDING, OPEN, CLOSING or INCIDENT.
+    open: bool
+    long_symbol: str
+    short_symbol: str
+    expiration: str | None
+    width: str | None
+    requested_quantity: int
+    filled_quantity: int
+    entry_debit: str | None = Field(
+        description="Average entry debit from reconciled fills, per share. Null until "
+        "fills reconcile; never the estimated debit."
+    )
+    open_risk: str | None = Field(description="US dollars for the whole structure.")
+    invalidation_level: str | None
+    invalidation_direction: str | None
+    invalidation_source: str | None
+    opened_at: str | None
+    entry_filled_at: str | None
+    closed_at: str | None
+    close_reason: str | None
+    mark_state: MarkState
+    latest_mark: MarkOut | None
+    unrealized: str | None = Field(
+        description="US dollars, as the exit logic recorded it on its own mark. Null when "
+        "no exit evaluation exists or the value was not measurable."
+    )
+    realized: str | None = Field(
+        description="US dollars for the round trip, from reconciled broker fills. Null "
+        "unless the entry and the close both filled."
+    )
+    open_incidents: int
+
+
+class PositionPage(Public):
+    items: list[PositionSummaryOut]
+    next_cursor: str | None
+    #: Positions matching the filter in this source, across every page.
+    total: int
+    #: Positions in this source in any state. Zero means none was ever opened.
+    ever: int
+
+
+class PositionDetailOut(Public):
+    position: PositionSummaryOut
+    #: Every exit evaluation recorded, newest first, including the ones that held.
+    exits: list[ExitOut]
+    incidents: list[IncidentOut]
+    observations_recorded: int
+
+
+class ObservationPage(Public):
+    items: list[MarkOut]
+    next_cursor: str | None
+    total: int
+
+
 class SceneOut(Public):
     number: int
     title: str

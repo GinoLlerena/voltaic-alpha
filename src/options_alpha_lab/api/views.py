@@ -14,8 +14,8 @@ from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
-from ..persistence.models import Incident
-from ..presentation import activity
+from ..persistence.models import ExitDecisionRecord, Incident, PositionObservation
+from ..presentation import activity, positions
 from ..presentation.artifacts import ArtifactLink, correlate_ablation, correlate_receipt
 from ..presentation.decision import DecisionView, signal_role
 from . import dto
@@ -242,14 +242,7 @@ def lifecycle(session: Session, view: DecisionView, *, root: Path) -> dto.Lifecy
             for p in view.positions
         ],
         exits=[
-            dto.ExitOut(
-                trigger=e.trigger, should_close=bool(e.should_close), disposition=e.disposition,
-                reason=e.reason, unrealized=dto.decimal(e.unrealized),
-                suggested_limit=dto.decimal(e.suggested_limit),
-                value_unmeasurable=bool(e.value_unmeasurable),
-                invalidation_unverifiable=bool(e.invalidation_unverifiable),
-                policy_version=e.policy_version, decided_at=dto.utc(e.decided_at),
-            )
+            exit_decision(e)
             for e in view.exits
         ],
         trail=dto.TrailOut(
@@ -285,4 +278,48 @@ def incident(row: Incident) -> dto.IncidentOut:
         kind=row.kind, severity=row.severity, execution_state=row.execution_state,
         opened_at=dto.utc(row.opened_at), resolved_at=dto.utc(row.resolved_at),
         open=row.resolved_at is None, withheld=["detail"] if row.detail else [],
+    )
+
+
+def exit_decision(e: ExitDecisionRecord) -> dto.ExitOut:
+    return dto.ExitOut(
+        trigger=e.trigger, should_close=bool(e.should_close), disposition=e.disposition,
+        reason=e.reason, unrealized=dto.decimal(e.unrealized),
+        suggested_limit=dto.decimal(e.suggested_limit),
+        value_unmeasurable=bool(e.value_unmeasurable),
+        invalidation_unverifiable=bool(e.invalidation_unverifiable),
+        policy_version=e.policy_version, decided_at=dto.utc(e.decided_at),
+    )
+
+
+def mark(o: PositionObservation) -> dto.MarkOut:
+    return dto.MarkOut(
+        observed_at=dto.utc(o.observed_at), source_time=dto.utc(o.source_time),
+        spread_value=dto.decimal(o.spread_value), long_bid=dto.decimal(o.long_bid),
+        short_ask=dto.decimal(o.short_ask), underlying_price=dto.decimal(o.underlying_price),
+        underlying_source=o.underlying_source, dte=o.dte, sessions_elapsed=o.sessions_elapsed,
+        data_quality=[str(q) for q in (o.data_quality or [])], snapshot_id=o.snapshot_id,
+    )
+
+
+def position_summary(v: positions.PositionView) -> dto.PositionSummaryOut:
+    p = v.position
+    return dto.PositionSummaryOut(
+        position_id=p.id,
+        decision_id=v.decision_hash.removeprefix("sha256:") if v.decision_hash else None,
+        instrument=v.instrument, strategy=p.strategy, direction=p.direction,
+        state=p.lifecycle_status, state_meaning=v.state_meaning, open=v.is_open,
+        long_symbol=p.long_symbol, short_symbol=p.short_symbol,
+        expiration=dto.utc(p.expiration), width=dto.decimal(p.width),
+        requested_quantity=p.requested_quantity, filled_quantity=p.filled_quantity,
+        entry_debit=dto.decimal(p.avg_entry_debit), open_risk=dto.decimal(p.open_risk),
+        invalidation_level=dto.decimal(p.invalidation_level),
+        invalidation_direction=p.invalidation_direction,
+        invalidation_source=p.invalidation_source,
+        opened_at=dto.utc(p.opened_at), entry_filled_at=dto.utc(p.entry_filled_at),
+        closed_at=dto.utc(p.closed_at), close_reason=p.close_reason,
+        mark_state=v.mark_state,
+        latest_mark=mark(v.observation) if v.observation is not None else None,
+        unrealized=dto.decimal(v.exit.unrealized) if v.exit is not None else None,
+        realized=dto.decimal(v.realized), open_incidents=v.open_incidents,
     )

@@ -1101,6 +1101,180 @@
         "title": "Envelope[MemoOut]",
         "type": "object"
       },
+      "Envelope_ObservationPage_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ObservationPage"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_id",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[ObservationPage]",
+        "type": "object"
+      },
+      "Envelope_PositionDetailOut_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PositionDetailOut"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_id",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[PositionDetailOut]",
+        "type": "object"
+      },
+      "Envelope_PositionPage_": {
+        "additionalProperties": false,
+        "properties": {
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PositionPage"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "public.v1",
+            "default": "public.v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_id": {
+            "enum": [
+              "live",
+              "committed"
+            ],
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_mode": {
+            "enum": [
+              "LIVE",
+              "FROZEN_REPLAY"
+            ],
+            "title": "Source Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_mode",
+          "source_id",
+          "source_label",
+          "observed_at",
+          "data"
+        ],
+        "title": "Envelope[PositionPage]",
+        "type": "object"
+      },
       "Envelope_ProofOut_": {
         "additionalProperties": false,
         "properties": {
@@ -2357,6 +2531,124 @@
         "title": "ListEntryOut",
         "type": "object"
       },
+      "MarkOut": {
+        "additionalProperties": false,
+        "description": "A recorded observation of a position. Never a live price.",
+        "properties": {
+          "data_quality": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Quality",
+            "type": "array"
+          },
+          "dte": {
+            "title": "Dte",
+            "type": "integer"
+          },
+          "long_bid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Bid"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "sessions_elapsed": {
+            "title": "Sessions Elapsed",
+            "type": "integer"
+          },
+          "short_ask": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Ask"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id"
+          },
+          "source_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Time"
+          },
+          "spread_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the spread could conservatively be closed for, per share. Null when it could not be read, which is a recorded fact, not a zero.",
+            "title": "Spread Value"
+          },
+          "underlying_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying Price"
+          },
+          "underlying_source": {
+            "title": "Underlying Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observed_at",
+          "source_time",
+          "spread_value",
+          "long_bid",
+          "short_ask",
+          "underlying_price",
+          "underlying_source",
+          "dte",
+          "sessions_elapsed",
+          "data_quality",
+          "snapshot_id"
+        ],
+        "title": "MarkOut",
+        "type": "object"
+      },
       "MarketOut": {
         "additionalProperties": false,
         "properties": {
@@ -2605,6 +2897,40 @@
         "title": "Observation",
         "type": "object"
       },
+      "ObservationPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarkOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total"
+        ],
+        "title": "ObservationPage",
+        "type": "object"
+      },
       "OrderOut": {
         "additionalProperties": false,
         "properties": {
@@ -2744,6 +3070,40 @@
           "withheld"
         ],
         "title": "OrderOut",
+        "type": "object"
+      },
+      "PositionDetailOut": {
+        "additionalProperties": false,
+        "properties": {
+          "exits": {
+            "items": {
+              "$ref": "#/components/schemas/ExitOut"
+            },
+            "title": "Exits",
+            "type": "array"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "observations_recorded": {
+            "title": "Observations Recorded",
+            "type": "integer"
+          },
+          "position": {
+            "$ref": "#/components/schemas/PositionSummaryOut"
+          }
+        },
+        "required": [
+          "position",
+          "exits",
+          "incidents",
+          "observations_recorded"
+        ],
+        "title": "PositionDetailOut",
         "type": "object"
       },
       "PositionOut": {
@@ -2934,6 +3294,317 @@
           "invalidation_source"
         ],
         "title": "PositionOut",
+        "type": "object"
+      },
+      "PositionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "ever": {
+            "title": "Ever",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PositionSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total",
+          "ever"
+        ],
+        "title": "PositionPage",
+        "type": "object"
+      },
+      "PositionSummaryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "close_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Reason"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "decision_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Id"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "entry_debit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Average entry debit from reconciled fills, per share. Null until fills reconcile; never the estimated debit.",
+            "title": "Entry Debit"
+          },
+          "entry_filled_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Filled At"
+          },
+          "expiration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration"
+          },
+          "filled_quantity": {
+            "title": "Filled Quantity",
+            "type": "integer"
+          },
+          "instrument": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument"
+          },
+          "invalidation_direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Direction"
+          },
+          "invalidation_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Level"
+          },
+          "invalidation_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation Source"
+          },
+          "latest_mark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MarkOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "long_symbol": {
+            "title": "Long Symbol",
+            "type": "string"
+          },
+          "mark_state": {
+            "enum": [
+              "never_observed",
+              "unreadable",
+              "current",
+              "last_session",
+              "stale",
+              "final"
+            ],
+            "title": "Mark State",
+            "type": "string"
+          },
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          },
+          "open_incidents": {
+            "title": "Open Incidents",
+            "type": "integer"
+          },
+          "open_risk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "US dollars for the whole structure.",
+            "title": "Open Risk"
+          },
+          "opened_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opened At"
+          },
+          "position_id": {
+            "title": "Position Id",
+            "type": "string"
+          },
+          "realized": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "US dollars for the round trip, from reconciled broker fills. Null unless the entry and the close both filled.",
+            "title": "Realized"
+          },
+          "requested_quantity": {
+            "title": "Requested Quantity",
+            "type": "integer"
+          },
+          "short_symbol": {
+            "title": "Short Symbol",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "state_meaning": {
+            "title": "State Meaning",
+            "type": "string"
+          },
+          "strategy": {
+            "title": "Strategy",
+            "type": "string"
+          },
+          "unrealized": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "US dollars, as the exit logic recorded it on its own mark. Null when no exit evaluation exists or the value was not measurable.",
+            "title": "Unrealized"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "required": [
+          "position_id",
+          "decision_id",
+          "instrument",
+          "strategy",
+          "direction",
+          "state",
+          "state_meaning",
+          "open",
+          "long_symbol",
+          "short_symbol",
+          "expiration",
+          "width",
+          "requested_quantity",
+          "filled_quantity",
+          "entry_debit",
+          "open_risk",
+          "invalidation_level",
+          "invalidation_direction",
+          "invalidation_source",
+          "opened_at",
+          "entry_filled_at",
+          "closed_at",
+          "close_reason",
+          "mark_state",
+          "latest_mark",
+          "unrealized",
+          "realized",
+          "open_incidents"
+        ],
+        "title": "PositionSummaryOut",
         "type": "object"
       },
       "ProofOut": {
@@ -4668,6 +5339,189 @@
           }
         },
         "summary": "Review Overview"
+      }
+    },
+    "/api/v1/positions": {
+      "get": {
+        "description": "Positions across decisions, newest first (PUI4 \u00a73).",
+        "operationId": "positions_page_api_v1_positions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "pattern": "^(open|closed|all)$",
+              "title": "State",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_PositionPage_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Positions Page"
+      }
+    },
+    "/api/v1/positions/{position_id}": {
+      "get": {
+        "operationId": "position_detail_api_v1_positions__position_id__get",
+        "parameters": [
+          {
+            "description": "positions.id",
+            "in": "path",
+            "name": "position_id",
+            "required": true,
+            "schema": {
+              "description": "positions.id",
+              "pattern": "^[0-9A-Za-z_-]{1,64}$",
+              "title": "Position Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_PositionDetailOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Position Detail"
+      }
+    },
+    "/api/v1/positions/{position_id}/observations": {
+      "get": {
+        "description": "The marks recorded for one position, newest first.",
+        "operationId": "position_observations_api_v1_positions__position_id__observations_get",
+        "parameters": [
+          {
+            "description": "positions.id",
+            "in": "path",
+            "name": "position_id",
+            "required": true,
+            "schema": {
+              "description": "positions.id",
+              "pattern": "^[0-9A-Za-z_-]{1,64}$",
+              "title": "Position Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ObservationPage_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Position Observations"
       }
     },
     "/api/v1/proof/{digest}.json": {
