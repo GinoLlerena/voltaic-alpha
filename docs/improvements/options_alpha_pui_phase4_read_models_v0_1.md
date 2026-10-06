@@ -1,9 +1,9 @@
-# Options Alpha — PUI Phase 4: Positions and Review read models (proposal)
+# Options Alpha — PUI Phase 4: Positions and Review read models
 
 | Field | Value |
 |---|---|
 | Date | 6 October 2026, America/Lima |
-| Status | **Proposal for owner approval. Nothing here is built.** |
+| Status | **Approved by the owner on 6 October 2026, all six decisions as recommended (§8).** Implementation follows §7; nothing was built when this was approved. |
 | Implements | [Personal UI redesign](options_alpha_personal_ui_redesign_v0_1.md) §9 Phase 4, §7 (Positions, Review) |
 | Reviewed revision | `500a4c7` |
 | Work prefix | `PUI4-` |
@@ -244,4 +244,6 @@ these are read models only. Audit Batch C stays out of this phase.
 | D5 | Navigation: add **Positions** and **Review** as primary destinations (five in total), or keep three and put Review under Evidence? | **Primary.** They are daily questions; Evidence stays secondary. |
 | D6 | The site is public over HTTP with no login. Position records (Paper only) would be public, as decision lifecycles already are. Proceed, or put access control first? | **Proceed for Paper.** Revisit before any non-Paper use; that review is already required by the redesign §7. |
 
-Approving the table as recommended is enough to start step 1.
+**Outcome, 6 October 2026:** the owner approved all six as recommended (D1 both
+screens; D2 by session; D3 counts only; D4 stale after five minutes, raising
+attention; D5 primary navigation; D6 proceed for Paper).
