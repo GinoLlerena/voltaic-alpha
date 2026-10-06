@@ -224,3 +224,4 @@ jobs:
           tests/test_lifecycle_e2e.py
           tests/test_learning_capture.py
           tests/test_api_positions.py
+          tests/test_api_review.py

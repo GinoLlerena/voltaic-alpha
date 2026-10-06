@@ -20,8 +20,9 @@ import base64
 import binascii
 import json
 import os
+import re
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -45,6 +46,7 @@ from ..presentation import (
     positions,
     proof,
     readiness,
+    review,
     status,
     tour,
 )
@@ -58,6 +60,7 @@ COMMITTED = ROOT / "demo" / "h0_demo.db"
 DIGEST = r"^[0-9a-f]{64}$"
 VIEW_PATTERN = "^(" + "|".join(listing.VIEWS) + ")$"
 Digest = Annotated[str, PathParam(pattern=DIGEST, description="decision_hash hex, no prefix")]
+HORIZON_PATTERN = "^(" + "|".join(re.escape(h) for h in review.HORIZON_LABELS) + ")$"
 PositionId = Annotated[str, PathParam(pattern=r"^[0-9A-Za-z_-]{1,64}$", description="positions.id")]
 
 
@@ -188,12 +191,15 @@ def create_app(
         db: Db,
         action: str | None = None,
         outcome: dto.Outcome | None = None,
+        day: Annotated[date | None, Query(description="A New York market day")] = None,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         cursor: str | None = None,
     ) -> dict[str, Any]:
         """Every decision, newest first: the full history the grouped list bounds."""
+        within = review.day_bounds(day, day) if day is not None else None
         rows, after = decision.listing(
-            db, action=action, outcome=outcome, limit=limit, before=_decode(cursor)
+            db, action=action, outcome=outcome, within=within, limit=limit,
+            before=_decode(cursor),
         )
         symbols = decision.instruments(db, rows)
         return envelope(db, dto.DecisionPage(
@@ -208,7 +214,7 @@ def create_app(
                 for r in rows
             ],
             next_cursor=_encode(*after) if after else None,
-            total=decision.count(db, action=action, outcome=outcome),
+            total=decision.count(db, action=action, outcome=outcome, within=within),
         ))
 
     @api.get("/decisions/grouped", response_model=dto.Envelope[dto.DecisionListOut])
@@ -437,6 +443,45 @@ def create_app(
             items=[views.mark(o) for o in marks],
             next_cursor=_encode(*after) if after else None,
             total=positions.observation_count(db, row.id),
+        ))
+
+    @api.get("/review/executions", response_model=dto.Envelope[dto.ExecutionPage])
+    def review_executions(
+        db: Db,
+        kind: Annotated[str, Query(pattern="^(closed|abandoned)$")] = "closed",
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """Execution outcomes: closed positions, apart from any research (PUI4 §4.2 A)."""
+        which: review.ExecutionKind = kind  # type: ignore[assignment]
+        calendar, _ = committed_calendar()
+        rows, after = review.executions(
+            db, kind=which, now=clock(), calendar=calendar, limit=limit,
+            before=_decode(cursor),
+        )
+        return envelope(db, dto.ExecutionPage(
+            items=[views.execution(e) for e in rows],
+            next_cursor=_encode(*after) if after else None, kind=which,
+            closed=review.execution_count(db, "closed"),
+            abandoned=review.execution_count(db, "abandoned"),
+        ))
+
+    @api.get("/review/sessions", response_model=dto.Envelope[dto.ReviewSessionPage])
+    def review_sessions(
+        db: Db,
+        horizon: Annotated[str, Query(pattern=HORIZON_PATTERN)] = review.HORIZON_LABELS[0],
+        limit: Annotated[int, Query(ge=1, le=60)] = 20,
+        before: Annotated[date | None, Query(description="Continue before this day")] = None,
+    ) -> dict[str, Any]:
+        """The research journal: one row per market session (PUI4 §4.2 B)."""
+        calendar, _ = committed_calendar()
+        page = review.sessions(
+            db, calendar=calendar, horizon=horizon, now=clock(), limit=limit, before=before
+        )
+        return envelope(db, dto.ReviewSessionPage(
+            items=[views.review_session(s) for s in page.items],
+            next_cursor=page.next_before.isoformat() if page.next_before else None,
+            total=page.total, horizon=horizon, horizons=list(review.HORIZON_LABELS),
         ))
 
     @api.get("/tour", response_model=dto.Envelope[list[dto.SceneOut]])

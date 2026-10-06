@@ -332,6 +332,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/review/executions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review Executions
+         * @description Execution outcomes: closed positions, apart from any research (PUI4 §4.2 A).
+         */
+        get: operations["review_executions_api_v1_review_executions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/review/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review Sessions
+         * @description The research journal: one row per market session (PUI4 §4.2 B).
+         */
+        get: operations["review_sessions_api_v1_review_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/proof": {
         parameters: {
             query?: never;
@@ -745,6 +785,32 @@ export interface components {
              */
             source_mode: "LIVE" | "FROZEN_REPLAY";
         };
+        /** Envelope[ExecutionPage] */
+        Envelope_ExecutionPage_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["ExecutionPage"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
         /** Envelope[LifecycleOut] */
         Envelope_LifecycleOut_: {
             /** Correlation Id */
@@ -932,6 +998,32 @@ export interface components {
             /** Correlation Id */
             correlation_id?: string | null;
             data: components["schemas"]["ReviewOverviewOut"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
+        /** Envelope[ReviewSessionPage] */
+        Envelope_ReviewSessionPage_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["ReviewSessionPage"];
             /** Observed At */
             observed_at: string;
             /**
@@ -1191,6 +1283,47 @@ export interface components {
              * @enum {string}
              */
             source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
+        /**
+         * ExecutionOutcomeOut
+         * @description A position that is no longer held. Not research: this one traded.
+         */
+        ExecutionOutcomeOut: {
+            /**
+             * Close Price
+             * @description The close order's reconciled average price, per share. Null for an entry that never filled.
+             */
+            close_price: string | null;
+            /** Exit Reason */
+            exit_reason: string | null;
+            /** Exit Trigger */
+            exit_trigger: string | null;
+            /** Held Seconds */
+            held_seconds: number | null;
+            position: components["schemas"]["PositionSummaryOut"];
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "closed" | "no_exposure";
+            /** Sessions Held */
+            sessions_held: number | null;
+        };
+        /** ExecutionPage */
+        ExecutionPage: {
+            /** Abandoned */
+            abandoned: number;
+            /** Closed */
+            closed: number;
+            /** Items */
+            items: components["schemas"]["ExecutionOutcomeOut"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "closed" | "abandoned";
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** ExitOut */
         ExitOut: {
@@ -1719,6 +1852,44 @@ export interface components {
             /** Resolved */
             resolved: number;
         };
+        /**
+         * ReviewSessionOut
+         * @description One market session: what was decided on it and what the underlying did after.
+         */
+        ReviewSessionOut: {
+            /** Close At */
+            close_at: string | null;
+            /** Closes Read */
+            closes_read: string[];
+            /** Day */
+            day: string;
+            /** Decisions */
+            decisions: number;
+            /** First Decided At */
+            first_decided_at: string | null;
+            horizon: components["schemas"]["SessionHorizonOut"] | null;
+            /** Last Decided At */
+            last_decided_at: string | null;
+            /** Latest Decision Id */
+            latest_decision_id: string | null;
+            /** Open At */
+            open_at: string | null;
+            /** Verdicts */
+            verdicts: components["schemas"]["VerdictCountOut"][];
+        };
+        /** ReviewSessionPage */
+        ReviewSessionPage: {
+            /** Horizon */
+            horizon: string;
+            /** Horizons */
+            horizons: string[];
+            /** Items */
+            items: components["schemas"]["ReviewSessionOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
         /** RiskDecisionOut */
         RiskDecisionOut: {
             /** Approved */
@@ -1767,6 +1938,38 @@ export interface components {
             tab: number;
             /** Title */
             title: string;
+        };
+        /**
+         * SessionHorizonOut
+         * @description Counts only. No rate: a sample this size cannot support one.
+         */
+        SessionHorizonOut: {
+            /** Agreed */
+            agreed: number;
+            /** At Horizon */
+            at_horizon: string[];
+            /** Disagreed */
+            disagreed: number;
+            /** Horizon */
+            horizon: string;
+            /** Largest Move */
+            largest_move: string | null;
+            /** Observed At */
+            observed_at: string | null;
+            /** Pending */
+            pending: number;
+            /** Resolved */
+            resolved: number;
+            /** Sessions */
+            sessions: number;
+            /** Smallest Move */
+            smallest_move: string | null;
+            /** Unanswerable */
+            unanswerable: number;
+            /** Unresolvable */
+            unresolvable: number;
+            /** Unscheduled */
+            unscheduled: number;
         };
         /** SignalOut */
         SignalOut: {
@@ -1939,6 +2142,20 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VerdictCountOut */
+        VerdictCountOut: {
+            /** Count */
+            count: number;
+            /** Direction */
+            direction: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "position" | "refusal";
+            /** Reason Codes */
+            reason_codes: string[];
+        };
         /** WorkerEventOut */
         WorkerEventOut: {
             /** Detail */
@@ -2029,6 +2246,8 @@ export interface operations {
             query?: {
                 action?: string | null;
                 outcome?: ("position" | "refusal") | null;
+                /** @description A New York market day */
+                day?: string | null;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -2516,6 +2735,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_executions_api_v1_review_executions_get: {
+        parameters: {
+            query?: {
+                kind?: string;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ExecutionPage_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_sessions_api_v1_review_sessions_get: {
+        parameters: {
+            query?: {
+                horizon?: string;
+                limit?: number;
+                /** @description Continue before this day */
+                before?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ReviewSessionPage_"];
                 };
             };
             /** @description Validation Error */
