@@ -212,6 +212,16 @@ class EditableInstall(unittest.TestCase):
         self.assertIn('if [ "$steady" != yes ]', sh.VERIFY)
         self.assertEqual(sh.VERIFY.count("exit 1"), 2)
 
+    def test_every_script_that_asks_where_the_package_is_runs_from_the_checkout(self) -> None:
+        # `WHERE` names ./.venv relative to the checkout. VERIFY first shipped
+        # without the `cd`, read an empty path, and reported a host that had just
+        # been repaired as still running a copy (6 Oct 2026).
+        for name in ("DIGESTS", "EDITABLE", "VERIFY"):
+            script = getattr(sh, name)
+            with self.subTest(name):
+                self.assertIn(sh.WHERE, script)
+                self.assertLess(script.index(f"cd {sh.HOST}\n"), script.index(sh.WHERE))
+
     def test_the_scripts_parse(self) -> None:
         for script in (sh.DEPS, sh.EDITABLE, sh.VERIFY, sh.DIGESTS, sh.restart_script(["a", "b"])):
             done = subprocess.run(  # noqa: S603 - fixed argv, the script is ours

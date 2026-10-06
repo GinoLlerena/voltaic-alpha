@@ -363,6 +363,7 @@ PY
 #: given time to start: on 5 Oct it was checked five seconds after its restart,
 #: while it was crash-looping, and `is-active` had not yet said so.
 VERIFY = f"""set -uo pipefail
+cd {HOST}
 code() {{ curl -s -o /dev/null -w '%{{http_code}}' --max-time 10 "$1"; }}
 steady=no
 for _ in $(seq 24); do
