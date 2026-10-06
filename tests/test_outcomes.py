@@ -412,6 +412,39 @@ class ReviewScaleTests(OutcomeCase):
         self.assertEqual(summary.completed, jobs)
         self.assertLess(elapsed, 10.0, f"{jobs} jobs took {elapsed:.1f}s")
 
+    def test_a_review_never_reads_a_snapshots_payload(self) -> None:
+        """A payload is the whole option chain: about 110 kB each as stored, 1,087
+        of them in 122 MB on the live host on 6 October 2026. The reviewer needs a
+        time and a price. Reading the rows would parse every chain into memory on
+        each pass, on a 2 GiB host, the moment the review clock actually ran."""
+        from sqlalchemy import event
+
+        base = self.snapshot("anchor", et("2026-08-27", 16), "600")
+        self.snapshot("later", et("2026-08-28", 16), "605")
+        for n in range(3):
+            decision = self.decision(base, decided_at=et("2026-08-27", 16))
+            decision.snapshot_id = f"d{n}"
+            outcomes.ensure_jobs(self.session, decision)
+        self.session.commit()
+        self.session.expire_all()
+
+        statements: list[str] = []
+
+        def record(_conn: object, _cursor: object, statement: str, *_: object) -> None:
+            statements.append(statement)
+
+        engine = self.session.get_bind()
+        event.listen(engine, "before_cursor_execute", record)
+        try:
+            summary = outcomes.review(self.session, self.calendar, now=et("2026-09-02", 17))
+        finally:
+            event.remove(engine, "before_cursor_execute", record)
+        self.assertGreater(summary.completed, 0)
+        about_snapshots = [s for s in statements if "FROM market_snapshots" in s]
+        self.assertEqual(len(about_snapshots), 1, "one read of the observations per pass")
+        self.assertNotIn("payload", about_snapshots[0])
+        self.assertFalse(any("market_snapshots.payload" in s for s in statements))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

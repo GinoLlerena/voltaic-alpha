@@ -46,6 +46,31 @@ HEARTBEAT_INTERVAL_SECONDS = 20
 DEFAULT_REVIEW_CLOCK_SECONDS = 900
 
 
+class Cadence:
+    """Whether a slow clock is due, by elapsed time since it last ran.
+
+    The wait between ticks counts seconds from zero and starts again at every
+    tick. The trading clocks test that counter (`waited % interval == 0`), which
+    works only for an interval shorter than the wait. The review clock's 900
+    seconds is longer than the 300-second tick the service runs, so its test was
+    never true: from 16 September to 6 October 2026 the worker never reviewed
+    an outcome, raised no error, and left 1,930 horizons pending. The 160 that
+    were resolved came from one manual run. This remembers when the clock last
+    ran instead, so it is due whatever the tick interval is.
+    """
+
+    def __init__(self, interval: int, *, now: float) -> None:
+        self.interval = interval
+        self._last = now
+
+    def due(self, now: float) -> bool:
+        """True once per `interval` seconds; never for a zero interval."""
+        if self.interval <= 0 or now - self._last < self.interval:
+            return False
+        self._last = now
+        return True
+
+
 class LeaseUnavailable(RuntimeError):
     """Another worker holds a live lease. Starting anyway would be the bug."""
 
@@ -388,6 +413,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
               flush=True)
         stopping["now"] = True
 
+    review_due = Cadence(args.review_interval, now=time.monotonic())
+
     def run_review() -> None:
         """`CIIP-008`. Resolve any review job whose horizon has now elapsed.
 
@@ -514,7 +541,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - linear startup s
                     waited % args.position_clock_interval == 0
                 ):
                     run_clock("position_clock", agent.position_clock)
-                if args.review_interval > 0 and (waited % args.review_interval == 0):
+                if review_due.due(time.monotonic()):
                     run_review()
     finally:
         recorder.end_run(agent.run_id, "ok" if not health.last_error else "degraded")

@@ -170,6 +170,16 @@ def ensure_jobs(session: Session, decision: Decision) -> list[ReviewJob]:
 
 
 @dataclass(frozen=True)
+class _Seen:
+    """The four facts about an observation that a review needs."""
+
+    id: str
+    snapshot_id: str
+    source_time: datetime
+    underlying_price: Decimal
+
+
+@dataclass(frozen=True)
 class _Observations:
     """Every recorded observation once, with its completed-session count.
 
@@ -178,23 +188,37 @@ class _Observations:
     is quadratic in evidence: at 402 jobs over 201 observations it did not finish
     inside a ten-minute window. The counts are monotone in `source_time`, so the
     first observation satisfying a horizon is a binary search.
+
+    Four columns, never the row. A snapshot's `payload` is the whole option
+    chain, about 110 kB each as stored: on 6 October 2026 the live table held
+    1,087 of them in 122 MB. Loading the rows would parse all of it into memory
+    on every pass, on a 2 GiB host that also runs the database and the worker.
     """
 
-    snapshots: tuple[MarketSnapshot, ...]
+    snapshots: tuple[_Seen, ...]
     closes: tuple[int, ...]
+    by_id: dict[str, _Seen]
 
     @classmethod
     def load(cls, session: Session, calendar: TradingCalendar) -> _Observations:
         rows = tuple(
-            session.scalars(
-                select(MarketSnapshot).order_by(MarketSnapshot.source_time)
+            _Seen(id_, snapshot_id, source_time, Decimal(str(price)))
+            for id_, snapshot_id, source_time, price in session.execute(
+                select(
+                    MarketSnapshot.id, MarketSnapshot.snapshot_id,
+                    MarketSnapshot.source_time, MarketSnapshot.underlying_price,
+                ).order_by(MarketSnapshot.source_time)
             ).all()
         )
-        return cls(rows, tuple(calendar.closes_through(aware(r.source_time)) for r in rows))
+        return cls(
+            rows,
+            tuple(calendar.closes_through(aware(r.source_time)) for r in rows),
+            {r.id: r for r in rows},
+        )
 
     def after(
         self, calendar: TradingCalendar, decided_at: datetime, horizon: int
-    ) -> tuple[MarketSnapshot, int] | None:
+    ) -> tuple[_Seen, int] | None:
         """The earliest observation at or after the horizon, or `None`.
 
         The earliest, never the latest: taking the most recent available would
@@ -242,7 +266,7 @@ def review(
             pending += 1
             continue
         snapshot, elapsed = found
-        decided_snapshot = session.get(MarketSnapshot, decision.market_snapshot_id)
+        decided_snapshot = observations.by_id.get(decision.market_snapshot_id)
         if decided_snapshot is None:  # pragma: no cover - a foreign key makes this unreachable
             pending += 1
             continue
@@ -255,8 +279,8 @@ def review(
             )
         ).one_or_none()
         if already is None:
-            at_decision = Decimal(str(decided_snapshot.underlying_price))
-            at_horizon = Decimal(str(snapshot.underlying_price))
+            at_decision = decided_snapshot.underlying_price
+            at_horizon = snapshot.underlying_price
             change = at_horizon - at_decision
             traded = decision.action == "OPTIONS_POSITION"
             session.add(
