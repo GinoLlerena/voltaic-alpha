@@ -252,6 +252,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Positions Page
+         * @description Positions across decisions, newest first (PUI4 §3).
+         */
+        get: operations["positions_page_api_v1_positions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/{position_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Position Detail */
+        get: operations["position_detail_api_v1_positions__position_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/positions/{position_id}/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Position Observations
+         * @description The marks recorded for one position, newest first.
+         */
+        get: operations["position_observations_api_v1_positions__position_id__observations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/proof/{digest}.json": {
         parameters: {
             query?: never;
@@ -766,6 +823,84 @@ export interface components {
              */
             source_mode: "LIVE" | "FROZEN_REPLAY";
         };
+        /** Envelope[ObservationPage] */
+        Envelope_ObservationPage_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["ObservationPage"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
+        /** Envelope[PositionDetailOut] */
+        Envelope_PositionDetailOut_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["PositionDetailOut"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
+        /** Envelope[PositionPage] */
+        Envelope_PositionPage_: {
+            /** Correlation Id */
+            correlation_id?: string | null;
+            data: components["schemas"]["PositionPage"];
+            /** Observed At */
+            observed_at: string;
+            /**
+             * Schema Version
+             * @default public.v1
+             * @constant
+             */
+            schema_version: "public.v1";
+            /**
+             * Source Id
+             * @enum {string}
+             */
+            source_id: "live" | "committed";
+            /** Source Label */
+            source_label: string;
+            /**
+             * Source Mode
+             * @enum {string}
+             */
+            source_mode: "LIVE" | "FROZEN_REPLAY";
+        };
         /** Envelope[ProofOut] */
         Envelope_ProofOut_: {
             /** Correlation Id */
@@ -1232,6 +1367,37 @@ export interface components {
             /** Snapshot Id */
             snapshot_id: string;
         };
+        /**
+         * MarkOut
+         * @description A recorded observation of a position. Never a live price.
+         */
+        MarkOut: {
+            /** Data Quality */
+            data_quality: string[];
+            /** Dte */
+            dte: number;
+            /** Long Bid */
+            long_bid: string | null;
+            /** Observed At */
+            observed_at: string | null;
+            /** Sessions Elapsed */
+            sessions_elapsed: number;
+            /** Short Ask */
+            short_ask: string | null;
+            /** Snapshot Id */
+            snapshot_id: string | null;
+            /** Source Time */
+            source_time: string | null;
+            /**
+             * Spread Value
+             * @description What the spread could conservatively be closed for, per share. Null when it could not be read, which is a recorded fact, not a zero.
+             */
+            spread_value: string | null;
+            /** Underlying Price */
+            underlying_price: string | null;
+            /** Underlying Source */
+            underlying_source: string;
+        };
         /** MarketOut */
         MarketOut: {
             observation: components["schemas"]["Observation"] | null;
@@ -1297,6 +1463,15 @@ export interface components {
             /** Underlying Price */
             underlying_price: string | null;
         };
+        /** ObservationPage */
+        ObservationPage: {
+            /** Items */
+            items: components["schemas"]["MarkOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
         /** OrderOut */
         OrderOut: {
             /** Client Order Id */
@@ -1327,6 +1502,16 @@ export interface components {
             terminal: boolean;
             /** Withheld */
             withheld: string[];
+        };
+        /** PositionDetailOut */
+        PositionDetailOut: {
+            /** Exits */
+            exits: components["schemas"]["ExitOut"][];
+            /** Incidents */
+            incidents: components["schemas"]["IncidentOut"][];
+            /** Observations Recorded */
+            observations_recorded: number;
+            position: components["schemas"]["PositionSummaryOut"];
         };
         /** PositionOut */
         PositionOut: {
@@ -1364,6 +1549,90 @@ export interface components {
             short_symbol: string;
             /** Strategy */
             strategy: string;
+            /** Width */
+            width: string | null;
+        };
+        /** PositionPage */
+        PositionPage: {
+            /** Ever */
+            ever: number;
+            /** Items */
+            items: components["schemas"]["PositionSummaryOut"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
+        /** PositionSummaryOut */
+        PositionSummaryOut: {
+            /** Close Reason */
+            close_reason: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Decision Id */
+            decision_id: string | null;
+            /** Direction */
+            direction: string;
+            /**
+             * Entry Debit
+             * @description Average entry debit from reconciled fills, per share. Null until fills reconcile; never the estimated debit.
+             */
+            entry_debit: string | null;
+            /** Entry Filled At */
+            entry_filled_at: string | null;
+            /** Expiration */
+            expiration: string | null;
+            /** Filled Quantity */
+            filled_quantity: number;
+            /** Instrument */
+            instrument: string | null;
+            /** Invalidation Direction */
+            invalidation_direction: string | null;
+            /** Invalidation Level */
+            invalidation_level: string | null;
+            /** Invalidation Source */
+            invalidation_source: string | null;
+            latest_mark: components["schemas"]["MarkOut"] | null;
+            /** Long Symbol */
+            long_symbol: string;
+            /**
+             * Mark State
+             * @enum {string}
+             */
+            mark_state: "never_observed" | "unreadable" | "current" | "last_session" | "stale" | "final";
+            /** Open */
+            open: boolean;
+            /** Open Incidents */
+            open_incidents: number;
+            /**
+             * Open Risk
+             * @description US dollars for the whole structure.
+             */
+            open_risk: string | null;
+            /** Opened At */
+            opened_at: string | null;
+            /** Position Id */
+            position_id: string;
+            /**
+             * Realized
+             * @description US dollars for the round trip, from reconciled broker fills. Null unless the entry and the close both filled.
+             */
+            realized: string | null;
+            /** Requested Quantity */
+            requested_quantity: number;
+            /** Short Symbol */
+            short_symbol: string;
+            /** State */
+            state: string;
+            /** State Meaning */
+            state_meaning: string;
+            /** Strategy */
+            strategy: string;
+            /**
+             * Unrealized
+             * @description US dollars, as the exit logic recorded it on its own mark. Null when no exit evaluation exists or the value was not measurable.
+             */
+            unrealized: string | null;
             /** Width */
             width: string | null;
         };
@@ -2124,6 +2393,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_ReviewOverviewOut_"];
+                };
+            };
+        };
+    };
+    positions_page_api_v1_positions_get: {
+        parameters: {
+            query?: {
+                state?: string;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_PositionPage_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    position_detail_api_v1_positions__position_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description positions.id */
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_PositionDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    position_observations_api_v1_positions__position_id__observations_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description positions.id */
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ObservationPage_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

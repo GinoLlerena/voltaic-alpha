@@ -42,6 +42,7 @@ from ..presentation import (
     export,
     horizons,
     listing,
+    positions,
     proof,
     readiness,
     status,
@@ -57,6 +58,7 @@ COMMITTED = ROOT / "demo" / "h0_demo.db"
 DIGEST = r"^[0-9a-f]{64}$"
 VIEW_PATTERN = "^(" + "|".join(listing.VIEWS) + ")$"
 Digest = Annotated[str, PathParam(pattern=DIGEST, description="decision_hash hex, no prefix")]
+PositionId = Annotated[str, PathParam(pattern=r"^[0-9A-Za-z_-]{1,64}$", description="positions.id")]
 
 
 def _encode(at: datetime, key: str) -> str:
@@ -379,6 +381,63 @@ def create_app(
     ) -> dict[str, Any]:
         rows = book.incidents(db, open_only=state == "open")
         return envelope(db, [views.incident(i) for i in rows])
+
+    @api.get("/positions", response_model=dto.Envelope[dto.PositionPage])
+    def positions_page(
+        db: Db,
+        state: Annotated[str, Query(pattern="^(open|closed|all)$")] = "all",
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """Positions across decisions, newest first (PUI4 §3)."""
+        which: positions.StateFilter = state  # type: ignore[assignment]
+        rows, after = positions.page(db, state=which, limit=limit, before=_decode(cursor))
+        calendar, _ = committed_calendar()
+        seen = positions.views(db, rows, now=clock(), calendar=calendar)
+        return envelope(db, dto.PositionPage(
+            items=[views.position_summary(v) for v in seen],
+            next_cursor=_encode(*after) if after else None,
+            total=positions.count(db, which), ever=positions.count(db),
+        ))
+
+    def position_found(db: Session, position_id: str):  # type: ignore[no-untyped-def]
+        row = positions.by_id(db, position_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="no position with that id")
+        return row
+
+    @api.get("/positions/{position_id}", response_model=dto.Envelope[dto.PositionDetailOut])
+    def position_detail(db: Db, position_id: PositionId) -> dict[str, Any]:
+        row = position_found(db, position_id)
+        calendar, _ = committed_calendar()
+        (view,) = positions.views(db, [row], now=clock(), calendar=calendar)
+        return envelope(db, dto.PositionDetailOut(
+            position=views.position_summary(view),
+            exits=[views.exit_decision(e) for e in positions.exits_for(db, row.id)],
+            incidents=[views.incident(i) for i in positions.incidents_for(db, row.id)],
+            observations_recorded=positions.observation_count(db, row.id),
+        ), correlation_id=view.decision_hash)
+
+    @api.get(
+        "/positions/{position_id}/observations",
+        response_model=dto.Envelope[dto.ObservationPage],
+    )
+    def position_observations(
+        db: Db,
+        position_id: PositionId,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """The marks recorded for one position, newest first."""
+        row = position_found(db, position_id)
+        marks, after = positions.observations(
+            db, row.id, limit=limit, before=_decode(cursor)
+        )
+        return envelope(db, dto.ObservationPage(
+            items=[views.mark(o) for o in marks],
+            next_cursor=_encode(*after) if after else None,
+            total=positions.observation_count(db, row.id),
+        ))
 
     @api.get("/tour", response_model=dto.Envelope[list[dto.SceneOut]])
     def guided_tour(db: Db) -> dict[str, Any]:

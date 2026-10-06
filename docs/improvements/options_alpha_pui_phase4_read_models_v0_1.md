@@ -118,6 +118,8 @@ the newest one, and the rule is explicit and tested:
 | `last_session` | the market is closed; the row is the last one of the latest session |
 | `stale` | the session is open and the row is older than 5 minutes |
 
+| `final` | the position is `CLOSED` or `ABANDONED`: it is no longer marked, so its last mark is the last one, not a stale one (added in step 1; the approved table had omitted closed positions) |
+
 Five minutes is five missed cycles of the worker's 60-second position clock.
 `stale` on an open position is attention, and appears in Today's attention list
 (a new, tested attention rule, as the redesign requires for any such rule).
@@ -219,6 +221,12 @@ research. The live source cannot supply these, so:
   extended to the new routes.
 - Browser tests cover the empty live shape, each state, loading/failed/stale,
   and both widths.
+
+**Step 1 as built (6 October 2026).** `tests/test_api_positions.py` builds each
+state with the lifecycle store's own calls (prepare, submit, reconcile, close,
+abandon, incident) rather than from a committed database, and runs on SQLite
+and in the PostgreSQL lane. The committed fixtures the browser tests need are
+captured with the screens, in steps 3 and 4.
 
 ## 7. Suggested order of work
 
