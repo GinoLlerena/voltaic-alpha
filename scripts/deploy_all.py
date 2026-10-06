@@ -18,6 +18,8 @@ own checks and refusals intact:
 
 Which flags step 2 gets is decided here, by `steps_for`:
 
+  - the host runs a copy of the package, not the checkout (5 Oct 2026)
+                                      -> re-linked by ship_host.py; every service restarts
   - `requirements.txt` differs        -> `--install-deps`, and every service restarts
   - the schema is behind              -> `--migrate` (which restarts the worker itself)
   - source the worker runs differs    -> `--restart-worker`
@@ -70,19 +72,22 @@ def steps_for(
     plan: sh.Plan, window: str | None, *, ignore_window: bool = False, after: str = "17:15 ET",
 ) -> Steps:
     """The `ship_host.py` invocation a set of differences calls for."""
-    if not (plan.changed or plan.units or plan.needs_migration):
+    if plan.editable and not (plan.changed or plan.units or plan.needs_migration):
         return Steps()
     source = [f for f in plan.changed if f.startswith("src/")]
     worker_source = [f for f in source if not f.startswith(READ_ONLY)]
     args = ["--apply"]
-    worker = bool(worker_source) or plan.deps_changed or plan.needs_migration
+    # A host running a copy of the package is re-linked by ship_host.py, and
+    # every service must restart to import the checkout instead of the copy.
+    relink = not plan.editable
+    worker = bool(worker_source) or plan.deps_changed or plan.needs_migration or relink
     if plan.deps_changed:
         args.append("--install-deps")
     if plan.needs_migration:
         args.append("--migrate")
     elif worker:
         args.append("--restart-worker")
-    if source or plan.deps_changed:
+    if source or plan.deps_changed or relink:
         args += ["--restart", API, "--restart", DASHBOARD]
     blocked = None
     if worker and window and not ignore_window:
