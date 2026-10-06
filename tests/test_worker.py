@@ -361,5 +361,66 @@ class ReviewClockWiringTests(unittest.TestCase):
         self.assertGreater(DEFAULT_REVIEW_CLOCK_SECONDS, DEFAULT_ORDER_CLOCK_SECONDS)
 
     def test_the_review_clock_can_be_disabled(self) -> None:
+        from options_alpha_lab.worker import Cadence
+
+        self.assertIn("Cadence(args.review_interval", self.source())
+        off = Cadence(0, now=0.0)
+        self.assertFalse(any(off.due(float(t)) for t in range(0, 5000, 7)))
+
+    def test_the_wait_loop_asks_the_cadence_not_the_wait_counter(self) -> None:
         loop = self.wait_loop()
-        self.assertIn("args.review_interval > 0", loop)
+        self.assertIn("if review_due.due(time.monotonic()):", loop)
+        self.assertNotIn("waited % args.review_interval", loop)
+
+
+class ReviewCadenceTests(unittest.TestCase):
+    """The review clock fires when its interval is longer than a tick.
+
+    From 16 September to 6 October 2026 it never did. The loop tested
+    `waited % 900 == 0` against a counter that restarts at every 300-second
+    tick, so the reviewer was wired, contained, tested by reading its source,
+    and never once called: 1,930 horizons sat pending with no fault recorded.
+    These tests run the wait as the worker runs it.
+    """
+
+    def fires(self, *, tick: int, review: int, seconds: int) -> list[int]:
+        """Seconds at which the reviewer runs, over ticks of `tick` seconds."""
+        from options_alpha_lab.worker import Cadence
+
+        cadence = Cadence(review, now=0.0)
+        fired: list[int] = []
+        clock = 0
+        while clock < seconds:
+            waited = 0  # the worker's counter: it starts again at every tick
+            while waited < tick and clock < seconds:
+                waited += 1
+                clock += 1
+                if cadence.due(float(clock)):
+                    fired.append(clock)
+        return fired
+
+    def test_it_fires_at_the_deployed_intervals(self) -> None:
+        from options_alpha_lab.worker import DEFAULT_REVIEW_CLOCK_SECONDS
+
+        fired = self.fires(tick=300, review=DEFAULT_REVIEW_CLOCK_SECONDS, seconds=3600)
+        self.assertEqual(fired, [900, 1800, 2700, 3600])
+
+    def test_the_old_test_never_fired_at_those_intervals(self) -> None:
+        """The defect, stated as arithmetic: no second of a 300-second wait is a
+        multiple of 900."""
+        self.assertFalse(any(waited % 900 == 0 for waited in range(1, 301)))
+
+    def test_it_does_not_depend_on_how_the_two_intervals_divide(self) -> None:
+        for tick, review in ((300, 900), (300, 1000), (60, 900), (7, 30), (1200, 900)):
+            with self.subTest(tick=tick, review=review):
+                fired = self.fires(tick=tick, review=review, seconds=review * 4)
+                self.assertEqual(len(fired), 4)
+                gaps = [b - a for a, b in zip(fired, fired[1:], strict=False)]
+                self.assertTrue(all(gap == review for gap in gaps), gaps)
+
+    def test_a_late_check_fires_once_not_once_per_missed_interval(self) -> None:
+        from options_alpha_lab.worker import Cadence
+
+        cadence = Cadence(900, now=0.0)
+        self.assertTrue(cadence.due(5000.0))
+        self.assertFalse(cadence.due(5001.0))
