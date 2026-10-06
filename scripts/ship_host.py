@@ -96,6 +96,20 @@ def local_files() -> dict[str, str]:
 #: The schema revision the host's database is at.
 REVISION_QUERY = "select version_num from alembic_version"
 
+#: Where the host's services must import the package from: the checkout this
+#: tool writes to. On 5 Oct 2026 `--install-deps` ran `pip install -r
+#: requirements.txt`, whose last line (`.`) installs the project itself, and
+#: that replaced the editable install with a copy in site-packages. Shipped
+#: source stopped taking effect, and the worker could not start at all: it
+#: finds alembic.ini relative to its own file. Found at the next start, a day
+#: later, because the running worker had already imported the old path.
+PACKAGE_DIR = f"{HOST}/src/options_alpha_lab"
+WHERE = (
+    "./.venv/bin/python -c "
+    "'import options_alpha_lab, os; print(os.path.dirname(options_alpha_lab.__file__))'"
+    " 2>/dev/null"
+)
+
 DIGESTS = f"""set -uo pipefail
 cd {HOST}
 find {" ".join(HOST_PATHS)} -type f ! -path '*/__pycache__/*' ! -path '*.egg-info/*' \\
@@ -111,6 +125,7 @@ for f in {UNIT_DIR}/*.d/options-alpha.conf; do
   echo "$(sha256sum "$f" | cut -d' ' -f1)  unit:deploy/systemd/$d/options-alpha.conf"
 done
 echo "@alembic $(sudo -u postgres psql -d options_alpha -tAc '{REVISION_QUERY}')"
+echo "@package $({WHERE})"
 """
 
 
@@ -122,6 +137,13 @@ class Plan:
     junk: list[str] = field(default_factory=list)
     host_revision: str = ""
     repo_head: str = ""
+    #: Where the host's venv imports options_alpha_lab from.
+    package: str = PACKAGE_DIR
+
+    @property
+    def editable(self) -> bool:
+        """The services run this checkout's source, not a copy of it."""
+        return self.package == PACKAGE_DIR
 
     @property
     def needs_migration(self) -> bool:
@@ -165,23 +187,25 @@ def compare(local: dict[str, str], host: dict[str, str]) -> Plan:
     return plan
 
 
-def host_state() -> tuple[dict[str, str], str]:
+def host_state() -> tuple[dict[str, str], str, str]:
     out = rt.remote(DIGESTS, timeout=180)
     files: dict[str, str] = {}
-    revision = ""
+    revision = package = ""
     for line in out.splitlines():
         if line.startswith("@alembic "):
             revision = line.removeprefix("@alembic ").strip()
+        elif line.startswith("@package"):
+            package = line.removeprefix("@package").strip()
         elif line.strip():
             digest, path = line.split(maxsplit=1)
             files[path] = digest
-    return files, revision
+    return files, revision, package
 
 
 def make_plan() -> Plan:
-    files, revision = host_state()
+    files, revision, package = host_state()
     plan = compare(local_files(), files)
-    plan.host_revision, plan.repo_head = revision, repo_head()
+    plan.host_revision, plan.repo_head, plan.package = revision, repo_head(), package
     return plan
 
 
@@ -281,10 +305,24 @@ echo "revision=$(sudo -u postgres psql -d options_alpha -tAc '{REVISION_QUERY}')
 systemctl start {WORKER}
 """
 
+#: The dependencies only. The file's last line, `.`, would install the project
+#: itself as a copy; the project is linked by `EDITABLE` instead.
 DEPS = f"""set -euo pipefail
 cd {HOST}
-./.venv/bin/pip install -q -r requirements.txt 2>&1 | tail -3
+grep -vxF . requirements.txt | ./.venv/bin/pip install -q -r /dev/stdin 2>&1 | tail -3
 """
+
+#: Link the venv to the checkout, so what is shipped is what runs.
+EDITABLE = f"""set -euo pipefail
+cd {HOST}
+./.venv/bin/pip install -q --no-deps -e . 2>&1 | tail -3
+echo "package=$({WHERE})"
+"""
+
+
+def restart_script(services: list[str]) -> str:
+    return "set -euo pipefail\n" + "".join(f"systemctl restart {s}\n" for s in services)
+
 
 #: Pins in requirements.txt the venv does not satisfy; empty means in step.
 #: A pin whose environment marker excludes this interpreter (emscripten, win32,
@@ -321,28 +359,54 @@ cd {HOST}
 PY
 """
 
-VERIFY = """set -uo pipefail
-sleep 5
-code() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$1"; }
+#: Exits non-zero when the host is not running what was shipped. The worker is
+#: given time to start: on 5 Oct it was checked five seconds after its restart,
+#: while it was crash-looping, and `is-active` had not yet said so.
+VERIFY = f"""set -uo pipefail
+code() {{ curl -s -o /dev/null -w '%{{http_code}}' --max-time 10 "$1"; }}
+steady=no
+for _ in $(seq 24); do
+  sleep 5
+  since=$(systemctl show {WORKER} -p ActiveEnterTimestampMonotonic --value)
+  now=$(awk '{{print int($1 * 1000000)}}' /proc/uptime)
+  if [ "$(systemctl is-active {WORKER})" = active ] && [ $((now - since)) -gt 20000000 ]; then
+    steady=yes; break
+  fi
+done
+package=$({WHERE})
+echo "package=$package"
 echo "api_status=$(code http://127.0.0.1:8600/api/v1/system/status)"
 echo "stop_readiness=$(code http://127.0.0.1:8600/api/v1/system/stop-readiness)"
-echo "worker=$(systemctl is-active options-alpha-worker)"
+echo "worker=$(systemctl is-active {WORKER}) steady=$steady"
 echo "api=$(systemctl is-active options-alpha-api)"
 echo "streamlit=$(code http://127.0.0.1:8501/)"
 systemctl start options-alpha-watchdog.service || true
 python3 - <<'PY'
 import json
-w = json.load(open("/var/run/options-alpha/watchdog.json"))
-print("watchdog_ok=" + str(w["ok"]))
-for c in w["checks"]:
-    if not c["ok"]:
-        print("watchdog_fail=" + c["name"] + ": " + c["detail"])
+try:
+    w = json.load(open("/var/run/options-alpha/watchdog.json"))
+except OSError:
+    print("watchdog_ok=unknown (no watchdog.json: the worker's run directory is absent)")
+else:
+    print("watchdog_ok=" + str(w["ok"]))
+    for c in w["checks"]:
+        if not c["ok"]:
+            print("watchdog_fail=" + c["name"] + ": " + c["detail"])
 PY
+if [ "$steady" != yes ]; then
+  echo "VERIFY FAILED: the worker is not staying up:"
+  journalctl -u {WORKER} --since "-3 min" --no-pager -o cat | grep -v '^ ' | tail -3
+  exit 1
+fi
+if [ "$package" != "{PACKAGE_DIR}" ]; then
+  echo "VERIFY FAILED: services import a copy of the package, not {PACKAGE_DIR}"
+  exit 1
+fi
 """
 
 
 def report(plan: Plan) -> None:
-    if not (plan.changed or plan.units or plan.junk):
+    if not (plan.changed or plan.units or plan.junk) and plan.editable:
         print("the host matches this checkout")
     for title, items in (
         ("checkout files that differ or are missing", plan.changed),
@@ -354,6 +418,10 @@ def report(plan: Plan) -> None:
             print(f"{title}:")
             for f in items:
                 print("   ", f)
+    if not plan.editable:
+        print("the host's services run a COPY of the package "
+              f"({plan.package or 'not importable'}), not this checkout's source: "
+              "--apply re-links it (pip install -e .)")
     print(f"schema: host {plan.host_revision or '?'}, repository head {plan.repo_head}"
           + ("  <- MIGRATION NEEDED (--migrate)" if plan.needs_migration else ""))
     if plan.deps_changed:
@@ -396,7 +464,9 @@ def main() -> int:
             print("\nrefusing to ship code ahead of its schema; re-run with --migrate",
                   file=sys.stderr)
             return 2 if args.apply else 0
-        nothing = not (plan.changed or plan.units or (args.prune_junk and plan.junk))
+        nothing = plan.editable and not (
+            plan.changed or plan.units or (args.prune_junk and plan.junk)
+        )
         if not args.apply or (nothing and not (args.migrate and plan.needs_migration)):
             if not args.apply and not nothing:
                 print("\nDry run. Re-run with --apply to ship these.")
@@ -405,15 +475,24 @@ def main() -> int:
         files = sorted(set(plan.changed) | set(plan.units))
         if files:
             staged = dr.ship(tarball(files, manifest(plan)), stamp)
-            restart = list(args.restart)
-            if args.restart_worker and not args.migrate:
-                restart.append(WORKER)
-            print(rt.remote(install(staged, stamp, plan, restart, prune_junk=args.prune_junk),
+            print(rt.remote(install(staged, stamp, plan, [], prune_junk=args.prune_junk),
                             timeout=600).strip())
-        if args.migrate and plan.needs_migration:
-            print(rt.remote(MIGRATE, timeout=600).strip())
+        # Everything a service will import is in place before any service
+        # starts: dependencies, then the link to the checkout, then the schema.
         if args.install_deps:
             print(rt.remote(DEPS, timeout=600).strip())
+        if args.install_deps or not plan.editable:
+            print(rt.remote(EDITABLE, timeout=600).strip())
+        if args.migrate and plan.needs_migration:
+            print(rt.remote(MIGRATE, timeout=600).strip())
+        restart = list(args.restart)
+        if args.restart_worker and not (args.migrate and plan.needs_migration):
+            restart.append(WORKER)
+        if restart:
+            rt.remote(restart_script(restart), timeout=300)
+            print("restarted: " + ", ".join(restart))
+        elif not plan.editable:
+            print("the package was re-linked; services keep the old copy until restarted")
         if plan.deps_changed or args.install_deps:
             print(rt.remote(PIN_CHECK, timeout=120).strip())
         print(rt.remote(VERIFY, timeout=300).strip())

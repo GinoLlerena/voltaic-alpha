@@ -55,6 +55,15 @@ class StepsFor(unittest.TestCase):
         self.assertNotIn("--restart-worker", steps.ship)
         self.assertTrue(steps.worker)
 
+    def test_a_host_running_a_copy_of_the_package_is_relinked_and_everything_restarts(self) -> None:
+        # 5 Oct 2026: nothing differed on disk, yet no service ran the checkout.
+        site = "/opt/options-alpha/.venv/lib/python3.12/site-packages"
+        plan = sh.Plan(package=f"{site}/options_alpha_lab")
+        steps = da.steps_for(plan, None)
+        self.assertEqual(steps.ship, ["--apply", "--restart-worker", *RESTARTS])
+        self.assertTrue(steps.worker)
+        self.assertIn("RUN IT AT OR AFTER", da.steps_for(plan, DAY).blocked or "")
+
     def test_scripts_and_docs_restart_nothing(self) -> None:
         steps = da.steps_for(sh.Plan(changed=["scripts/session.py", "README.md"]), DAY)
         self.assertEqual(steps.ship, ["--apply"])

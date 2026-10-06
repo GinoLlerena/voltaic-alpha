@@ -172,6 +172,54 @@ class PinCheck(unittest.TestCase):
         )
 
 
+class EditableInstall(unittest.TestCase):
+    """The services must run the checkout this tool writes to, not a copy.
+
+    5 Oct 2026: `--install-deps` ran `pip install -r requirements.txt`. Its last
+    line, `.`, installed the project as a copy in site-packages, replacing the
+    editable install. Shipped source stopped taking effect, and the worker could
+    not start (it finds alembic.ini relative to its own file). Nothing noticed
+    until the next start, a day later.
+    """
+
+    SITE = "/opt/options-alpha/.venv/lib/python3.12/site-packages/options_alpha_lab"
+
+    def test_installing_dependencies_never_installs_the_project_as_a_copy(self) -> None:
+        self.assertIn("grep -vxF . requirements.txt", sh.DEPS)
+        self.assertNotIn("-r requirements.txt", sh.DEPS)
+
+    def test_the_dependency_filter_drops_only_the_project_line(self) -> None:
+        done = subprocess.run(  # noqa: S603 - fixed argv
+            [shutil.which("grep") or "grep", "-vxF", ".", str(ROOT / "requirements.txt")],
+            capture_output=True, text=True, check=True,
+        )
+        kept = [line for line in done.stdout.splitlines() if not line.startswith("#")]
+        self.assertNotIn(".", kept)
+        self.assertTrue(all("==" in line for line in kept), kept[:3])
+        self.assertIn(".", (ROOT / "requirements.txt").read_text().splitlines())
+
+    def test_the_project_is_linked_not_copied(self) -> None:
+        self.assertIn("pip install -q --no-deps -e .", sh.EDITABLE)
+
+    def test_a_plan_knows_whether_the_host_runs_the_checkout(self) -> None:
+        self.assertTrue(sh.Plan().editable)
+        self.assertTrue(sh.Plan(package="/opt/options-alpha/src/options_alpha_lab").editable)
+        self.assertFalse(sh.Plan(package=self.SITE).editable)
+        self.assertFalse(sh.Plan(package="").editable, "an unimportable package is not fine")
+
+    def test_verification_fails_on_a_copy_or_a_worker_that_does_not_stay_up(self) -> None:
+        self.assertIn('if [ "$package" != "/opt/options-alpha/src/options_alpha_lab" ]', sh.VERIFY)
+        self.assertIn('if [ "$steady" != yes ]', sh.VERIFY)
+        self.assertEqual(sh.VERIFY.count("exit 1"), 2)
+
+    def test_the_scripts_parse(self) -> None:
+        for script in (sh.DEPS, sh.EDITABLE, sh.VERIFY, sh.DIGESTS, sh.restart_script(["a", "b"])):
+            done = subprocess.run(  # noqa: S603 - fixed argv, the script is ours
+                [BASH, "-n"], input=script, capture_output=True, text=True, check=False
+            )
+            self.assertEqual(done.returncode, 0, done.stderr)
+
+
 class Refusals(unittest.TestCase):
     def run_main(self, *argv: str, window: str | None = None) -> int:
         with (
