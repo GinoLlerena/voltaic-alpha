@@ -3469,6 +3469,166 @@
    }
   ]
  },
+ "/api/v1/positions?state=open": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [],
+   "next_cursor": null,
+   "total": 0,
+   "ever": 1
+  }
+ },
+ "/api/v1/positions?state=closed": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "position_id": "f8a7b24910d34d66870640c4394ca9d3",
+     "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+     "instrument": "SPY",
+     "strategy": "bull_call_debit_spread",
+     "direction": "bullish",
+     "state": "CLOSED",
+     "state_meaning": "The broker confirms flat.",
+     "open": false,
+     "long_symbol": "SPY260911C00772000",
+     "short_symbol": "SPY260911C00778000",
+     "expiration": "2026-08-28T15:50:00+00:00",
+     "width": "6.000000",
+     "requested_quantity": 1,
+     "filled_quantity": 0,
+     "entry_debit": "3.130000",
+     "open_risk": "339.000000",
+     "invalidation_level": null,
+     "invalidation_direction": null,
+     "invalidation_source": null,
+     "opened_at": "2026-08-28T15:50:00+00:00",
+     "entry_filled_at": "2026-08-28T15:50:00+00:00",
+     "closed_at": "2026-08-28T15:50:00+00:00",
+     "close_reason": "manual_demo_close",
+     "mark_state": "never_observed",
+     "latest_mark": null,
+     "unrealized": null,
+     "realized": "-7.00",
+     "open_incidents": 0
+    }
+   ],
+   "next_cursor": null,
+   "total": 1,
+   "ever": 1
+  }
+ },
+ "/api/v1/positions?state=all": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [
+    {
+     "position_id": "f8a7b24910d34d66870640c4394ca9d3",
+     "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+     "instrument": "SPY",
+     "strategy": "bull_call_debit_spread",
+     "direction": "bullish",
+     "state": "CLOSED",
+     "state_meaning": "The broker confirms flat.",
+     "open": false,
+     "long_symbol": "SPY260911C00772000",
+     "short_symbol": "SPY260911C00778000",
+     "expiration": "2026-08-28T15:50:00+00:00",
+     "width": "6.000000",
+     "requested_quantity": 1,
+     "filled_quantity": 0,
+     "entry_debit": "3.130000",
+     "open_risk": "339.000000",
+     "invalidation_level": null,
+     "invalidation_direction": null,
+     "invalidation_source": null,
+     "opened_at": "2026-08-28T15:50:00+00:00",
+     "entry_filled_at": "2026-08-28T15:50:00+00:00",
+     "closed_at": "2026-08-28T15:50:00+00:00",
+     "close_reason": "manual_demo_close",
+     "mark_state": "never_observed",
+     "latest_mark": null,
+     "unrealized": null,
+     "realized": "-7.00",
+     "open_incidents": 0
+    }
+   ],
+   "next_cursor": null,
+   "total": 1,
+   "ever": 1
+  }
+ },
+ "/api/v1/positions/f8a7b24910d34d66870640c4394ca9d3": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": "sha256:75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+  "data": {
+   "position": {
+    "position_id": "f8a7b24910d34d66870640c4394ca9d3",
+    "decision_id": "75a9cc71475697f276792fed4cac5af0b56c992b7cc3b899629c844493561e6d",
+    "instrument": "SPY",
+    "strategy": "bull_call_debit_spread",
+    "direction": "bullish",
+    "state": "CLOSED",
+    "state_meaning": "The broker confirms flat.",
+    "open": false,
+    "long_symbol": "SPY260911C00772000",
+    "short_symbol": "SPY260911C00778000",
+    "expiration": "2026-08-28T15:50:00+00:00",
+    "width": "6.000000",
+    "requested_quantity": 1,
+    "filled_quantity": 0,
+    "entry_debit": "3.130000",
+    "open_risk": "339.000000",
+    "invalidation_level": null,
+    "invalidation_direction": null,
+    "invalidation_source": null,
+    "opened_at": "2026-08-28T15:50:00+00:00",
+    "entry_filled_at": "2026-08-28T15:50:00+00:00",
+    "closed_at": "2026-08-28T15:50:00+00:00",
+    "close_reason": "manual_demo_close",
+    "mark_state": "never_observed",
+    "latest_mark": null,
+    "unrealized": null,
+    "realized": "-7.00",
+    "open_incidents": 0
+   },
+   "exits": [],
+   "incidents": [],
+   "observations_recorded": 0
+  }
+ },
+ "/api/v1/positions/f8a7b24910d34d66870640c4394ca9d3/observations": {
+  "schema_version": "public.v1",
+  "source_mode": "FROZEN_REPLAY",
+  "source_id": "committed",
+  "source_label": "committed evidence",
+  "observed_at": "2026-09-17T12:00:00+00:00",
+  "correlation_id": null,
+  "data": {
+   "items": [],
+   "next_cursor": null,
+   "total": 0
+  }
+ },
  "/api/v1/activity": {
   "schema_version": "public.v1",
   "source_mode": "FROZEN_REPLAY",

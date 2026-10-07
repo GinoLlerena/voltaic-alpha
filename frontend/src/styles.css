@@ -295,3 +295,26 @@ header nav { flex-wrap: wrap; row-gap: .35rem; }
 .matrix.wide td:first-child, .matrix.wide th:first-child { min-width: 11rem; }
 .matrix.wide td:nth-child(2) { min-width: 9rem; }
 .matrix.wide .src { overflow-wrap: normal; }
+
+/* PUI Phase 4: Positions. State is said in words first; amber marks a position
+   still held that needs a look (an open incident, a stale or unreadable mark),
+   and the row says which in text as well. */
+.positions { list-style: none; padding: 0; display: grid; gap: 1px; background: var(--edge);
+  border: 1px solid var(--edge); }
+.positions a { display: grid; gap: .25rem; padding: .6rem .7rem; background: var(--panel);
+  color: inherit; text-decoration: none; }
+.positions a:hover { background: #101923; }
+.positions a[data-attention="true"] { box-shadow: inset 3px 0 0 var(--warm); }
+.positions a[data-open="false"] .name { color: var(--muted); }
+.positions .name { font-weight: 600; }
+.positions .what { font-weight: 400; color: var(--muted); margin-left: .5rem; font-size: var(--fs-data); }
+.positions .state { font-size: var(--fs-data); }
+.positions .state strong { font-family: var(--mono); font-size: var(--fs-meta); letter-spacing: .08em; }
+.positions .meaning { color: var(--muted); }
+.positions .figures { display: flex; flex-wrap: wrap; gap: .2rem 1rem; font-family: var(--mono);
+  font-size: var(--fs-meta); color: var(--dim); }
+.positions [data-mark="stale"], .positions [data-mark="unreadable"], .positions .incident { color: var(--warm); }
+.state-line { font-size: var(--fs-data); color: var(--muted); max-width: 70ch; }
+.state-line strong { color: var(--text); }
+[data-testid="position-mark"], [data-testid="position-exits"], [data-testid="position-incidents"],
+[data-testid="position-observations"] { margin-top: 1.4rem; }

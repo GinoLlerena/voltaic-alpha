@@ -62,6 +62,20 @@ for (const digest of digests) {
   }
 }
 
+// PUI Phase 4: Positions. Each filter the page offers, and every position the
+// source holds, so the list and each detail page render from a record.
+const positionIds = new Set();
+for (const state of ["open", "closed", "all"]) {
+  const path = `/api/v1/positions?state=${state}`;
+  captured[path] = await envelope(path);
+  for (const item of captured[path].data.items) positionIds.add(item.position_id);
+}
+for (const id of positionIds) {
+  for (const path of [`/api/v1/positions/${id}`, `/api/v1/positions/${id}/observations`]) {
+    captured[path] = await envelope(path);
+  }
+}
+
 // RUI-5. The audit feed is captured in small pages on purpose: the whole
 // committed corpus fits one default page, so a fixture taken at the default
 // limit would exercise none of the cursor loop — the exact path `RUI-VAL-004`
