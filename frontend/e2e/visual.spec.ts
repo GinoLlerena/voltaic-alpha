@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { replayApi, settled } from "./fixtures";
+import { positionIds, replayApi, settled } from "./fixtures";
 
 /**
  * Visual regression over the screens an evaluator actually sees.
@@ -22,6 +22,11 @@ const SCREENS = [
   { name: "tour-step", path: "/evidence?tour=4" },
   { name: "activity", path: "/activity" },
   { name: "review", path: "/review" },
+  // Open positions: none in the committed evidence, so this is the truthful
+  // empty state the live site shows. The closed list and one position follow.
+  { name: "positions", path: "/positions" },
+  { name: "positions-closed", path: "/positions?state=closed" },
+  { name: "position", path: `/positions/${positionIds[0] ?? "none"}` },
   {
     name: "decision-refusal",
     path: "/decisions/8374de98a8af7fa09bdfb2bbcb0423fe6279879b5c53650acbda4e2affdcd8b2",

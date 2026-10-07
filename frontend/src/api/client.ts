@@ -101,6 +101,22 @@ export const api = {
   workerFaults: () => `${published("/api/v1/worker/events")}?faults_only=true` as ApiUrl,
   proofTiles: () => published("/api/v1/system/proof") as ApiUrl,
   reviewOverview: () => published("/api/v1/outcomes") as ApiUrl,
+  /** Positions across decisions, by whether exposure may exist (PUI4 §3). */
+  positions: (state: "open" | "closed" | "all", cursor?: string | null) => {
+    const query = new URLSearchParams({ state });
+    if (cursor) query.set("cursor", cursor);
+    return `${published("/api/v1/positions")}?${query.toString()}` as ApiUrl;
+  },
+  position: (positionId: string) =>
+    published("/api/v1/positions/{position_id}").replace("{position_id}", positionId) as ApiUrl,
+  /** A position's recorded marks, newest first, on the server's cursor. */
+  positionObservations: (positionId: string, cursor?: string | null) => {
+    const base = published("/api/v1/positions/{position_id}/observations").replace(
+      "{position_id}",
+      positionId,
+    );
+    return (cursor ? `${base}?cursor=${encodeURIComponent(cursor)}` : base) as ApiUrl;
+  },
   /** Execution outcomes: positions no longer held (PUI4 §4.2 A). */
   reviewExecutions: (kind: "closed" | "abandoned") =>
     `${published("/api/v1/review/executions")}?kind=${kind}` as ApiUrl,

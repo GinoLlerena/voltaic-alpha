@@ -15,6 +15,9 @@ import { Activity } from "./routes/Activity";
 import { Decision } from "./routes/Decision";
 import { Decisions } from "./routes/Decisions";
 import { Evidence } from "./routes/Evidence";
+import { asStateFilter, DEFAULT_STATE, type StateFilter } from "./components/positions";
+import { Position } from "./routes/Position";
+import { Positions } from "./routes/Positions";
 import { asHorizon, DEFAULT_HORIZON, type Horizon, Review } from "./routes/Review";
 import { Today } from "./routes/Today";
 
@@ -42,6 +45,7 @@ const rootRoute = createRootRoute({
             Today
           </Link>
           <Link to="/decisions">Decisions</Link>
+          <Link to="/positions">Positions</Link>
           <Link to="/activity">Activity</Link>
           <Link to="/review">Review</Link>
           <Link to="/evidence" className="secondary">
@@ -142,6 +146,31 @@ const evidenceRoute = createRoute({
   },
 });
 
+export interface PositionsSearch {
+  state?: StateFilter | undefined;
+}
+
+const positionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/positions",
+  validateSearch: (search: Record<string, unknown>): PositionsSearch => ({
+    state: asStateFilter(search["state"]),
+  }),
+  component: function PositionsRoute() {
+    const { state } = useSearch({ from: "/positions" });
+    return <Positions state={asStateFilter(state) ?? DEFAULT_STATE} />;
+  },
+});
+
+const positionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/positions/$positionId",
+  component: function PositionRoute() {
+    const { positionId } = useParams({ from: "/positions/$positionId" });
+    return <Position positionId={positionId} />;
+  },
+});
+
 export interface ReviewSearch {
   horizon?: Horizon | undefined;
 }
@@ -162,6 +191,8 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   decisionsRoute,
   decisionRoute,
+  positionsRoute,
+  positionRoute,
   activityRoute,
   reviewRoute,
   evidenceRoute,

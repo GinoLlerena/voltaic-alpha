@@ -135,13 +135,14 @@ describe("Today (PUI phase 2)", () => {
     );
   });
 
-  it("offers Today, Decisions, Activity, Review and Evidence", async () => {
+  it("offers Today, Decisions, Positions, Activity, Review and Evidence", async () => {
     vi.stubGlobal("fetch", respond());
     render(at("/"));
     const nav = await screen.findByRole("navigation", { name: "Primary" });
     expect([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual([
-      // Review joined in PUI Phase 4 (owner decision D5); Evidence stays last, secondary.
-      "/", "/decisions", "/activity", "/review", "/evidence",
+      // Positions and Review joined in PUI Phase 4 (owner decision D5); Evidence
+      // stays last, secondary.
+      "/", "/decisions", "/positions", "/activity", "/review", "/evidence",
     ]);
   });
 

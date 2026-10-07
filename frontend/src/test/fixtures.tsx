@@ -313,11 +313,39 @@ export const executionRow = {
   result: "closed", close_price: "2.800000", exit_trigger: "stop_loss",
   exit_reason: "spread value fell through the stop", held_seconds: 3600, sessions_held: 0,
 };
+export const POSITION = "p".repeat(32);
+/** A position summary in a chosen state, over the closed round trip's facts. */
+export const positionIn = (over: Record<string, unknown> = {}) => ({
+  ...executionRow.position, ...over,
+});
+export const currentMark = {
+  observed_at: "2026-08-28T15:29:00+00:00", source_time: "2026-08-28T15:28:58+00:00",
+  spread_value: "3.400000", long_bid: "7.100000", short_ask: "3.700000",
+  underlying_price: "640.100000", underlying_source: "completed_daily_close", dte: 21,
+  sessions_elapsed: 1, data_quality: [] as string[], snapshot_id: null,
+};
+export const openPosition = positionIn({
+  state: "OPEN", state_meaning: "Reconciled fills establish this exposure.", open: true,
+  closed_at: null, close_reason: null, realized: null, unrealized: "27.00",
+  mark_state: "current", latest_mark: currentMark,
+});
+export const positionsPage = (items: unknown[], ever = items.length) => ({
+  items, next_cursor: null, total: items.length, ever,
+});
+export const positionDetail = (position: unknown, over: Record<string, unknown> = {}) => ({
+  position, exits: [], incidents: [], observations_recorded: 0, ...over,
+});
+export const noMarks = { items: [], next_cursor: null, total: 0 };
+
 export const noExecutions = (kind: string) => ({
   items: [], next_cursor: null, kind, closed: 0, abandoned: 0,
 });
 
 export const routes: Record<string, unknown> = {
+  // As the live source is: no position has ever been opened.
+  "/api/v1/positions?state=": envelope(positionsPage([], 0)),
+  [`/api/v1/positions/${POSITION}/observations`]: envelope(noMarks),
+  [`/api/v1/positions/${POSITION}`]: envelope(positionDetail(openPosition)),
   "/api/v1/review/executions?kind=closed": envelope(noExecutions("closed")),
   "/api/v1/review/executions?kind=abandoned": envelope(noExecutions("abandoned")),
   "/api/v1/review/sessions?horizon=T%2B1&before=2026-10-02": envelope(journalPage2),

@@ -39,6 +39,12 @@ export async function replayApi(page: Page): Promise<string[]> {
   return missed;
 }
 
+/** Positions the source holds, from the list the page itself asks for. */
+export const positionIds: string[] = (
+  (captured["/api/v1/positions?state=all"] as { data?: { items?: { position_id: string }[] } })
+    ?.data?.items ?? []
+).map((item) => item.position_id);
+
 /** Routes the gate walks: Today, the list, the full history, Evidence with two tour steps, activity, and every decision. */
 export const routes = [
   "/",
@@ -49,6 +55,9 @@ export const routes = [
   "/evidence?tour=4",
   "/activity",
   "/review",
+  "/positions",
+  "/positions?state=closed",
+  ...positionIds.map((id) => `/positions/${id}`),
   ...digests.map((d) => `/decisions/${d}`),
 ];
 
@@ -61,6 +70,9 @@ export const names = [
   "tour-4",
   "activity",
   "review",
+  "positions",
+  "positions-closed",
+  ...positionIds.map((id) => `position-${id.slice(0, 12)}`),
   ...digests.map((d) => `decision-${d.slice(0, 12)}`),
 ];
 
