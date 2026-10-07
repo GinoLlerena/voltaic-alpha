@@ -8,6 +8,7 @@ needed, and what is refused during the trading day. Nothing here reaches a host.
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -26,21 +27,41 @@ class StepsFor(unittest.TestCase):
         steps = da.steps_for(sh.Plan(), DAY)
         self.assertEqual((steps.ship, steps.worker, steps.blocked), ([], False, None))
 
-    def test_read_only_source_restarts_the_api_and_dashboard_but_not_the_worker(self) -> None:
-        plan = sh.Plan(changed=[
-            "src/options_alpha_lab/api/server.py", "src/options_alpha_lab/presentation/decision.py",
-        ])
+    def test_api_only_source_restarts_the_api_alone_and_may_ship_in_the_day(self) -> None:
+        plan = sh.Plan(changed=["src/options_alpha_lab/api/server.py"])
         steps = da.steps_for(plan, DAY)
-        self.assertEqual(steps.ship, ["--apply", *RESTARTS])
+        self.assertEqual(steps.ship, ["--apply", "--restart", "options-alpha-api"])
         self.assertFalse(steps.worker)
         self.assertIsNone(steps.blocked, "no worker restart, so the trading day does not block it")
 
-    def test_worker_source_restarts_the_worker_and_waits_for_the_close(self) -> None:
+    def test_a_file_the_worker_loads_restarts_the_worker_and_waits_for_the_close(self) -> None:
         plan = sh.Plan(changed=["src/options_alpha_lab/agent.py"])
         blocked = da.steps_for(plan, DAY)
-        self.assertEqual(blocked.ship, ["--apply", "--restart-worker", *RESTARTS])
+        self.assertEqual(blocked.ship, ["--apply", "--restart-worker"])
         self.assertIn("RUN IT AT OR AFTER 17:15 ET", blocked.blocked or "")
         self.assertIsNone(da.steps_for(plan, None).blocked)
+
+    def test_a_file_every_service_loads_restarts_them_all(self) -> None:
+        plan = sh.Plan(changed=["src/options_alpha_lab/calendar.py"])
+        self.assertEqual(
+            da.steps_for(plan, None).ship, ["--apply", "--restart-worker", *RESTARTS]
+        )
+
+    def test_source_no_service_loads_restarts_nothing_and_ships_in_the_day(self) -> None:
+        # 7 October 2026: the scheduler function's module was held until after
+        # the close as "worker source". Nothing running on the host imports it.
+        plan = sh.Plan(changed=[
+            "src/options_alpha_lab/scheduler.py", "deploy/scheduler/handler.py",
+            "scripts/arm_worker.sh",
+        ])
+        steps = da.steps_for(plan, DAY)
+        self.assertEqual((steps.ship, steps.worker, steps.blocked), (["--apply"], False, None))
+
+    def test_a_packaged_data_file_restarts_everything_because_imports_cannot_trace_it(self) -> None:
+        plan = sh.Plan(changed=["src/options_alpha_lab/data/nyse_sessions.json"])
+        self.assertEqual(
+            da.steps_for(plan, None).ship, ["--apply", "--restart-worker", *RESTARTS]
+        )
 
     def test_changed_requirements_install_and_restart_everything(self) -> None:
         plan = sh.Plan(changed=["requirements.txt"])
@@ -73,6 +94,46 @@ class StepsFor(unittest.TestCase):
         steps = da.steps_for(plan, DAY, ignore_window=True)
         self.assertIsNone(steps.blocked)
         self.assertIn("--ignore-window", steps.ship)
+
+
+class LoadedBy(unittest.TestCase):
+    """What each service loads is read from its imports, so it cannot drift."""
+
+    def loads(self, service: str) -> frozenset[str]:
+        return da.loaded_by(da.ENTRY_POINTS[service])
+
+    def test_the_worker_loads_the_agent_and_the_lifecycle_but_no_read_only_surface(self) -> None:
+        worker = self.loads(da.WORKER)
+        for path in ("worker.py", "agent.py", "outcomes.py", "execution/lifecycle.py",
+                     "calendar.py", "__init__.py"):
+            self.assertIn(f"src/options_alpha_lab/{path}", worker)
+        for path in ("api/server.py", "presentation/review.py", "scheduler.py"):
+            self.assertNotIn(f"src/options_alpha_lab/{path}", worker)
+
+    def test_the_api_loads_its_read_models_and_nothing_that_can_trade(self) -> None:
+        api = self.loads(da.API)
+        for path in ("api/server.py", "api/dto.py", "presentation/positions.py",
+                     "presentation/review.py"):
+            self.assertIn(f"src/options_alpha_lab/{path}", api)
+        # The same boundary `test_api` asserts against the running import graph.
+        for path in ("agent.py", "worker.py", "config.py", "execution/gateway.py"):
+            self.assertNotIn(f"src/options_alpha_lab/{path}", api)
+
+    def test_an_import_inside_a_function_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pkg = root / "src" / "options_alpha_lab"
+            (pkg / "sub").mkdir(parents=True)
+            (pkg / "__init__.py").write_text("")
+            (pkg / "sub" / "__init__.py").write_text("")
+            (pkg / "entry.py").write_text("def run():\n    from .sub import late\n")
+            (pkg / "sub" / "late.py").write_text("from .. import top\n")
+            (pkg / "top.py").write_text("")
+            (pkg / "unused.py").write_text("")
+            got = da.loaded_by("src/options_alpha_lab/entry.py", root)
+        names = {p.removeprefix("src/options_alpha_lab/") for p in got}
+        self.assertEqual(names, {"entry.py", "sub/__init__.py", "sub/late.py", "top.py",
+                                 "__init__.py"})
 
 
 class SessionAction(unittest.TestCase):

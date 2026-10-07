@@ -690,8 +690,11 @@ python3 scripts/deploy_all.py --apply   # session if needed, host code, UI, conf
 
 It reads the differences and chooses `ship_host.py`'s flags: `--install-deps`
 when `requirements.txt` differs, `--migrate` when the schema is behind,
-`--restart-worker` when source the worker runs differs, and an API and
-dashboard restart for any source change. It opens a one-hour session whenever no
+and a restart of each service whose own loaded files differ. Which files the
+worker, the API and the dashboard load is read from their imports
+(`deploy_all.loaded_by`), so a change nothing running imports - an operator
+script, the scheduler function's module - restarts nothing and may ship during
+the trading day. It opens a one-hour session whenever no
 session lock is held, so the scheduler cannot stop the server mid-deploy (a
 deploy started at 17:15 ET is otherwise still running when the run window
 closes at 17:30), and ends only a session it opened; an owner's lock about to
