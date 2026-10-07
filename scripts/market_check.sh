@@ -9,6 +9,15 @@
 # MARKET_CLOSED, which is the worker behaving correctly rather than a fault.
 set -euo pipefail
 
+# The CLI echoes the AccessKey ID in its error output, so its stderr is never
+# shown (readiness review PER-R-2). A failure says which call failed and stops.
+aliyun() {
+  command aliyun "$@" 2>/dev/null || {
+    echo "aliyun ${1:-} ${2:-} failed; its stderr is withheld because it can echo the AccessKey ID" >&2
+    return 1
+  }
+}
+
 REGION=ap-southeast-1
 # The worker moved onto the demo host with CIIP-I-001's consolidation on
 # 10 September 2026, and the separate worker instance was released. This

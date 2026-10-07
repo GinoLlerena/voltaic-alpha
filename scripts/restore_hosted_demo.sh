@@ -15,6 +15,15 @@
 # nothing, because every phase below spends money or changes a production host.
 set -euo pipefail
 
+# The CLI echoes the AccessKey ID in its error output, so its stderr is never
+# shown (readiness review PER-R-2). A failure says which call failed and stops.
+aliyun() {
+  command aliyun "$@" 2>/dev/null || {
+    echo "aliyun ${1:-} ${2:-} failed; its stderr is withheld because it can echo the AccessKey ID" >&2
+    return 1
+  }
+}
+
 REGION=ap-southeast-1
 DEMO=i-t4n88bkfwsq0lhzmfjii          # options-alpha-demo, public dashboard
 # CIIP-I-001 consolidated the worker onto the demo host on 10 September 2026 and

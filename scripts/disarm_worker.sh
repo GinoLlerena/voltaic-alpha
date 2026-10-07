@@ -1,7 +1,7 @@
 #!/bin/bash
 # Disarm autonomous Paper entry. Safe to run at any time, including mid-position.
 #
-# Removes the paper_execute drop-in and returns the worker to `recommend`, where
+# Removes the paper_execute drop-in and returns the worker to the base unit's `observe`, where
 # it still observes, decides, reconciles, enforces deadlines and manages exits -
 # it simply cannot open new risk. Risk-reducing closes are unaffected either
 # way, because blocking an exit would trap exposure at the moment it most needs
@@ -10,6 +10,15 @@
 # This does NOT close an open position. If one is open, the worker keeps
 # managing it under the same exit policy; check with scripts/market_check.sh.
 set -euo pipefail
+
+# The CLI echoes the AccessKey ID in its error output, so its stderr is never
+# shown (readiness review PER-R-2). A failure says which call failed and stops.
+aliyun() {
+  command aliyun "$@" 2>/dev/null || {
+    echo "aliyun ${1:-} ${2:-} failed; its stderr is withheld because it can echo the AccessKey ID" >&2
+    return 1
+  }
+}
 REGION=ap-southeast-1
 # The worker moved onto the demo host with CIIP-I-001's consolidation on
 # 10 September 2026, and the separate worker instance was released. This
@@ -42,7 +51,7 @@ if s not in ('Running','Pending','Invoked'):
 ")
   case "$(head -1 <<<"$out")" in
     Running|Pending|Invoked) sleep 4 ;;
-    *) tail -n +2 <<<"$out"; echo; echo "Disarmed. Expect: \"mode\": \"recommend\", \"writes\": \"disabled\"."; exit 0 ;;
+    *) tail -n +2 <<<"$out"; echo; echo "Disarmed. Expect: \"mode\": \"observe\", \"writes\": \"disabled\"."; exit 0 ;;
   esac
 done
 echo "timed out; check with scripts/market_check.sh" >&2; exit 1
