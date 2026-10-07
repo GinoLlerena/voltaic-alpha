@@ -109,6 +109,15 @@ def in_run_window(calendar: TradingCalendar, now: datetime, covered_until: date)
 class Readiness:
     ok: bool
     reasons: tuple[str, ...] = ()
+    #: Exposure the worker still owns. While any exists the server stays up,
+    #: and that is the system working, not a fault.
+    open_positions: int = 0
+    working_orders: int = 0
+    unresolved_incidents: int = 0
+
+    @property
+    def holding(self) -> bool:
+        return self.open_positions > 0 or self.working_orders > 0
 
 
 class Action(str, Enum):  # noqa: UP042 - matches the str-Enum style used project-wide
@@ -194,6 +203,21 @@ def decide(
     # (4) Asked last: the server's own view of whether stopping is safe.
     ready = readiness()
     if not ready.ok:
+        # (4a) Holding exposure is a reason to stay up, not an alert. A position
+        # is held for up to three sessions, and this runs every 15 minutes: an
+        # alert per tick would be about sixty a night saying the system is doing
+        # what it should, on the channel that also carries "the server did not
+        # start" (readiness review PER-R-1, 7 October 2026). An unresolved
+        # incident is different and still alerts, held position or not.
+        if ready.holding and ready.unresolved_incidents == 0:
+            held = []
+            if ready.open_positions:
+                held.append(f"{ready.open_positions} open position(s)")
+            if ready.working_orders:
+                held.append(f"{ready.working_orders} working order(s)")
+            return Decision(
+                Action.NONE, f"holding {' and '.join(held)}; the server stays up", tuple(alerts)
+            )
         alerts.append(f"stop skipped: {'; '.join(ready.reasons) or 'not ready'}")
         return Decision(Action.NONE, "not ready to stop", tuple(alerts))
 

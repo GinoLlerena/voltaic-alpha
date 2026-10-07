@@ -150,7 +150,18 @@ def readiness_from(base_url: str) -> Readiness:
     if status != 200 or not isinstance(body, dict):
         return Readiness(False, (f"stop-readiness unreachable (HTTP {status})",))
     data = body.get("data") or {}
-    return Readiness(bool(data.get("ok")), tuple(data.get("reasons") or ()))
+
+    def count(key: str) -> int:
+        value = data.get(key)
+        return value if isinstance(value, int) and value > 0 else 0
+
+    # The counts let `decide` tell "holding exposure" (stay up, no alert) from
+    # a fault. A response without them reads as zero, which alerts as before.
+    return Readiness(
+        bool(data.get("ok")), tuple(data.get("reasons") or ()),
+        open_positions=count("open_positions"), working_orders=count("working_orders"),
+        unresolved_incidents=count("unresolved_incidents"),
+    )
 
 
 def started_healthy(base_url: str) -> tuple[bool, str]:
