@@ -21,12 +21,45 @@
 # than from the flag that configured it. Those can disagree, and only one of
 # them is safe.
 set -euo pipefail
+
+# The CLI echoes the AccessKey ID in its error output, so its stderr is never
+# shown (readiness review PER-R-2). A failure says which call failed and stops.
+aliyun() {
+  command aliyun "$@" 2>/dev/null || {
+    echo "aliyun ${1:-} ${2:-} failed; its stderr is withheld because it can echo the AccessKey ID" >&2
+    return 1
+  }
+}
 REGION=ap-southeast-1
 # The worker moved onto the demo host with CIIP-I-001's consolidation on
 # 10 September 2026, and the separate worker instance was released. This
 # pointed at that released instance until 19 September and could only fail
 # with InvalidInstance.NotFound.
 WORKER=i-t4n88bkfwsq0lhzmfjii
+
+# Arming restarts the worker, so it waits for the trading day to end, as a
+# deploy that restarts the worker does. ARM_IGNORE_WINDOW=1 overrides; ARM_AT
+# (an ISO time) exists so the check can be tested.
+if [ "${ARM_IGNORE_WINDOW:-0}" != 1 ]; then
+  why=$(python3 - <<'PY'
+import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+et = ZoneInfo("America/New_York")
+at = os.environ.get("ARM_AT")
+now = (datetime.fromisoformat(at) if at else datetime.now(et)).astimezone(et)
+minutes = now.hour * 60 + now.minute
+if now.weekday() < 5 and 8 * 60 + 30 <= minutes < 17 * 60 + 15:
+    print(f"{now:%a %H:%M} ET is inside the trading day")
+PY
+)
+  if [ -n "$why" ]; then
+    echo "REFUSING to arm: $why. Arming restarts the worker; run it at or after 17:15 ET," >&2
+    echo "or on a weekend. ARM_IGNORE_WINDOW=1 overrides." >&2
+    exit 2
+  fi
+fi
 
 # A fresh token per arming, recorded with every decision it authorises, so two
 # armings are distinguishable in the audit trail.

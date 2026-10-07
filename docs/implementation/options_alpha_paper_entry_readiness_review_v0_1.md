@@ -169,7 +169,7 @@ The first real trade is the test. Until it has completed a full round trip:
 | Item | Status |
 |---|---|
 | PER-R-1 | **Fixed in code, 7 October 2026.** `scheduler.decide` returns "holding N open position(s); the server stays up" with no alert when exposure is held and no incident is open; an unresolved incident still alerts; a refusal with no exposure alerts as before. The handler passes the counts from stop-readiness. Eight tests (`HoldingExposureTests`). The alert rule sends one email per event (`Period 15`), so the old behaviour was about sixty emails a night per held position. **Takes effect only after the function is redeployed** (`python3 scripts/provision_scheduler.py apply`). |
-| PER-R-2 | Open. |
+| PER-R-2 | **Fixed, 7 October 2026.** Every operator shell script that calls the cloud CLI (`arm_worker.sh`, `disarm_worker.sh`, `market_check.sh`, `restore_hosted_demo.sh`) now wraps it: stderr is discarded and a failure names the call and stops. `arm_worker.sh` refuses during the trading day (08:30–17:15 ET on weekdays) before any cloud call, unless `ARM_IGNORE_WINDOW=1`; disarming is never refused by the clock. The disarm text names `observe`. `tests/test_arm_scripts.py` runs both scripts against a stand-in CLI that fails and leaks on stderr. |
 | PER-R-4 | Asked on 7 October 2026 whether the provisional status of the thresholds is accepted, the owner replied "proceed". Recorded as that reply, to be confirmed in words at arming. |
 | PER-R-5 | Applies at and after arming. |
 
