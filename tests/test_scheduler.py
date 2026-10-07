@@ -42,9 +42,9 @@ def utc(text: str) -> datetime:
 class Readiness_:
     """A readiness probe that records whether it was asked."""
 
-    def __init__(self, ok: bool = True, *reasons: str) -> None:
+    def __init__(self, ok: bool = True, *reasons: str, **counts: int) -> None:
         self.calls = 0
-        self.result = Readiness(ok, reasons)
+        self.result = Readiness(ok, reasons, **counts)
 
     def __call__(self) -> Readiness:
         self.calls += 1
@@ -61,6 +61,90 @@ def tick(now: str, status: str = "Running", tags: dict[str, str] | None = None,
 
 def lock(until: str, reason: str = "dev") -> dict[str, str]:
     return {LOCK_UNTIL_TAG: until, LOCK_REASON_TAG: reason}
+
+
+class HoldingExposureTests(unittest.TestCase):
+    """Holding a position keeps the server up, and is not an alert.
+
+    Readiness review PER-R-1, 7 October 2026. Stop-readiness refuses a stop
+    while a position is open or an order is working, and it is right to. The
+    scheduler used to alert on every refusal, every 15 minutes: about sixty
+    alerts a night for a position held as designed, on the channel that also
+    carries "the server did not start".
+    """
+
+    NIGHT = "2026-09-30T02:00"  # outside the run window, no lock
+
+    def test_an_open_position_holds_the_server_up_without_an_alert(self) -> None:
+        decision, probe = tick(
+            self.NIGHT, ready=Readiness_(False, "1 open position(s)", open_positions=1)
+        )
+        self.assertEqual(probe.calls, 1)
+        self.assertIs(decision.action, Action.NONE)
+        self.assertEqual(decision.alerts, ())
+        self.assertEqual(decision.reason, "holding 1 open position(s); the server stays up")
+
+    def test_a_working_order_holds_it_too(self) -> None:
+        decision, _ = tick(self.NIGHT, ready=Readiness_(
+            False, "1 open position(s)", "1 working order(s)", open_positions=1, working_orders=1,
+        ))
+        self.assertEqual(decision.alerts, ())
+        self.assertIn("1 open position(s) and 1 working order(s)", decision.reason)
+
+    def test_other_gaps_do_not_alert_while_exposure_is_held(self) -> None:
+        # The stop would not happen anyway; the backup's own checks report a backup.
+        decision, _ = tick(self.NIGHT, ready=Readiness_(
+            False, "1 open position(s)", "the latest backup is not verified", open_positions=1,
+        ))
+        self.assertIs(decision.action, Action.NONE)
+        self.assertEqual(decision.alerts, ())
+
+    def test_an_unresolved_incident_still_alerts_with_a_position_held(self) -> None:
+        decision, _ = tick(self.NIGHT, ready=Readiness_(
+            False, "1 open position(s)", "1 unresolved incident(s)",
+            open_positions=1, unresolved_incidents=1,
+        ))
+        self.assertIs(decision.action, Action.NONE)
+        self.assertEqual(len(decision.alerts), 1)
+        self.assertIn("1 unresolved incident(s)", decision.alerts[0])
+
+    def test_a_refusal_with_no_exposure_alerts_as_before(self) -> None:
+        decision, _ = tick(self.NIGHT, ready=Readiness_(False, "the latest backup is not verified"))
+        self.assertEqual(decision.reason, "not ready to stop")
+        self.assertEqual(decision.alerts, ("stop skipped: the latest backup is not verified",))
+
+    def test_holding_never_becomes_a_stop(self) -> None:
+        for counts in ({"open_positions": 1}, {"working_orders": 2}):
+            with self.subTest(counts):
+                decision, _ = tick(self.NIGHT, ready=Readiness_(False, "held", **counts))
+                self.assertIsNot(decision.action, Action.STOP)
+
+    def test_a_ready_server_with_counts_of_zero_still_stops(self) -> None:
+        decision, _ = tick(self.NIGHT, ready=Readiness_(True))
+        self.assertIs(decision.action, Action.STOP)
+
+    def test_the_handler_passes_the_counts_and_reads_a_missing_one_as_zero(self) -> None:
+        import sys
+        from pathlib import Path
+        from unittest import mock
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "deploy" / "scheduler"))
+        import handler
+
+        held = {"data": {"ok": False, "reasons": ["1 open position(s)"], "open_positions": 1,
+                         "working_orders": 0, "unresolved_incidents": 0}}
+        with mock.patch.object(handler, "http_json", return_value=(200, held)):
+            ready = handler.readiness_from("http://x")
+        self.assertTrue(ready.holding)
+        self.assertEqual((ready.open_positions, ready.unresolved_incidents), (1, 0))
+
+        old = {"data": {"ok": False, "reasons": ["the latest backup is not verified"]}}
+        with mock.patch.object(handler, "http_json", return_value=(200, old)):
+            self.assertFalse(handler.readiness_from("http://x").holding)
+        with mock.patch.object(handler, "http_json", return_value=(0, "refused")):
+            unreachable = handler.readiness_from("http://x")
+        self.assertFalse(unreachable.ok)
+        self.assertFalse(unreachable.holding)
 
 
 class RunWindowTests(unittest.TestCase):
