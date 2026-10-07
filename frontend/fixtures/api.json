@@ -500,7 +500,8 @@
       "latest_mark": null,
       "unrealized": null,
       "realized": "-7.00",
-      "open_incidents": 0
+      "open_incidents": 0,
+      "attention": []
      },
      "result": "closed",
      "close_price": "3.060000",
@@ -3520,7 +3521,8 @@
      "latest_mark": null,
      "unrealized": null,
      "realized": "-7.00",
-     "open_incidents": 0
+     "open_incidents": 0,
+     "attention": []
     }
    ],
    "next_cursor": null,
@@ -3565,7 +3567,8 @@
      "latest_mark": null,
      "unrealized": null,
      "realized": "-7.00",
-     "open_incidents": 0
+     "open_incidents": 0,
+     "attention": []
     }
    ],
    "next_cursor": null,
@@ -3609,7 +3612,8 @@
     "latest_mark": null,
     "unrealized": null,
     "realized": "-7.00",
-    "open_incidents": 0
+    "open_incidents": 0,
+    "attention": []
    },
    "exits": [],
    "incidents": [],

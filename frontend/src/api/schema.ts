@@ -1698,6 +1698,8 @@ export interface components {
         };
         /** PositionSummaryOut */
         PositionSummaryOut: {
+            /** Attention */
+            attention: ("open_incident" | "stale_mark" | "unreadable_mark" | "never_marked")[];
             /** Close Reason */
             close_reason: string | null;
             /** Closed At */

@@ -318,3 +318,4 @@ header nav { flex-wrap: wrap; row-gap: .35rem; }
 .state-line strong { color: var(--text); }
 [data-testid="position-mark"], [data-testid="position-exits"], [data-testid="position-incidents"],
 [data-testid="position-observations"] { margin-top: 1.4rem; }
+.attention li[data-kind="position"] .m { color: var(--warm); }

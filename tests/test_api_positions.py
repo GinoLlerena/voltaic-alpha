@@ -9,7 +9,7 @@ lifecycle store itself: the same calls the worker makes, never an invented row.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -152,6 +152,69 @@ class Marks(PositionsCase):
         self.assertEqual(seen, ["3.100000", "3.200000", "3.300000"])
         self.assertEqual(page["total"], 3)
         self.assertEqual(self.get(position_id)["observations_recorded"], 3)
+
+
+class Attention(PositionsCase):
+    """The one rule for when a held position needs the owner to look (D4)."""
+
+    def reasons(self, position_id: str, now: datetime = NOW) -> list[str]:
+        found: list[str] = self.summary(position_id, now)["attention"]
+        return found
+
+    def test_a_freshly_marked_open_position_needs_nothing(self) -> None:
+        position_id, _ = self.opened()
+        self.mark(position_id, NOW - timedelta(minutes=1))
+        self.assertEqual(self.reasons(position_id), [])
+
+    def test_a_stale_mark_in_an_open_session_does(self) -> None:
+        position_id, _ = self.opened()
+        self.mark(position_id, NOW - timedelta(minutes=6))
+        self.assertEqual(self.reasons(position_id), ["stale_mark"])
+
+    def test_the_same_mark_after_the_close_does_not(self) -> None:
+        position_id, _ = self.opened()
+        self.mark(position_id, NOW)
+        self.assertEqual(self.reasons(position_id, AFTER_CLOSE), [])
+
+    def test_an_unreadable_mark_does(self) -> None:
+        position_id, _ = self.opened()
+        self.mark(position_id, NOW - timedelta(minutes=1), value=None)
+        self.assertEqual(self.reasons(position_id), ["unreadable_mark"])
+
+    def test_an_open_incident_does_alongside_a_stale_mark(self) -> None:
+        position_id, _ = self.opened()
+        self.mark(position_id, NOW - timedelta(minutes=6))
+        self.store.open_incident(
+            kind="position_mismatch", detail="x", execution_state=ExecutionState.NO_NEW_RISK,
+            position_id=position_id, now=NOW,
+        )
+        self.assertEqual(self.reasons(position_id), ["open_incident", "stale_mark"])
+
+    def test_held_but_never_marked_five_minutes_into_a_session_does(self) -> None:
+        position_id, _ = self.opened()  # opened at NOW, never observed
+        self.assertEqual(self.reasons(position_id, NOW + timedelta(minutes=5)), [])
+        self.assertEqual(
+            self.reasons(position_id, NOW + timedelta(minutes=5, seconds=1)), ["never_marked"]
+        )
+        self.assertEqual(self.reasons(position_id, AFTER_CLOSE), [])
+
+    def test_a_pending_entry_is_left_to_its_own_deadline(self) -> None:
+        self.assertEqual(self.reasons(self.pending(), NOW + timedelta(hours=1)), [])
+
+    def test_a_closed_or_abandoned_position_never_does(self) -> None:
+        closed = self.closed()
+        self.mark(closed, NOW - timedelta(days=30))
+        self.assertEqual(self.reasons(closed, MONDAY_OPEN), [])
+        abandoned = self.pending()
+        self.store.apply_entry_outcome(abandoned, state=OrderState.CANCELED,
+                                       filled_quantity=0, avg_debit=None, now=NOW)
+        self.assertEqual(self.reasons(abandoned, MONDAY_OPEN), [])
+
+    def test_the_list_carries_the_same_reasons_as_the_position(self) -> None:
+        position_id, _ = self.opened()
+        self.mark(position_id, NOW - timedelta(minutes=6))
+        items = self.client().get("/api/v1/positions?state=open").json()["data"]["items"]
+        self.assertEqual(items[0]["attention"], ["stale_mark"])
 
 
 class ListAndBoundary(PositionsCase):

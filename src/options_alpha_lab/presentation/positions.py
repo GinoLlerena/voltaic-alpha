@@ -91,6 +91,47 @@ def mark_state(
     return "stale"
 
 
+Attention = Literal["open_incident", "stale_mark", "unreadable_mark", "never_marked"]
+
+
+def attention(
+    position: Position,
+    observation: PositionObservation | None,
+    state: MarkState,
+    open_incidents: int,
+    now: datetime,
+    calendar: TradingCalendar,
+) -> tuple[Attention, ...]:
+    """Why a held position needs the owner to look at it. Empty when it does not.
+
+    The whole rule, in one place (`PUI4` §3.5, owner decision D4), so no surface
+    invents its own: an open incident on the position; a newest mark that is
+    stale or could not be read; or a position with confirmed exposure that has
+    never been marked more than five minutes into an open session. A position
+    that is closed or abandoned never needs attention, and a pending entry is
+    the order clock's business: its own deadline raises an incident.
+    """
+    if position.lifecycle_status not in OPEN_STATES:
+        return ()
+    reasons: list[Attention] = []
+    if open_incidents > 0:
+        reasons.append("open_incident")
+    if state == "stale":
+        reasons.append("stale_mark")
+    elif state == "unreadable":
+        reasons.append("unreadable_mark")
+    elif (
+        observation is None
+        and position.lifecycle_status in ("OPEN", "CLOSING")
+        and position.opened_at is not None
+    ):
+        session = calendar.session_for(now)
+        in_session = session is not None and session.open_at <= now < session.close_at
+        if in_session and now - _aware(position.opened_at) > STALE_AFTER:
+            reasons.append("never_marked")
+    return tuple(reasons)
+
+
 @dataclass(frozen=True)
 class PositionView:
     """One position with what the records say around it."""
@@ -104,6 +145,8 @@ class PositionView:
     #: USD for the round trip, from reconciled fills; None unless both sides filled.
     realized: Decimal | None
     open_incidents: int
+    #: Why this position needs a look; empty when it does not. See `attention`.
+    attention: tuple[Attention, ...] = ()
 
     @property
     def state_meaning(self) -> str:
@@ -191,12 +234,15 @@ def views(
         decision = decisions.get(p.decision_id)
         mark = marks.get(p.id)
         exit_row = exits.get(p.id)
+        state = mark_state(p, mark, now, calendar)
+        open_incidents = int(incidents.get(p.id, 0))
         out.append(PositionView(
             position=p,
             decision_hash=decision.decision_hash if decision else None,
             instrument=symbols.get(decision.market_snapshot_id) if decision else None,
             observation=mark,
-            mark_state=mark_state(p, mark, now, calendar),
+            mark_state=state,
+            attention=attention(p, mark, state, open_incidents, now, calendar),
             exit=exit_row,
             # A result exists only for a confirmed round trip; never for a state
             # in which the close is unconfirmed.
@@ -204,7 +250,7 @@ def views(
                 realized_from_fills(session, p.decision_id)
                 if p.lifecycle_status == "CLOSED" else None
             ),
-            open_incidents=int(incidents.get(p.id, 0)),
+            open_incidents=open_incidents,
         ))
     return out
 

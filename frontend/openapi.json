@@ -3586,6 +3586,19 @@
       "PositionSummaryOut": {
         "additionalProperties": false,
         "properties": {
+          "attention": {
+            "items": {
+              "enum": [
+                "open_incident",
+                "stale_mark",
+                "unreadable_mark",
+                "never_marked"
+              ],
+              "type": "string"
+            },
+            "title": "Attention",
+            "type": "array"
+          },
           "close_reason": {
             "anyOf": [
               {
@@ -3850,7 +3863,8 @@
           "latest_mark",
           "unrealized",
           "realized",
-          "open_incidents"
+          "open_incidents",
+          "attention"
         ],
         "title": "PositionSummaryOut",
         "type": "object"
