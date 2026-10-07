@@ -292,12 +292,18 @@ an explicit `--approve` token whenever `REQUIRE_OPERATOR_APPROVAL` is set. Close
 are deliberately exempt: blocking an exit traps exposure at the moment it most
 needs reducing.
 
-**Current safety status:** autonomous Paper entry is **armed** as of 30 August
-2026, on the deployed worker, for the hackathon demonstration. It was not armed
-because the preconditions were met - the exit thresholds in `exits.py` are
-`PROVISIONAL` with no sensitivity analysis, `DEC-008` is open, and the hosted
-database has no backup or alerting. Treat any performance it produces as
-evidence that the mechanism runs, never that the thresholds are right.
+**Current safety status:** autonomous Paper entry is **armed** as of 7 October
+2026 on the consolidated host (`EV-045`), with the entry rules and the breadth
+veto unchanged. It ran armed from 30 August to early September on the previous
+worker host, then in `observe` from 10 September until this re-arming. It is
+not armed because the preconditions were all met: every threshold in
+`exits.py`, `components.py` and `evidence.py` is still `PROVISIONAL` and
+`DEC-008` is open, which the owner accepted on 7 October before arming. What has
+changed since August is that the hosted database is backed up off-host and
+failures alert by email. Treat any performance it produces as evidence that the
+mechanism runs, never that the thresholds are right. The readiness review is
+`docs/implementation/options_alpha_paper_entry_readiness_review_v0_1.md`;
+`scripts/disarm_worker.sh` removes write authority at any time.
 
 The machinery underneath is sound: broker acceptance is recorded as `SUBMITTED`
 and never as `FILLED`, position state is durable and reconstructed at startup

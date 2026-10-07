@@ -6,7 +6,7 @@
 | Reviewed revision | `b713dbc` |
 | Requested by | Owner, 7 October 2026: "complete the readiness review and, if all checks pass, enable Paper trading with the current entry rules and breadth veto unchanged" |
 | Scope | Re-arming autonomous **Paper** entry on the consolidated host. Entry rules, the breadth veto and every threshold are unchanged. |
-| Verdict | **Not yet. One blocking defect (R-1) and one hardening item (R-2) first; then one owner decision (R-4). The lifecycle machinery passes.** |
+| Verdict | At review: **not yet** - one blocking defect (R-1), one hardening item (R-2), one owner decision (R-4). **All three were closed the same day and Paper entry was armed at 21:29 UTC on 7 October 2026 (`EV-045`).** R-5 stays open until the first real round trip. |
 | Work prefix | `PER-` |
 
 ## 1. Background
@@ -170,8 +170,8 @@ The first real trade is the test. Until it has completed a full round trip:
 |---|---|
 | PER-R-1 | **Fixed in code, 7 October 2026.** `scheduler.decide` returns "holding N open position(s); the server stays up" with no alert when exposure is held and no incident is open; an unresolved incident still alerts; a refusal with no exposure alerts as before. The handler passes the counts from stop-readiness. Eight tests (`HoldingExposureTests`). The alert rule sends one email per event (`Period 15`), so the old behaviour was about sixty emails a night per held position. **Takes effect only after the function is redeployed** (`python3 scripts/provision_scheduler.py apply`). |
 | PER-R-2 | **Fixed, 7 October 2026.** Every operator shell script that calls the cloud CLI (`arm_worker.sh`, `disarm_worker.sh`, `market_check.sh`, `restore_hosted_demo.sh`) now wraps it: stderr is discarded and a failure names the call and stops. `arm_worker.sh` refuses during the trading day (08:30–17:15 ET on weekdays) before any cloud call, unless `ARM_IGNORE_WINDOW=1`; disarming is never refused by the clock. The disarm text names `observe`. `tests/test_arm_scripts.py` runs both scripts against a stand-in CLI that fails and leaks on stderr. |
-| PER-R-4 | Asked on 7 October 2026 whether the provisional status of the thresholds is accepted, the owner replied "proceed". Recorded as that reply, to be confirmed in words at arming. |
-| PER-R-5 | Applies at and after arming. |
+| PER-R-4 | **Closed.** Asked on 7 October 2026, the owner first replied "proceed", then, before arming, was shown the sentence "I accept the entry and exit thresholds are still provisional; Paper results show the mechanism works, not that the thresholds are right" and replied "I accept the entry and exit ...", adopting it. |
+| PER-R-5 | **Arming checks passed, 7 October 2026.** Armed 21:29 UTC: mode `paper_execute`, writes enabled, approval required, endpoint `paper-api.alpaca.markets`, startup reconciliation clean, one live lease, flat locally and at the broker, watchdog ok. Forced restart 21:31 UTC: same mode, clean reconciliation, one lease. **Still open:** the first real trade, to be followed from fill to close and compared with the broker. |
 
 ## 5. Order of work
 
