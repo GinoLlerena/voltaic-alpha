@@ -222,6 +222,15 @@ research. The live source cannot supply these, so:
 - Browser tests cover the empty live shape, each state, loading/failed/stale,
   and both widths.
 
+**Step 5 as built (6 October 2026).** The attention rule is one server function,
+`presentation/positions.attention`, and every position carries its answer as
+`attention`: `open_incident`, `stale_mark`, `unreadable_mark`, or `never_marked`
+(confirmed exposure with no mark more than five minutes into an open session;
+the approved text named only the stale mark, and an unmarked position is the
+same gap). Closed and abandoned positions never need attention, and a pending
+entry is left to its own deadline. Today and the Positions list both show that
+answer and compute nothing.
+
 **Step 1 as built (6 October 2026).** `tests/test_api_positions.py` builds each
 state with the lifecycle store's own calls (prepare, submit, reconcile, close,
 abandon, incident) rather than from a committed database, and runs on SQLite

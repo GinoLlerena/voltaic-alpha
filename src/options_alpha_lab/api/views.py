@@ -322,6 +322,7 @@ def position_summary(v: positions.PositionView) -> dto.PositionSummaryOut:
         latest_mark=mark(v.observation) if v.observation is not None else None,
         unrealized=dto.decimal(v.exit.unrealized) if v.exit is not None else None,
         realized=dto.decimal(v.realized), open_incidents=v.open_incidents,
+        attention=list(v.attention),
     )
 
 

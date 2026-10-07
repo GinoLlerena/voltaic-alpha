@@ -3,6 +3,7 @@ import type { Schemas } from "../api/client";
 import { api } from "../api/client";
 import { dataOf, useResource, type Resource } from "../api/useResource";
 import { Matrix } from "../components/Panel";
+import { ATTENTION } from "../components/positions";
 import { Loaded, Pending, StaleNote } from "../components/ResourceState";
 import { StatusHeader } from "../components/StatusHeader";
 import { checkedAt } from "../components/time";
@@ -14,6 +15,7 @@ type Listing = Schemas["DecisionListOut"];
 type Summary = Schemas["DecisionSummary"];
 type Market = Schemas["MarketOut"];
 type Page = Schemas["ActivityPage"];
+type PositionPage = Schemas["PositionPage"];
 
 /**
  * Today: is it operating correctly, what changed, and do I need to look?
@@ -27,17 +29,19 @@ export function Today() {
   const status = useResource<Status>(api.status());
   const incidents = useResource<Incident[]>(api.incidents("open"));
   const faults = useResource<WorkerEvents>(api.workerFaults());
+  const held = useResource<PositionPage>(api.positions("open"));
   const listing = useResource<Listing>(api.groupedDecisions("Notable"));
   const activity = useResource<Page>(api.activity());
 
   return (
     <>
       <StatusHeader status={status} />
-      <Attention incidents={incidents} faults={faults} />
+      <Attention incidents={incidents} faults={faults} held={held} />
       <LatestDecision listing={listing} />
       <RecentChanges activity={activity} />
       <nav className="shortcuts" aria-label="More">
         <Link to="/decisions">All decisions</Link>
+        <Link to="/positions">Positions</Link>
         <Link to="/activity">Full activity</Link>
         <Link to="/evidence">Evidence and proof</Link>
       </nav>
@@ -46,36 +50,60 @@ export function Today() {
 }
 
 /**
- * Open incidents and the worker's recorded faults, straight from the server.
+ * Open incidents, the worker's recorded faults, and held positions that need a
+ * look, straight from the server.
  *
  * No severity is computed here and no threshold is invented: the list is what
- * the two sources returned. If either could not answer, the section says so and
- * does not report a quiet system - an unreadable monitor is itself attention.
+ * the three sources returned. Which positions need a look, and why, is the
+ * server's rule (PUI Phase 4, owner decision D4: an open incident, a stale or
+ * unreadable mark, or exposure never marked); this only shows its answer. If a
+ * source could not answer, the section says so and does not report a quiet
+ * system - an unreadable monitor is itself attention.
  */
 function Attention({
   incidents,
   faults,
+  held,
 }: {
   incidents: Resource<Incident[]>;
   faults: Resource<WorkerEvents>;
+  held: Resource<PositionPage>;
 }) {
+  const heldData = dataOf(held);
+  const flagged = heldData ? heldData.items.filter((p) => p.attention.length > 0) : [];
+  // More open positions than one page holds: the rest were not checked here.
+  const heldUnchecked = heldData !== null && heldData.next_cursor !== null;
   const open = dataOf(incidents);
   const faultData = dataOf(faults);
   const faultSourceDown = faultData !== null && !faultData.available;
   const faultItems = faultData?.available ? faultData.items.slice(0, 3) : [];
-  const settled = open !== null && faultData !== null;
-  const quiet = settled && open.length === 0 && !faultSourceDown && faultItems.length === 0;
-  const checked = [incidents, faults].flatMap((r) => (r.state === "ready" ? [r.fetchedAt] : []));
+  const settled = open !== null && faultData !== null && heldData !== null;
+  const quiet =
+    settled &&
+    open.length === 0 &&
+    !faultSourceDown &&
+    faultItems.length === 0 &&
+    flagged.length === 0 &&
+    !heldUnchecked;
+  const checked = [incidents, faults, held].flatMap((r) =>
+    r.state === "ready" ? [r.fetchedAt] : [],
+  );
 
   return (
     <section className="attention" data-testid="attention" data-quiet={String(quiet)}>
       <h2>Needs attention</h2>
       {open === null ? <Pending what="incidents" resources={[incidents]} /> : null}
       {faultData === null ? <Pending what="worker faults" resources={[faults]} /> : null}
-      <StaleNote what="attention sources" resources={[incidents, faults]} />
+      {heldData === null ? <Pending what="held positions" resources={[held]} /> : null}
+      <StaleNote what="attention sources" resources={[incidents, faults, held]} />
       {quiet ? (
         <p className="quiet" data-testid="attention-quiet">
-          Nothing needs attention: no incident is open and the worker has recorded no fault.
+          Nothing needs attention: no incident is open, the worker has recorded no fault, and
+          {heldData && heldData.items.length > 0
+            ? ` none of the ${heldData.items.length} held position${
+                heldData.items.length === 1 ? "" : "s"
+              } needs a look.`
+            : " no position is held."}
           {checked.length > 0 ? ` Checked ${checkedAt(checked.sort()[0] ?? "")}.` : ""}
         </p>
       ) : null}
@@ -91,6 +119,25 @@ function Attention({
               </span>
             </li>
           ))}
+          {flagged.map((p) => (
+            <li key={p.position_id} data-kind="position">
+              <span className="m">held position · {p.state}</span>
+              <span className="prose">
+                <Link to="/positions/$positionId" params={{ positionId: p.position_id }}>
+                  {p.instrument ?? "instrument not recorded"} {p.strategy.replaceAll("_", " ")}
+                </Link>
+                : {p.attention.map((reason) => ATTENTION[reason]).join("; ")}
+              </span>
+            </li>
+          ))}
+          {heldUnchecked ? (
+            <li data-kind="monitor">
+              <span className="m">not all checked</span>
+              <span className="prose">
+                More positions are held than this list reads. <Link to="/positions">Open Positions</Link>
+              </span>
+            </li>
+          ) : null}
           {faultSourceDown ? (
             <li data-kind="monitor">
               <span className="m">monitor unavailable</span>

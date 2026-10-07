@@ -525,6 +525,9 @@ class PositionSummaryOut(Public):
         "unless the entry and the close both filled."
     )
     open_incidents: int
+    #: Why a held position needs a look; empty when it does not. One rule, on
+    #: the server, for every surface that lists positions.
+    attention: list[Literal["open_incident", "stale_mark", "unreadable_mark", "never_marked"]]
 
 
 class PositionPage(Public):

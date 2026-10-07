@@ -4,8 +4,8 @@ import type { Schemas } from "../api/client";
 import { api } from "../api/client";
 import { useCursorPage } from "../api/useCursorPage";
 import {
+  ATTENTION,
   DEFAULT_STATE,
-  MARK_NEEDS_ATTENTION,
   MARK_STATE,
   STATE_FILTERS,
   type StateFilter,
@@ -139,8 +139,8 @@ function PositionList({ state }: { state: StateFilter }) {
 /** One position as a row: what it is, its state in words, and what needs a look. */
 export function PositionRow({ position: p }: { position: Position }) {
   const mark = MARK_STATE[p.mark_state];
-  const attention =
-    p.open && (p.open_incidents > 0 || MARK_NEEDS_ATTENTION.includes(p.mark_state));
+  // The server decides whether a position needs a look, and why.
+  const attention = p.attention.length > 0;
   return (
     <Link
       to="/positions/$positionId"
@@ -171,6 +171,9 @@ export function PositionRow({ position: p }: { position: Position }) {
           <span className="incident">
             {p.open_incidents} open incident{p.open_incidents === 1 ? "" : "s"}
           </span>
+        ) : null}
+        {p.attention.includes("never_marked") ? (
+          <span className="incident">{ATTENTION.never_marked}</span>
         ) : null}
       </span>
     </Link>

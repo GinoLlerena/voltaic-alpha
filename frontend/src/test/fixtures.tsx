@@ -308,7 +308,7 @@ export const executionRow = {
     invalidation_source: "completed_daily_close", opened_at: "2026-08-28T15:30:00+00:00",
     entry_filled_at: "2026-08-28T15:30:00+00:00", closed_at: "2026-08-28T16:30:00+00:00",
     close_reason: "stop_loss", mark_state: "final", latest_mark: null, unrealized: null,
-    realized: "-33.00", open_incidents: 0,
+    realized: "-33.00", open_incidents: 0, attention: [] as string[],
   },
   result: "closed", close_price: "2.800000", exit_trigger: "stop_loss",
   exit_reason: "spread value fell through the stop", held_seconds: 3600, sessions_held: 0,

@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MARK_STATE } from "../components/positions";
+import { ATTENTION, MARK_STATE } from "../components/positions";
 import {
   at,
   currentMark,
@@ -94,9 +94,13 @@ describe("the positions list (PUI phase 4)", () => {
   });
 
   it("marks a held position that needs a look, and says why in words", async () => {
-    const stale = positionIn({ ...openPosition, position_id: "s".repeat(32), mark_state: "stale" });
+    const stale = positionIn({
+      ...openPosition, position_id: "s".repeat(32), mark_state: "stale",
+      attention: ["stale_mark"],
+    });
     const incident = positionIn({
       ...openPosition, position_id: "i".repeat(32), state: "INCIDENT", open_incidents: 1,
+      attention: ["open_incident"],
       state_meaning: "Local records and the broker disagree. Treat exposure as unknown.",
     });
     const closed = executionRow.position;
@@ -256,6 +260,19 @@ describe("one position (PUI phase 4)", () => {
 });
 
 describe("mark states", () => {
+  it("names every attention reason the contract can serve", () => {
+    interface Spec {
+      components: {
+        schemas: {
+          PositionSummaryOut: { properties: { attention: { items: { enum: string[] } } } };
+        };
+      };
+    }
+    const spec = JSON.parse(readFileSync("openapi.json", "utf8")) as Spec;
+    const served = spec.components.schemas.PositionSummaryOut.properties.attention.items.enum;
+    expect(Object.keys(ATTENTION).sort()).toEqual([...served].sort());
+  });
+
   it("names every state the contract can serve", () => {
     interface Spec {
       components: { schemas: { PositionSummaryOut: { properties: { mark_state: { enum: string[] } } } } };

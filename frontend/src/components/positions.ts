@@ -36,8 +36,19 @@ export const MARK_STATE: Record<MarkState, { label: string; meaning: string }> =
   },
 };
 
-/** Mark states that need the owner's attention on a position still held. */
-export const MARK_NEEDS_ATTENTION: readonly MarkState[] = ["stale", "unreadable"];
+type Attention = Schemas["PositionSummaryOut"]["attention"][number];
+
+/**
+ * Why a held position needs a look, in words. The reasons are the server's
+ * (one rule, `presentation/positions.attention`); this names them. A test
+ * holds the keys to the contract.
+ */
+export const ATTENTION: Record<Attention, string> = {
+  open_incident: "an incident is open on it",
+  stale_mark: "its mark is stale",
+  unreadable_mark: "its latest mark could not be read",
+  never_marked: "it is held but has never been marked",
+};
 
 export const STATE_FILTERS = ["open", "closed", "all"] as const;
 export type StateFilter = (typeof STATE_FILTERS)[number];

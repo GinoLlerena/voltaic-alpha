@@ -5,8 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../router";
 import {
   DIGEST,
+  POSITION,
   at,
   envelope,
+  openPosition,
+  positionIn,
+  positionsPage,
   respond,
 } from "../test/fixtures";
 
@@ -67,12 +71,67 @@ describe("Today (PUI phase 2)", () => {
     expect(screen.queryByTestId("tour-card")).toBeNull();
   });
 
-  it("states a verified quiet, dated, only when both sources answered", async () => {
+  it("states a verified quiet, dated, only when every source answered", async () => {
     vi.stubGlobal("fetch", respond());
     render(at("/"));
     const quiet = await screen.findByTestId("attention-quiet");
-    expect(quiet).toHaveTextContent("no incident is open and the worker has recorded no fault");
+    expect(quiet).toHaveTextContent(
+      "no incident is open, the worker has recorded no fault, and no position is held.",
+    );
     expect(quiet).toHaveTextContent(/Checked \d{4}-\d\d-\d\d/);
+  });
+
+  it("stays quiet about a held position that needs nothing, and counts it", async () => {
+    vi.stubGlobal("fetch", respond(new Set(), {
+      "/api/v1/positions?state=": envelope(positionsPage([openPosition])),
+    }));
+    render(at("/"));
+    expect(await screen.findByTestId("attention-quiet")).toHaveTextContent(
+      "none of the 1 held position needs a look.",
+    );
+  });
+
+  it("lists a held position that needs a look, with the server's reasons and a link", async () => {
+    // PUI Phase 4, owner decision D4. The reasons are the server's rule, not the page's.
+    const stale = positionIn({
+      ...openPosition, mark_state: "stale", open_incidents: 1,
+      attention: ["open_incident", "stale_mark"],
+    });
+    vi.stubGlobal("fetch", respond(new Set(), {
+      "/api/v1/positions?state=": envelope(positionsPage([stale, openPosition])),
+    }));
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    await waitFor(() => expect(attention).toHaveAttribute("data-quiet", "false"));
+    const rows = attention.querySelectorAll('[data-kind="position"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("held position · OPEN");
+    expect(rows[0]).toHaveTextContent("an incident is open on it; its mark is stale");
+    expect(within(rows[0] as HTMLElement).getByRole("link")).toHaveAttribute(
+      "href",
+      `/positions/${POSITION}`,
+    );
+    expect(screen.queryByTestId("attention-quiet")).toBeNull();
+  });
+
+  it("never reports a quiet system when the positions source failed", async () => {
+    vi.stubGlobal("fetch", respond(new Set(["/api/v1/positions?state="])));
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    await waitFor(() => expect(attention).toHaveTextContent("held positions unavailable"));
+    expect(screen.queryByTestId("attention-quiet")).toBeNull();
+  });
+
+  it("says so when more positions are held than it read", async () => {
+    vi.stubGlobal("fetch", respond(new Set(), {
+      "/api/v1/positions?state=": envelope({
+        ...positionsPage([openPosition]), next_cursor: "opaque-more",
+      }),
+    }));
+    render(at("/"));
+    const attention = await screen.findByTestId("attention");
+    await waitFor(() => expect(attention).toHaveTextContent("More positions are held"));
+    expect(screen.queryByTestId("attention-quiet")).toBeNull();
   });
 
   it("lists open incidents and recorded worker faults as attention", async () => {
