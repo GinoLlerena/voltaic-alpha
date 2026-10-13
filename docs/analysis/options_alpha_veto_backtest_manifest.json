@@ -48,6 +48,47 @@
       "sessions": 13,
       "source": "live worker database: market_snapshots.payload, reduced on the host"
     },
+    "options/": {
+      "coverage": {
+        "bytes": 364311,
+        "first": "2024-02-01",
+        "last": "2026-10-08",
+        "sessions": 19
+      },
+      "digest": "sha256:5860b297fa1926415283ba841551c11b901e4cff534074f9626edb6401604401",
+      "digest_of": "each file's name and SHA-256, in name order",
+      "endpoints": [
+        "/v2/options/contracts",
+        "/v1beta1/options/bars"
+      ],
+      "fetched_at": "2026-10-13T15:22:46+00:00",
+      "params": {
+        "expiry": "10 to 60 days after the session",
+        "strikes": "calls and puts within 1% of the previous close; calls 0.94 to 1.07 of it from 2026-09-22 to 2026-10-08",
+        "timeframe": "5Min",
+        "window": "09:45 to 10:05 New York"
+      }
+    },
+    "spy_5min_open.json": {
+      "bytes": 237427,
+      "coverage": {
+        "bars": 4886,
+        "first": "2024-01-02",
+        "last": "2026-10-13",
+        "sessions": 698
+      },
+      "digest": "sha256:333b524ea9efed0a5d447de1ed72b5418f0c0879895a71811f4971c8832d7a1b",
+      "endpoint": "/v2/stocks/SPY/bars",
+      "feed": "sip",
+      "fetched_at": "2026-10-13T15:16:14+00:00",
+      "params": {
+        "adjustment": "raw",
+        "feed": "sip",
+        "limit": 10000,
+        "timeframe": "5Min"
+      },
+      "window": "bars opening 09:30 to 10:00 New York"
+    },
     "stored_signals.json": {
       "bytes": 139971,
       "digest": "sha256:77435ef3075b57d76379d8fd7245c3f2842d04a15cfceb93de02a5646872c742",
