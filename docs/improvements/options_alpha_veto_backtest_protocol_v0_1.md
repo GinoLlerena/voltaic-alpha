@@ -152,3 +152,28 @@ bot.
 request to review this document, with the six values of §9 listed in that
 request. It approves every value here as proposed. The column heading
 "Proposed value" is kept as written; the values are now the frozen ones.
+
+## 11. Measured values and implementation notes
+
+Dated notes, as §10 requires. None changes an approved value.
+
+**12 October 2026: `k` measured and frozen at 0.6224% (0.006224).** It is the
+median relative half-spread of 2,271 call quotes inside the two delta bands,
+from 13 stored decision snapshots, one a session from 22 September to
+8 October 2026, each the first at or after 10:00 New York. No quote was
+unusable. By band: 0.7576% for the long leg's band and 0.4828% for the short
+leg's; session medians ran from 0.4793% to 0.7457%. The input is
+`decision_snapshots.json`, named by digest in the
+[manifest](../analysis/options_alpha_veto_backtest_manifest.json), and the
+measurement is `python -m options_alpha_lab.veto_calibration`. It reads quotes
+only. 9 October has no snapshot at or after 10:00, because the position
+opened at 09:45 and the worker stopped looking for entries; 12 October has
+none for the same reason. The sensitivity runs of §4 use 0.3112% and 1.2448%.
+
+**12 October 2026: two implementation choices**, put to the owner the same day
+and accepted ("Agree"):
+
+- The risk-free rate is the published DGS3MO value read as an annual rate,
+  with no compounding conversion.
+- `k` counts calls only: they are the legs of the bullish spread the study
+  covers.

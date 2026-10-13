@@ -27,7 +27,10 @@ from .components import LONG_DELTA_BAND, SHORT_DELTA_BAND
 from .evidence import parse_occ_symbol
 
 SNAPSHOTS = Path(".cache/veto_backtest/decision_snapshots.json")
-#: Used if the snapshots cannot be exported (protocol section 4).
+#: Measured on 12 October 2026 from 2,271 quotes in 13 sessions and frozen
+#: (protocol section 11). The backtest uses this; it does not measure again.
+K = Decimal("0.006224")
+#: What the protocol named for the case where the snapshots could not be exported.
 FALLBACK_K = Decimal("0.010")
 BANDS = {"long": LONG_DELTA_BAND, "short": SHORT_DELTA_BAND}
 

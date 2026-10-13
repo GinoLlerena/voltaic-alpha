@@ -37,6 +37,17 @@
         "timeframe": "1Day"
       }
     },
+    "decision_snapshots.json": {
+      "bytes": 549686,
+      "contracts": 5872,
+      "digest": "sha256:2e0219206def7191d935662ed24ffe43c9a16c5c89f4e5ce9941a9cc6cd1e1e9",
+      "fetched_at": "2026-10-13T04:20:46+00:00",
+      "first": "2026-09-22",
+      "last": "2026-10-12",
+      "rule": "first snapshot at or after 10:00 New York; calls with stored delta 0.20 to 0.75, and either type struck within 1% of the underlying price",
+      "sessions": 13,
+      "source": "live worker database: market_snapshots.payload, reduced on the host"
+    },
     "stored_signals.json": {
       "bytes": 139971,
       "digest": "sha256:77435ef3075b57d76379d8fd7245c3f2842d04a15cfceb93de02a5646872c742",
