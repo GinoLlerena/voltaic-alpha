@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Proposed. Not approved. No outcome may be computed until the owner approves or changes these values.** |
+| Status | **Approved by the owner on 12 October 2026, as proposed, with no value changed (§10). The values are frozen for the study.** |
 | Parent | [Breadth veto backtest: plan](options_alpha_veto_backtest_plan_v0_1.md) §9 decision 9, and §6 control 1 |
 | Reviewed revision | `037f9f5` |
 | Boundary | Offline research settings only. No trading rule, threshold or worker setting changes. |
@@ -147,3 +147,8 @@ Approving this document freezes these values for the study. A later change
 needs a dated note in this file saying what changed and why, made before the
 affected results are computed. Approval does not authorize any change to the
 bot.
+
+**Owner's answer, 12 October 2026: "Agree".** It was given in reply to the
+request to review this document, with the six values of §9 listed in that
+request. It approves every value here as proposed. The column heading
+"Proposed value" is kept as written; the values are now the frozen ones.

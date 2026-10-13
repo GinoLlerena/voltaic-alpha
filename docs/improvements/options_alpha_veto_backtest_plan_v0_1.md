@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) open; no outcome is computed until it is approved.** |
+| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md).** |
 | Requested by | Owner, 7 October 2026: "We can review the veto later with a longer backtest and results for the actual option spreads. I don't want to loosen it just to generate trades." |
 | Reviewed revision | `70e1493` |
 | Work prefix | `VBT-` |
@@ -718,8 +718,10 @@ that day (`scripts/veto_export.py`; result in the
 [feasibility count](../analysis/options_alpha_veto_feasibility_count_v0_1.md)).
 Three things it does not cover:
 
-- **Decision 9** stays open. Its recommendation is that the values be
-  specified and reviewed, and none has been proposed yet.
+- **Decision 9** stayed open at that point. The values were then proposed in
+  the [numeric protocol](options_alpha_veto_backtest_protocol_v0_1.md), and
+  the owner approved them as proposed later the same day ("Agree"; recorded
+  in that document's §10).
 - **Decision 11's export of full decision snapshots** has not run. The stored
   signals were enough for the feasibility check; the snapshots are needed for
   Step 1 and are a larger transfer, to be run with the same read-only limits.
@@ -807,7 +809,7 @@ The review's test command was not re-run.
 | Live decision snapshots named as the calibration and exact-parity set | §3, §6.4, Step 1, decision 11 |
 | Provenance of the author's 12 October read-only checks recorded, and marked as not retained evidence | §3 |
 
-Still open: decision 9 has no proposed values yet. The pricing model, age and
-synchronization limits, synthetic quote rule, bootstrap settings and
-non-inferiority margin need a concrete proposal before the protocol can be
-frozen. That proposal is only needed if the feasibility count passes.
+Decision 9 was open when this section was written. It is now closed: the
+feasibility count passed, and the pricing model, age and synchronization
+limits, synthetic quote rule, bootstrap settings and non-inferiority margin
+are frozen in the [numeric protocol](options_alpha_veto_backtest_protocol_v0_1.md).
