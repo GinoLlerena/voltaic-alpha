@@ -1,5 +1,17 @@
 {
   "files": {
+    "DGS3MO.csv": {
+      "bytes": 11472,
+      "coverage": {
+        "first": "2024-01-02",
+        "last": "2026-10-08",
+        "values": 693
+      },
+      "digest": "sha256:7bcd0c2cf1dd984e445a7a8766fb6ef9fa38c3296e500f744aef385c9daea293",
+      "fetched_at": "2026-10-13T04:04:53+00:00",
+      "source": "FRED, series DGS3MO, percent a year",
+      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=2024-01-01"
+    },
     "daily_bars.json": {
       "bytes": 162538,
       "coverage": {
