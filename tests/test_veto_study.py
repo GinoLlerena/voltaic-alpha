@@ -144,6 +144,60 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual(veto_study.longest_run([]), 0)
 
 
+class ReferenceTests(unittest.TestCase):
+    """The replay is held to what the worker stored, exactly."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        spy, rsp = veto_study.load_bars()
+        cls.rows = list(veto_study.rows(spy, rsp))
+        cls.spy = spy
+
+    def _stored(self, row: veto_study.Row, day: str) -> dict[str, object]:
+        return {
+            "snapshots": {day: 1},
+            "signals": [
+                {"day": day, "signal_id": s.signal_id, "direction": s.direction.value,
+                 "strength": f"{s.strength:.4f}"}
+                for s in row.signals
+            ],
+        }
+
+    def _a_row_with_signals(self) -> veto_study.Row:
+        return next(r for r in self.rows[:-1] if r.signals)
+
+    def test_a_stored_session_matches_the_row_completed_before_it(self) -> None:
+        row = self._a_row_with_signals()
+        next_session = str(self.spy[row.index + 1].session)
+        self.assertEqual(veto_study.disagreements(self.rows, self._stored(row, next_session)), [])
+
+    def test_a_different_strength_is_a_disagreement(self) -> None:
+        row = self._a_row_with_signals()
+        stored = self._stored(row, str(self.spy[row.index + 1].session))
+        stored["signals"][0]["strength"] = "0.0100"  # type: ignore[index]
+        self.assertEqual(len(veto_study.disagreements(self.rows, stored)), 1)
+
+    def test_a_signal_the_worker_did_not_store_is_a_disagreement(self) -> None:
+        row = self._a_row_with_signals()
+        stored = self._stored(row, str(self.spy[row.index + 1].session))
+        stored["signals"] = []
+        self.assertEqual(len(veto_study.disagreements(self.rows, stored)), 1)
+
+    def test_the_volatility_signal_is_not_expected_of_the_replay(self) -> None:
+        row = self._a_row_with_signals()
+        day = str(self.spy[row.index + 1].session)
+        stored = self._stored(row, day)
+        stored["signals"].append(  # type: ignore[attr-defined]
+            {"day": day, "signal_id": veto_study.NOT_REPLAYED, "direction": "bullish",
+             "strength": "0.7500"}
+        )
+        self.assertEqual(veto_study.disagreements(self.rows, stored), [])
+
+    def test_a_session_the_bars_do_not_reach_is_a_disagreement_not_a_skip(self) -> None:
+        stored = {"snapshots": {"2001-01-02": 1}, "signals": []}
+        self.assertEqual(len(veto_study.disagreements(self.rows, stored)), 1)
+
+
 class ScreenTests(unittest.TestCase):
     def test_the_report_fails_the_screen_when_a_group_is_too_small(self) -> None:
         spy, rsp = veto_study.load_bars()
