@@ -1,0 +1,39 @@
+{
+  "files": {
+    "daily_bars.json": {
+      "bytes": 162538,
+      "coverage": {
+        "RSP": {
+          "bars": 947,
+          "first": "2023-01-03",
+          "last": "2026-10-12"
+        },
+        "SPY": {
+          "bars": 947,
+          "first": "2023-01-03",
+          "last": "2026-10-12"
+        }
+      },
+      "digest": "sha256:ad81af445355c951585c0bf7922a758180dc60c87fb2e28a469fec732c4b34f7",
+      "endpoint": "/v2/stocks/{symbol}/bars",
+      "feed": "sip",
+      "fetched_at": "2026-10-13T02:30:46+00:00",
+      "params": {
+        "adjustment": "split",
+        "feed": "sip",
+        "limit": 1000,
+        "timeframe": "1Day"
+      }
+    },
+    "stored_signals.json": {
+      "bytes": 139971,
+      "digest": "sha256:77435ef3075b57d76379d8fd7245c3f2842d04a15cfceb93de02a5646872c742",
+      "fetched_at": "2026-10-13T02:30:51+00:00",
+      "first": "2026-09-22",
+      "last": "2026-10-09",
+      "sessions": 14,
+      "snapshots": 843,
+      "source": "live worker database: signals joined to market_snapshots"
+    }
+  }
+}

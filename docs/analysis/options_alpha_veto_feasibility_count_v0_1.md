@@ -3,43 +3,49 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Preliminary: run on the committed bar fixture. The full period and the reference check need a data export the owner has not yet approved (§5).** |
+| Status | **Complete. The count passes the screen on the full option-data period, and the replay reproduces the bot's stored signals exactly.** The preliminary fixture-only result is kept in §6. |
 | Plan | [Breadth veto backtest: plan](../improvements/options_alpha_veto_backtest_plan_v0_1.md) §4.0, Step 0B, `VBT-100` |
 | Code | `src/options_alpha_lab/veto_study.py`, `tests/test_veto_study.py` |
-| Reproduce | `uv run python -m options_alpha_lab.veto_study` |
+| Reproduce | `uv run python -m options_alpha_lab.veto_study --bars .cache/veto_backtest/daily_bars.json --since 2024-02-01 --reference .cache/veto_backtest/stored_signals.json` |
 | Boundary | Counts only. No outcome, price move or return is computed. No rule is changed. |
 
 ## 1. Result
 
-On the history already in the repository, the count **passes the screen** with
-room to spare.
+On the full period the option data covers, the count **passes the screen**.
 
 | Group | Sessions | Clusters | Longest run | 2024 | 2025 | 2026 |
 |---|---:|---:|---:|---:|---:|---:|
-| Bullish structure, opposing breadth below the line | 183 | 31 | 13 | 43 | 85 | 55 |
-| Bullish structure, opposing breadth at or above the line | 101 | 27 | 15 | 18 | 62 | 21 |
+| Bullish structure, opposing breadth below the line | 245 | 42 | 15 | 100 | 86 | 59 |
+| Bullish structure, opposing breadth at or above the line | 162 | 36 | 19 | 68 | 62 | 32 |
 | Screen, per group | 30 | 10 | | | | |
 
-- 493 completed sessions were measured, 11 September 2024 to 28 August 2026.
-- Bullish structure reached 0.60 on 284 of them; bearish structure, out of
+- 676 completed sessions were measured, 1 February 2024 to 12 October 2026.
+- Bullish structure reached 0.60 on 407 of them; bearish structure, out of
   scope, on 41.
 - No session in either group carried a veto from another family that can be
   read from daily bars (momentum).
 
+**Reference check: passed.** The replay was compared with the signals the bot
+stored for its 14 sessions from 22 September to 9 October 2026 (843
+snapshots). Structure, breadth and momentum signals match on every session, in
+direction and in strength to two decimals, including the four sessions with no
+signal at all, 5 October at structure 0.59, and 9 October with no breadth
+signal. The volatility signal is not replayed, because the count supplies no
+implied volatility.
+
 ## 2. What this means
 
-- **The option-backed study is worth starting.** Each group has roughly three
-  times the screen's sessions and clusters, before the remaining months of
-  2024 and September to October 2026 are added.
-- **The veto is not rare.** In this period opposing breadth reached the line on
-  about a third of the sessions where bullish structure passed (101 of 284).
+- **The option-backed study is worth starting.** Each group has several times
+  the screen's sessions and clusters.
+- **The veto is not rare.** Opposing breadth reached the line on 40% of the
+  sessions where bullish structure passed (162 of 407).
 - **The numbers will shrink.** They are an upper bound. The full rule also
   needs a confirmation, and a stressed-volatility reading can veto. Entry-time
   option data will be missing for some sessions, and the chronological
   portfolio in the plan's §5.5 takes at most one position at a time. A run of
-  13 qualifying sessions is at most a handful of trades.
-- **Clusters are the better guide.** About 30 separate episodes per group is
-  the realistic size of the evidence, not 183 or 101.
+  15 qualifying sessions is at most a handful of trades.
+- **Clusters are the better guide.** About 40 separate episodes per group is
+  the realistic size of the evidence, not 245 or 162.
 
 This says nothing about whether the veto helps. No outcome was measured.
 
@@ -54,43 +60,41 @@ between neighbours.
 
 **Why it is an upper bound.** Supplying volatility later can only remove
 sessions. `test_veto_study.py` checks this against the shipped classifier on
-every session in the fixture, at a calm, a middle and a stressed volatility:
-the classifier never qualifies a bullish setup outside the "below the line"
-group, and never qualifies anything in the "at or above" group.
+every session in the committed fixture, at a calm, a middle and a stressed
+volatility: the classifier never qualifies a bullish setup outside the "below
+the line" group, and never qualifies anything in the "at or above" group.
 
 Other tests cover: no row uses a later bar; the window is the bounded 400 days
 and not the whole series; the 0.70 line itself counts as at or above; a veto
-from another family is reported separately.
+from another family is reported separately; and the reference check treats a
+different strength, a missing signal or an unreachable session as a
+disagreement.
 
 ## 4. Data
 
-| Field | Value |
-|---|---|
-| File | `fixtures/h0/sensitivity_bars.json` (committed) |
-| SHA-256 | `69a79a590ddac05fb68c1687a68db13d438dc6cab1967552e3a04636d22fb5f3` |
-| Provider, feed | Alpaca, SIP, fetched 31 August 2026 |
-| Coverage | SPY and RSP, 562 sessions each, 3 June 2024 to 28 August 2026 |
-| First counted session | 11 September 2024, after the 70-bar minimum |
+Exported read-only from the server on 12 October 2026 (Lima) with
+`scripts/veto_export.py`, under the owner's approval of the same day. The files
+are kept out of git; `options_alpha_veto_backtest_manifest.json` names them by
+digest.
 
-## 5. What is still missing
+| File | Content | Coverage |
+|---|---|---|
+| `daily_bars.json` | SPY and RSP daily bars; Alpaca, SIP feed, split-adjusted: the worker's own request | 947 sessions each, 3 January 2023 to 12 October 2026 |
+| `stored_signals.json` | each distinct signal the worker stored, per session | 14 sessions, 843 snapshots, 22 September to 9 October 2026 |
 
-1. **The full option-data period.** February to August 2024 and 29 August to
-   October 2026 are not in the fixture. Earlier bars are also needed so that
-   sessions from February 2024 have their warm-up.
-2. **The reference check.** The plan requires the count to agree with the
-   bot's stored signals for 22 September to 9 October 2026. The fixture ends
-   before that, so this check has not been run.
-3. **Feed.** The fixture is SIP. The feed the live worker uses has to be
-   recorded and matched, or the difference stated.
+The export read market data and ran one SELECT. It wrote nothing on the
+server, restarted nothing, and no credential left the host. The first counted
+session is 1 February 2024; 2023 supplies the warm-up.
 
-All three need one read-only export from the server: SPY and RSP daily bars
-from 2023 onward with the worker's own settings, and the stored signals for
-the reference interval. The plan (§9, decisions 4 and 11) requires the owner
-to approve that export explicitly. It has not been run.
+## 5. Recommendation
 
-## 6. Recommendation
+**Go.** Continue to Step 1 of the plan. Before any outcome is computed, the
+numeric protocol in the plan's decision 9 has to be proposed and approved.
 
-Go: continue to Step 1 of the plan once the export is approved and the two
-checks above pass. The preliminary result is large enough that the missing
-months cannot turn a pass into a fail; the reference check can still show the
-replay is wrong, and that would stop the work.
+## 6. Preliminary result, superseded
+
+The first run used only the committed fixture
+(`fixtures/h0/sensitivity_bars.json`, SIP, 3 June 2024 to 28 August 2026) and
+counted 183 sessions in 31 clusters below the line and 101 in 27 at or above,
+over 493 sessions from 11 September 2024. It is consistent with the full
+result and is kept here because the tests run on that fixture.

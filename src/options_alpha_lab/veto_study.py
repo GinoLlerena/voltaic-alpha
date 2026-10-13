@@ -136,6 +136,40 @@ def rows(spy: list[Bar], rsp: list[Bar]) -> Iterator[Row]:
         yield Row(last.session, index, tuple(build_signals(window, None, as_of, breadth)))
 
 
+#: Needs implied volatility, which this count does not supply.
+NOT_REPLAYED = "sig-volatility-regime"
+
+
+def disagreements(measured: list[Row], stored: dict[str, Any]) -> list[str]:
+    """Where the replay differs from the signals the worker stored.
+
+    `stored` is `veto_export.py signals`: per decision session, each distinct
+    signal the worker recorded. The worker decides on the session after the last
+    completed bar, so a stored session is compared with the row before it. An
+    empty list means every stored session was reproduced exactly; a session the
+    bars do not reach is a disagreement, not a skip.
+    """
+    by_day: dict[str, set[tuple[str, str, Decimal]]] = {day: set() for day in stored["snapshots"]}
+    for signal in stored["signals"]:
+        if signal["signal_id"] != NOT_REPLAYED:
+            by_day[signal["day"]].add(
+                (signal["signal_id"], signal["direction"], Decimal(signal["strength"]))
+            )
+    problems: list[str] = []
+    for day, expected in sorted(by_day.items()):
+        earlier = [row for row in measured if row.completed < date.fromisoformat(day)]
+        if not earlier:
+            problems.append(f"{day}: no completed session before it in the bars")
+            continue
+        replayed = {(s.signal_id, s.direction.value, s.strength) for s in earlier[-1].signals}
+        if replayed != expected:
+            problems.append(
+                f"{day}: stored {sorted(expected)} but replayed {sorted(replayed)} "
+                f"from the session completed {earlier[-1].completed}"
+            )
+    return problems
+
+
 def clusters(indexes: list[int]) -> list[list[int]]:
     """Runs of members, split wherever `CLUSTER_GAP_SESSIONS` or more separate them."""
     out: list[list[int]] = []
@@ -228,9 +262,20 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapp
     parser.add_argument("--since", type=date.fromisoformat, default=None,
                         help="count completed sessions from this date")
     parser.add_argument("--json", action="store_true", help="emit the report as JSON")
+    parser.add_argument("--reference", type=Path, default=None,
+                        help="stored signals to hold the replay to (veto_export.py signals)")
     args = parser.parse_args(argv)
 
     spy, rsp = load_bars(args.bars)
+    if args.reference is not None:
+        stored = json.loads(args.reference.read_text())
+        problems = disagreements(list(rows(spy, rsp)), stored)
+        if problems:
+            print("The replay does not reproduce the stored signals; the count is void.")
+            print("\n".join(problems))
+            return 1
+        print(f"Replay reproduces the stored signals on all {len(stored['snapshots'])} "
+              "reference sessions.\n")
     report = run(spy, rsp, since=args.since)
     print(json.dumps(report, indent=2) if args.json else render(report))
     return 0

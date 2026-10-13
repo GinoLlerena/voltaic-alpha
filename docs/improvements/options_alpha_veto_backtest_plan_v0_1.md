@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Revised after code review; awaiting review and the owner's decisions in §9. No backtest is built.** |
+| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) open; no outcome is computed until it is approved.** |
 | Requested by | Owner, 7 October 2026: "We can review the veto later with a longer backtest and results for the actual option spreads. I don't want to loosen it just to generate trades." |
 | Reviewed revision | `70e1493` |
 | Work prefix | `VBT-` |
@@ -711,6 +711,21 @@ Keep implementation small and modular, with normal branch, full CI and PR review
 | 10 | Run the feasibility count (§4.0, Step 0B) first, and stop if it fails the screen of about 30 sessions and 10 distinct clusters per group? | Yes. It is cheap, computes no outcomes, and avoids building the reconstruction for a sample that cannot decide the question. It may run before decision 9 is settled |
 | 11 | Export the live decision snapshots and stored signals read-only as the calibration and exact-parity set? | Yes, under the same approval as decision 4(a): one reviewed read-only export, no deployment, no credentials copied |
 
+**Owner's answer, 12 October 2026: "approved as recommended, including the
+export".** This approves the recommendation column for decisions 1 to 8, 10
+and 11, and the read-only export of daily bars and stored signals, which ran
+that day (`scripts/veto_export.py`; result in the
+[feasibility count](../analysis/options_alpha_veto_feasibility_count_v0_1.md)).
+Three things it does not cover:
+
+- **Decision 9** stays open. Its recommendation is that the values be
+  specified and reviewed, and none has been proposed yet.
+- **Decision 11's export of full decision snapshots** has not run. The stored
+  signals were enough for the feasibility check; the snapshots are needed for
+  Step 1 and are a larger transfer, to be run with the same read-only limits.
+- **Decision 5** approves recording a failed RSP read as a separate change to
+  the live bot. It is not built yet and changes no entry rule.
+
 Decision 4(a) authorizes neither a deployment nor copying credentials. The owner
 must separately approve the export's target, read-only commands and transfer;
 the analysis remains local. No owner approvals are inferred from this document edit.
@@ -762,7 +777,7 @@ no live rules were changed.
 
 ### 10.2 Review acceptance checklist
 
-- [ ] Feasibility count run and its go/no-go recorded (§4.0).
+- [x] Feasibility count run and its go/no-go recorded (§4.0): go, 12 October 2026.
 
 - [ ] Owner decisions in §9 recorded; unresolved numeric protocol choices frozen.
 - [ ] Reference evidence and deployed-policy discrepancies reconciled.

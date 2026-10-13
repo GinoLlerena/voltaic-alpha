@@ -27,6 +27,9 @@
       "scripts/run_h0_validation.sh": "sha256:15269f3d9ada84f7c5aff93bde84024e35315f5ead7764dc7274c88ab51054fd",
       "scripts/session.py": "sha256:c2024af22611c5a121bb3ef7e1819112e82c65a59dde9c862e22cfd91eec688f",
       "scripts/ship_host.py": "sha256:8fcdac4c6d1da61f2e2cf1ba84c053e1c0a2038283928d2e2df2627024815112",
+      "scripts/veto_export.py": "sha256:796130cbfb89b7e82136dd80584142d8e9f8ffd5e73376a7a99d73c3402a8ec6",
+      "scripts/veto_export_remote/bars.py": "sha256:9c9323b1ca54821a7edead6b21eb7114fb1c2791b89157be0e0278808e4a3cad",
+      "scripts/veto_export_remote/signals.py": "sha256:c380af50a4775c56305d9e8aa56e74766d7057f35fdb2ddd75229e80bc404d8f",
       "src/options_alpha_lab/__init__.py": "sha256:e3aad86846fe4e3d86929adfd25c2a46c78de3349a59ef586beb8990d886d9b4",
       "src/options_alpha_lab/ablation.py": "sha256:25172bdf16d4de7b095d20beedb268a8ccdacd50d14c7e4ab3746460fb764196",
       "src/options_alpha_lab/agent.py": "sha256:0c5c7bb8b514f558ad24641ee57aafc17943b49b0545964be9fd32ec3bda669e",
@@ -100,7 +103,7 @@
       "src/options_alpha_lab/sensitivity.py": "sha256:58caf44c957ad8ffed2f0fb53204a87798a82e96ea29569de2a5970b7baf89aa",
       "src/options_alpha_lab/snapshot_io.py": "sha256:37ad078ee0981aa1bbbe7343d0490b81d10eec7736787d8ee78485da2d2cf7fc",
       "src/options_alpha_lab/telemetry.py": "sha256:f3cf2c61c2a7ccc9caf0ec7fc5a9457bb13a423f47d4b09611a0ed7097808092",
-      "src/options_alpha_lab/veto_study.py": "sha256:d44bec91388b21664da9079963783b397871caf8e4174158734c44f6820edbe9",
+      "src/options_alpha_lab/veto_study.py": "sha256:33ca69ee1453878f85a559e91c17c8ce237e5af8a0e268fd3c2656cb2acdb54f",
       "src/options_alpha_lab/watchdog.py": "sha256:a84dd3b7cfab4f12a407694831f55bcc27301024a325da5723e5d17db2060501",
       "src/options_alpha_lab/worker.py": "sha256:84853b0c68c7a47cd9bf7607b5d3ed5581ff4e9079ad6f10a29a4f47877eaf51"
     },
@@ -138,8 +141,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:53b06dd0927f159995442a946c8a7752a74a2456",
-  "freeze_digest": "sha256:bdbca9813b8b9a8c1d614b44bc5d364ac2feebd3d6652c54c6f709c5c8ae87a2",
-  "frozen_at": "2026-10-12T22:48:27.200149+00:00",
+  "commit": "git:5bb83b641542da9d8ba906567375de119474c3fa",
+  "freeze_digest": "sha256:761e1b5bd63eeae9545b9b0fdcffc9e1a7e2cfe392192c2ea8ebd2f99e434b23",
+  "frozen_at": "2026-10-13T02:36:29.535795+00:00",
   "manifest_version": "release_freeze.v1"
 }

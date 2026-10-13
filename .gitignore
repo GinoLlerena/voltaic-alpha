@@ -40,3 +40,6 @@ rehearsal/
 # documents that feed no H0 outcome, no G0-G4 gate, and no implementation step.
 # Anything still required to build H0 stays tracked — see the pending task list.
 docs/archive/
+
+# Derived research data; the committed manifest names it by digest
+.cache/
