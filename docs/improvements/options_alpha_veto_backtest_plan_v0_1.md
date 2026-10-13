@@ -728,6 +728,19 @@ Three things it does not cover:
 - **Decision 5** approves recording a failed RSP read as a separate change to
   the live bot. It is not built yet and changes no entry rule.
 
+**Owner's answer, 13 October 2026: "Approved".** It approves the historical
+option download as it was put to the owner that day: the same host through
+Cloud Assistant; GET requests only (the option contract record, 5-minute option
+trade bars and SPY 5-minute bars); prices from 09:45 to 10:05 New York for
+contracts expiring 10 to 60 days out, for the sessions from 1 February 2024;
+calls and puts struck within 1% of the previous close, and calls from 0.94 to
+1.07 of it for the sessions that have a stored snapshot; requests 0.5 seconds
+apart; the result returned in the command output and kept on the Mac outside
+git; nothing written on the host, nothing restarted, no credential leaving it,
+no new subscription and no added host hours. The tool is
+`scripts/veto_export.py options` and `spot`. Exit-path prices for Part 2 are
+not covered and need a later request.
+
 Decision 4(a) authorizes neither a deployment nor copying credentials. The owner
 must separately approve the export's target, read-only commands and transfer;
 the analysis remains local. No owner approvals are inferred from this document edit.
