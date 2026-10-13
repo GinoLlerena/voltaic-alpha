@@ -5,6 +5,7 @@ and 11, approved by the owner on 12 October 2026 for this export.
 
   veto_export.py bars     SPY and RSP daily bars, with the worker's own settings
   veto_export.py signals  the signals the worker stored, for the reference check
+  veto_export.py snapshots  one stored decision snapshot a session, for calibration
 
 The host-side programs are the files in `veto_export_remote/`, sent as they are,
 so what was reviewed is what runs. Each is one read: a market-data GET or a
@@ -13,7 +14,7 @@ leaves it. The data lands in `.cache/veto_backtest/`, which git ignores; what is
 committed is the manifest, naming each file by its digest.
 
 Cloud Assistant returns about 24 kB per command, so bars are fetched a year at
-a time.
+a time and a snapshot's contracts a page at a time.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ import gzip
 import hashlib
 import json
 import sys
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +117,51 @@ def signals(first: str, last: str) -> int:
     return 0
 
 
+#: Contracts per call, sized to stay under Cloud Assistant's output limit.
+PAGE = 400
+
+
+def snapshots(first: str, last: str) -> int:
+    sessions: dict[str, Any] = {}
+    day = date.fromisoformat(first)
+    while day <= date.fromisoformat(last):
+        if day.weekday() < 5:
+            reply = unpack(on_host("snapshots.py", day.isoformat(), "0", str(PAGE))["gz"])
+            if reply["snapshot"] is None:
+                print(f"{day}: no snapshot at or after the decision time "
+                      f"({reply['stored']} stored)")
+            else:
+                rows = list(reply["rows"])
+                while len(rows) < reply["snapshot"]["kept_contracts"]:
+                    more = unpack(
+                        on_host("snapshots.py", day.isoformat(), str(len(rows)), str(PAGE))["gz"]
+                    )
+                    if more["snapshot"]["snapshot_id"] != reply["snapshot"]["snapshot_id"]:
+                        raise SystemExit(f"{day}: the snapshot changed between pages")
+                    if not more["rows"]:
+                        raise SystemExit(f"{day}: a page came back empty")
+                    rows.extend(more["rows"])
+                symbols = [row[0] for row in rows]
+                if symbols != sorted(set(symbols)):
+                    raise SystemExit(f"{day}: contracts are not unique and ordered")
+                sessions[day.isoformat()] = {
+                    **reply["snapshot"], "columns": reply["columns"], "rows": rows,
+                }
+                print(f"{day}: {reply['snapshot']['snapshot_id']}, {len(rows)} of "
+                      f"{reply['snapshot']['chain_contracts']} contracts kept")
+        day += timedelta(days=1)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = CACHE / "decision_snapshots.json"
+    path.write_text(json.dumps({"sessions": sessions}, separators=(",", ":")))
+    record(path, source="live worker database: market_snapshots.payload, reduced on the host",
+           rule="first snapshot at or after 10:00 New York; calls with stored delta 0.20 to "
+                "0.75, and either type struck within 1% of the underlying price",
+           first=first, last=last, sessions=len(sessions),
+           contracts=sum(len(s["rows"]) for s in sessions.values()))
+    print(f"wrote {path}: {len(sessions)} sessions")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -124,10 +170,15 @@ def main() -> int:
     s = sub.add_parser("signals")
     s.add_argument("--first", default="2026-09-22")
     s.add_argument("--last", default="2026-10-09")
+    n = sub.add_parser("snapshots")
+    n.add_argument("--first", default="2026-09-22")
+    n.add_argument("--last", default="2026-10-12")
     args = parser.parse_args()
     try:
         if args.command == "bars":
             return bars(args.first_year)
+        if args.command == "snapshots":
+            return snapshots(args.first, args.last)
         return signals(args.first, args.last)
     except rt.Stop as stop:
         print(f"stopped: {stop}", file=sys.stderr)
