@@ -180,10 +180,12 @@ def spot(first_year: int) -> int:
             if start > today:
                 break
             last = date(year + (month == 10), (month + 3) % 12 or 12, 1) - timedelta(days=1)
-            reply = on_host("spot.py", start.isoformat(), "" if last >= today else last.isoformat())
+            reply = unpack(on_host(
+                "spot.py", start.isoformat(), "" if last >= today else last.isoformat()
+            )["gz"])
             feeds.add(reply["feed"])
             params = reply["params"]
-            found = unpack(reply["gz"])["rows"]
+            found = reply["rows"]
             rows.extend(found)
             print(f"{start}: {len(found)} bars in {len({row[0] for row in found})} sessions")
     if len(feeds) != 1:
