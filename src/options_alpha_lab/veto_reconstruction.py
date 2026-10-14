@@ -229,6 +229,73 @@ def parity(
     }
 
 
+def coverage(
+    options: dict[str, dict[str, Any]], spot: dict[tuple[str, str], float], rates: pricing.Rates,
+    dividend: float = pricing.DIVIDEND_YIELD,
+) -> dict[str, Any]:
+    """Which sessions have an at-the-money reading, and why contracts were dropped.
+
+    The reading's level is reported only as a distribution and by class: it is an
+    input to the replay, not a result.
+    """
+    unmeasurable: list[dict[str, Any]] = []
+    classes: Counter[str] = Counter()
+    dropped: Counter[str] = Counter()
+    near_a_threshold: list[str] = []
+    levels: list[float] = []
+    priced = 0
+    for day, data in sorted(options.items()):
+        readings, reasons = reconstruct(
+            data, spot, rates.before(date.fromisoformat(day)), dividend
+        )
+        dropped.update(reasons)
+        priced += len(readings)
+        chosen = at_the_money(readings, float(data["previous_close"]))
+        if chosen is None:
+            unmeasurable.append({"session": day, "listed": data["listed"],
+                                 "traded": data["traded"]})
+            continue
+        levels.append(chosen.implied_volatility)
+        classes[regime(chosen.implied_volatility)] += 1
+        if any(abs(chosen.implied_volatility - float(line)) <= ATM_IV_TOLERANCE
+               for line in (CALM_ATM_IV, STRESSED_ATM_IV)):
+            near_a_threshold.append(day)
+    levels.sort()
+    return {
+        "sessions": len(options),
+        "measured": len(levels),
+        "unmeasurable": unmeasurable,
+        "priced_contracts": priced,
+        "dropped": dict(dropped),
+        "classes": dict(classes),
+        "near_a_threshold": near_a_threshold,
+        "levels": {"min": levels[0], "median": _quantile(levels, 0.5), "max": levels[-1]}
+        if levels else None,
+    }
+
+
+def render_coverage(report: dict[str, Any]) -> str:
+    lines = [
+        "At-the-money reading over the download (inputs only; no outcome is read)", "",
+        f"Sessions: {report['sessions']}; with a reading: {report['measured']}",
+    ]
+    for row in report["unmeasurable"]:
+        lines.append(f"  {row['session']}: no reading ({row['traded']} of {row['listed']} "
+                     "listed contracts traded)")
+    lines.append(f"Contracts priced: {report['priced_contracts']}")
+    for reason, count in sorted(report["dropped"].items()):
+        lines.append(f"  dropped, {reason}: {count}")
+    if report["levels"]:
+        levels = report["levels"]
+        lines.append(f"Reading: lowest {levels['min']:.4f}, median {levels['median']:.4f}, "
+                     f"highest {levels['max']:.4f}")
+    lines.append("Class: " + ", ".join(f"{name} {count}"
+                                        for name, count in sorted(report["classes"].items())))
+    lines.append(f"Within {ATM_IV_TOLERANCE} of a threshold: {len(report['near_a_threshold'])} "
+                 "sessions")
+    return "\n".join(lines)
+
+
 def _quantile(values: list[float], share: float) -> float:
     return values[min(len(values) - 1, int(share * len(values)))]
 
@@ -272,7 +339,16 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapp
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache", type=Path, default=CACHE)
     parser.add_argument("--dividend", type=float, default=pricing.DIVIDEND_YIELD)
+    parser.add_argument("--coverage", action="store_true",
+                        help="report the reading over every downloaded session instead")
     args = parser.parse_args(argv)
+    if args.coverage:
+        every = {path.stem: json.loads(path.read_text())
+                 for path in (args.cache / "options").glob("*.json")}
+        spot = spot_by_bar(json.loads((args.cache / "spy_5min_open.json").read_text()))
+        rates = pricing.Rates.load(args.cache / "DGS3MO.csv")
+        print(render_coverage(coverage(every, spot, rates, args.dividend)))
+        return 0
     snapshots = json.loads((args.cache / "decision_snapshots.json").read_text())
     options = {
         path.stem: json.loads(path.read_text())
