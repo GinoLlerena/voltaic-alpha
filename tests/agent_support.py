@@ -254,14 +254,15 @@ class DurableAgentCase(unittest.TestCase):
         agent.reconciler = Reconciler(Broker(positions=positions), self.store)
         return agent
 
-    def open_position(self, *, avg_debit: str = "3.13", filled_at=None) -> str:
+    def open_position(self, *, avg_debit: str = "3.13", filled_at=None,
+                      legs: tuple[str, str] = (LONG, SHORT), expires_in_days: int = 25) -> str:
         """An OPEN position established the only legal way: from reconciled fills."""
         intent = entry_intent()
         order_id, position_id = self.store.prepare_entry(
             decision_id=self.decision_id, intent=intent,
             request=prepare_mleg_request(intent, now=NOW),
-            direction=Direction.BULLISH, long_symbol=LONG, short_symbol=SHORT,
-            expiration=NOW + timedelta(days=25), width=Decimal("5.00"),
+            direction=Direction.BULLISH, long_symbol=legs[0], short_symbol=legs[1],
+            expiration=NOW + timedelta(days=expires_in_days), width=Decimal("5.00"),
             max_loss=Decimal("339.00"),
             invalidation=TypedInvalidation(Decimal("600.00"), Direction.BULLISH,
                                         PriceSource.COMPLETED_DAILY_CLOSE),
