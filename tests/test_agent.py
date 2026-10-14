@@ -21,13 +21,19 @@ from agent_support import (
     FakeClient,
     agent,
     entry_intent,
+    read,
 )
 from options_alpha_lab.agent import (
     TradingAgent,
     halt_state_for,
     spread_value,
 )
-from options_alpha_lab.architecture.contracts import Direction, ExecutionState, PriceSource
+from options_alpha_lab.architecture.contracts import (
+    Direction,
+    ExecutionState,
+    PriceSource,
+    SignalFamily,
+)
 from options_alpha_lab.config import load_settings
 from options_alpha_lab.execution.gateway import ExecutionGateway
 from options_alpha_lab.execution.lifecycle import (
@@ -733,6 +739,95 @@ class PositionClockTests(DurableAgentCase):
         self.assertIsNone(
             result, "the broker reports nothing held, so there is nothing to value"
         )
+
+
+class HeldLegsOutsideTheChainTests(DurableAgentCase):
+    """A held spread must stay priceable until the expiry guard closes it.
+
+    The chain is read from 10 to 60 days out and the expiry guard fires at 7.
+    On 14 October 2026 a Paper spread reached 9 days, its legs fell out of the
+    chain, and the session stop that fired at the open could not be priced, so
+    the position was held under an incident instead of being closed.
+    """
+
+    NEAR = NOW + timedelta(days=9)
+
+    def near_leg(self, strike: int) -> str:
+        return f"SPY{self.NEAR:%y%m%d}C{strike * 1000:08d}"
+
+    def client(self):
+        near = (self.near_leg(620), self.near_leg(625))
+
+        class WindowedClient(FakeClient):
+            """Honours the expiry window, as the provider does."""
+
+            windows: list[tuple[str, str]] = []
+
+            def option_chain(self, symbol, *, expiration_gte, expiration_lte):
+                self.windows.append((expiration_gte, expiration_lte))
+                fresh = (NOW - timedelta(seconds=20)).isoformat()
+                # The near legs sit at the money with a stressed volatility, so
+                # any leak into the at-the-money reading would show in the signals.
+                every = {
+                    LONG: ("12.40", "12.60", 0.60, 0.15), SHORT: ("9.60", "9.80", 0.32, 0.15),
+                    near[0]: ("4.00", "4.10", 0.52, 0.90), near[1]: ("1.50", "1.60", 0.30, 0.90),
+                }
+                snaps = {
+                    sym: {"latestQuote": {"bp": float(bid), "ap": float(ask), "t": fresh},
+                          "impliedVolatility": iv, "greeks": {"delta": delta}}
+                    for sym, (bid, ask, delta, iv) in every.items()
+                    if expiration_gte <= f"20{sym[3:5]}-{sym[5:7]}-{sym[7:9]}" <= expiration_lte
+                }
+                return read({"underlying": symbol, "snapshots": snaps})
+
+        WindowedClient.windows = []
+        return WindowedClient()
+
+    def test_legs_nine_days_out_are_still_priced(self) -> None:
+        client = self.client()
+        agent = self.build(WRITE_ENV, client=client)
+        self.open_position(legs=(self.near_leg(620), self.near_leg(625)), expires_in_days=9)
+        snapshot, _ = agent.observe()
+        self.assertEqual(
+            spread_value(snapshot, self.near_leg(620), self.near_leg(625)), Decimal("2.40")
+        )
+        self.assertEqual(client.windows[-1], ((NOW + timedelta(days=9)).date().isoformat(),) * 2)
+
+    def test_the_held_legs_do_not_reach_the_at_the_money_reading(self) -> None:
+        client = self.client()
+        agent = self.build(WRITE_ENV, client=client)
+        self.open_position(legs=(self.near_leg(620), self.near_leg(625)), expires_in_days=9)
+        snapshot, _ = agent.observe()
+        volatility = [s for s in snapshot.signals if s.family is SignalFamily.VOLATILITY_OPTIONS]
+        self.assertTrue(volatility)
+        self.assertTrue(all(s.direction is Direction.BULLISH for s in volatility),
+                        "a 0.90 reading from the held legs would have read as stress")
+        symbols = {q.contract_symbol for q in snapshot.option_chain}
+        self.assertEqual(symbols, {LONG, SHORT, self.near_leg(620), self.near_leg(625)})
+
+    def test_the_session_stop_closes_instead_of_blocking(self) -> None:
+        client = self.client()
+        agent = self.build(WRITE_ENV, client=client)
+        self.open_position(legs=(self.near_leg(620), self.near_leg(625)), expires_in_days=9,
+                           filled_at=NOW - timedelta(days=7))
+        result = agent.tick()
+        self.assertNotEqual(result.action, "EXIT_BLOCKED", result.detail)
+        self.assertNotIn("unmeasurable_position_value",
+                         [i.kind for i in self.store.open_incidents()])
+
+    def test_a_position_inside_the_window_costs_no_extra_read(self) -> None:
+        client = self.client()
+        agent = self.build(WRITE_ENV, client=client)
+        self.open_position()
+        agent.observe()
+        self.assertEqual(len(client.windows), 1)
+
+    def test_a_flat_agent_reads_only_the_chain_window(self) -> None:
+        client = self.client()
+        agent = self.build(WRITE_ENV, client=client)
+        snapshot, _ = agent.observe()
+        self.assertEqual(len(client.windows), 1)
+        self.assertEqual({q.contract_symbol for q in snapshot.option_chain}, {LONG, SHORT})
 
 
 class OrderClockTests(DurableAgentCase):

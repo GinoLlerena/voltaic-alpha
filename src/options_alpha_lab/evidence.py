@@ -503,6 +503,8 @@ def build_snapshot(
     bars_read: ProviderRead,
     chain_read: ProviderRead,
     participation_read: ProviderRead | None = None,
+    held_read: ProviderRead | None = None,
+    held_symbols: tuple[str, ...] = (),
     as_of: datetime | None = None,
 ) -> DecisionSnapshot:
     """Assemble the production snapshot, recording every data-quality finding."""
@@ -558,6 +560,19 @@ def build_snapshot(
     )
     if not quotes:
         missing.append("option_chain")
+    if held_read is not None:
+        # The legs of a held spread whose expiry is outside the chain window.
+        # Added after the at-the-money reading, which must not see them, and
+        # only those two: nothing else in that expiry is evidence for an entry.
+        present = {quote.contract_symbol for quote in quotes}
+        held_quotes, _, _ = build_option_chain(
+            held_read, as_of=now, underlying_price=underlying_price
+        )
+        quotes.extend(
+            quote for quote in held_quotes
+            if quote.contract_symbol in held_symbols and quote.contract_symbol not in present
+        )
+        quotes.sort(key=lambda quote: (quote.expiration, quote.option_type.value, quote.strike))
     # Individual stale contracts are normal in a wide chain; only record the
     # finding when nothing tradeable survived.
     if chain_stale and not quotes:
