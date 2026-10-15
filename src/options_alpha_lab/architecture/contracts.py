@@ -142,6 +142,11 @@ class DataQuality:
     missing_fields: tuple[str, ...] = ()
     stale_fields: tuple[str, ...] = ()
     provider_errors: tuple[str, ...] = ()
+    #: Findings recorded for the record only. They never make the snapshot
+    #: unusable and never become reason codes: a source that is optional by
+    #: design (breadth) can fail without blocking a decision, but the failure
+    #: must not vanish either.
+    advisories: tuple[str, ...] = ()
 
     @property
     def is_usable(self) -> bool:
