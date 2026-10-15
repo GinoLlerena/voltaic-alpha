@@ -36,7 +36,7 @@
       "scripts/veto_rates.py": "sha256:f514f7b2f9fad5840abdd9a53573a39a244f2fa443e912e4da58fe19b5922fe4",
       "src/options_alpha_lab/__init__.py": "sha256:e3aad86846fe4e3d86929adfd25c2a46c78de3349a59ef586beb8990d886d9b4",
       "src/options_alpha_lab/ablation.py": "sha256:25172bdf16d4de7b095d20beedb268a8ccdacd50d14c7e4ab3746460fb764196",
-      "src/options_alpha_lab/agent.py": "sha256:0c5c7bb8b514f558ad24641ee57aafc17943b49b0545964be9fd32ec3bda669e",
+      "src/options_alpha_lab/agent.py": "sha256:8ba8371c8e71c6e040c571da2560e61db8a934d017f8ebe33b71d5df50b55a7f",
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
       "src/options_alpha_lab/api/__init__.py": "sha256:4430b1f87ec17e889ded8dac44683c16c6906d0862b33cc14a02bfa9008f3e0c",
       "src/options_alpha_lab/api/__main__.py": "sha256:20571ffdb01f5602a76937e71794f135c38ab8cd9fcf0a995ebf0a41d4b6152f",
@@ -55,7 +55,7 @@
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
       "src/options_alpha_lab/data/nyse_sessions.json": "sha256:20eeea78acefa6f2260706db3a2b74e6165d45ff14be8f8349fbd557c5fea601",
       "src/options_alpha_lab/evaluations.py": "sha256:f5d33745f1bc99fdb4829a38bff7488be3941b24448dfa9bc737e32c6515b8ce",
-      "src/options_alpha_lab/evidence.py": "sha256:e070940d9aec47a460cb0f909699bc945b4917dbd98bb89c947fff4729107555",
+      "src/options_alpha_lab/evidence.py": "sha256:33b84d31175ad1016012a68247922b4375bacf84292c2453a9c17af449ad5f86",
       "src/options_alpha_lab/execution/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/execution/deadline.py": "sha256:5df778c8e738a5ccfae0a7a8ba48ac46588036a6eba1a2e15281c8e3b5c492b6",
       "src/options_alpha_lab/execution/gateway.py": "sha256:882e1122f8b539be1ef760980371ee7b1214fb98e3eb82056526bdc2c9402946",
@@ -109,7 +109,7 @@
       "src/options_alpha_lab/telemetry.py": "sha256:f3cf2c61c2a7ccc9caf0ec7fc5a9457bb13a423f47d4b09611a0ed7097808092",
       "src/options_alpha_lab/veto_calibration.py": "sha256:6be471e7154b97feb95312ee717d41ab09b76702f6f519e414ff7c6e94577e32",
       "src/options_alpha_lab/veto_pricing.py": "sha256:26503d6a2f9ee41530bf51b42c9ab0610b131b36097aa259d192efcf75ea9ee9",
-      "src/options_alpha_lab/veto_reconstruction.py": "sha256:a412f97bf8f5dee80958df28f1fb65984caa13308d4fd770c625d2917ad5aec0",
+      "src/options_alpha_lab/veto_reconstruction.py": "sha256:8548a28c63f04a509a5237cbc2068cd9b52c22b8733257162e0471a09708e955",
       "src/options_alpha_lab/veto_study.py": "sha256:33ca69ee1453878f85a559e91c17c8ce237e5af8a0e268fd3c2656cb2acdb54f",
       "src/options_alpha_lab/watchdog.py": "sha256:a84dd3b7cfab4f12a407694831f55bcc27301024a325da5723e5d17db2060501",
       "src/options_alpha_lab/worker.py": "sha256:84853b0c68c7a47cd9bf7607b5d3ed5581ff4e9079ad6f10a29a4f47877eaf51"
@@ -142,14 +142,14 @@
     "policy": {
       "src/options_alpha_lab/components.py": "sha256:732e8462252654a107681e2174ae818a6c8bc33192d408c667cc965060b1ddde",
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
-      "src/options_alpha_lab/evidence.py": "sha256:e070940d9aec47a460cb0f909699bc945b4917dbd98bb89c947fff4729107555"
+      "src/options_alpha_lab/evidence.py": "sha256:33b84d31175ad1016012a68247922b4375bacf84292c2453a9c17af449ad5f86"
     },
     "prompts": {
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
   "commit": "git:57f96e8612e44ab4c62f36d625ef88f4d52b640d",
-  "freeze_digest": "sha256:03f4bdaa7b8bfe9c514ac948265412f80a9d5b0b17ff3973d1b39734c3d5b584",
-  "frozen_at": "2026-10-14T04:06:01.090610+00:00",
+  "freeze_digest": "sha256:2c5ab3799270aa0aa3a426d92e9f50667a0ec7b7a7b9f749094c0437b557d44f",
+  "frozen_at": "2026-10-14T13:49:10.158146+00:00",
   "manifest_version": "release_freeze.v1"
 }

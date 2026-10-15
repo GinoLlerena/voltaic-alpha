@@ -300,6 +300,26 @@ class TradingAgent:
             expiration_gte=(today + timedelta(days=CHAIN_DTE_LOW)).isoformat(),
             expiration_lte=(today + timedelta(days=CHAIN_DTE_HIGH)).isoformat(),
         )
+        # A held spread outlives the chain window: the expiry guard closes it at
+        # 7 days, and the chain starts at 10. From 9 days the legs fell out of
+        # the read, so the position could be neither marked nor closed - the
+        # session stop fired on 14 October 2026 and was blocked for that reason.
+        # Its expiry is read on its own and only its two legs are kept, so the
+        # entry evidence, the at-the-money reading included, is unchanged.
+        held_read = None
+        held_symbols: tuple[str, ...] = ()
+        held = self.active_position()
+        if held is not None:
+            expires = held.expiration
+            # SQLite returns the stored UTC instant without its zone.
+            expiry = (expires.astimezone(UTC) if expires.tzinfo else expires).date()
+            held_symbols = (held.long_symbol, held.short_symbol)
+            if expiry < today + timedelta(days=CHAIN_DTE_LOW):
+                held_read = self.client.option_chain(
+                    self.symbol,
+                    expiration_gte=expiry.isoformat(),
+                    expiration_lte=expiry.isoformat(),
+                )
         is_open = bool(
             isinstance(clock_read.payload, dict) and clock_read.payload.get("is_open")
         )
@@ -318,6 +338,8 @@ class TradingAgent:
             bars_read=bars,
             chain_read=chain,
             participation_read=participation,
+            held_read=held_read,
+            held_symbols=held_symbols,
             as_of=self._clock(),
         )
         return snapshot, is_open
