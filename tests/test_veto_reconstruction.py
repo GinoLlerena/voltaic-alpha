@@ -166,5 +166,27 @@ class ParityTests(unittest.TestCase):
         self.assertIn("no option prices", vr.render(report))
 
 
+class CoverageTests(unittest.TestCase):
+    def test_a_session_with_no_trade_is_unmeasurable_and_named(self) -> None:
+        day = SESSION.isoformat()
+        traded = {**_options(_row("C", 777, 0.11)), "previous_close": 777.22,
+                  "listed": 2, "traded": 1}
+        empty = {**_options(), "session": "2026-10-09", "previous_close": 777.0,
+                 "listed": 850, "traded": 0}
+        rates = vp.Rates({date(2026, 10, 7): RATE, date(2026, 10, 8): RATE})
+        report = vr.coverage({day: traded, "2026-10-09": empty}, SPOT_BARS, rates)
+        self.assertEqual((report["sessions"], report["measured"]), (2, 1))
+        self.assertEqual(report["unmeasurable"][0]["session"], "2026-10-09")
+        self.assertEqual(report["classes"], {"calm": 1})
+        self.assertIn("2026-10-09: no reading", vr.render_coverage(report))
+
+    def test_a_reading_close_to_a_threshold_is_listed(self) -> None:
+        day = SESSION.isoformat()
+        data = {**_options(_row("C", 777, 0.215)), "previous_close": 777.22,
+                "listed": 1, "traded": 1}
+        report = vr.coverage({day: data}, SPOT_BARS, RATES)
+        self.assertEqual(report["near_a_threshold"], [day])
+
+
 if __name__ == "__main__":
     unittest.main()

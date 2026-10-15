@@ -50,18 +50,18 @@
     },
     "options/": {
       "coverage": {
-        "bytes": 364311,
+        "bytes": 7830833,
         "first": "2024-02-01",
-        "last": "2026-10-08",
-        "sessions": 19
+        "last": "2026-10-12",
+        "sessions": 676
       },
-      "digest": "sha256:5860b297fa1926415283ba841551c11b901e4cff534074f9626edb6401604401",
+      "digest": "sha256:af196556b21b37ab0bde425fa9faacec52d8745fee5ab2b200fe67b8d1ec7212",
       "digest_of": "each file's name and SHA-256, in name order",
       "endpoints": [
         "/v2/options/contracts",
         "/v1beta1/options/bars"
       ],
-      "fetched_at": "2026-10-13T15:22:46+00:00",
+      "fetched_at": "2026-10-14T04:04:38+00:00",
       "params": {
         "expiry": "10 to 60 days after the session",
         "strikes": "calls and puts within 1% of the previous close; calls 0.94 to 1.07 of it from 2026-09-22 to 2026-10-08",
