@@ -503,6 +503,7 @@ def build_snapshot(
     bars_read: ProviderRead,
     chain_read: ProviderRead,
     participation_read: ProviderRead | None = None,
+    participation_failure: str | None = None,
     held_read: ProviderRead | None = None,
     held_symbols: tuple[str, ...] = (),
     as_of: datetime | None = None,
@@ -512,6 +513,7 @@ def build_snapshot(
     missing: list[str] = []
     stale: list[str] = []
     errors: list[str] = []
+    advisories: list[str] = []
 
     clock_payload = clock_read.payload if isinstance(clock_read.payload, dict) else {}
     raw_is_open = clock_payload.get("is_open")
@@ -590,6 +592,14 @@ def build_snapshot(
             )
         except EvidenceError:
             errors.append(f"{PARTICIPATION_SYMBOL.lower()}:bars_unreadable")
+    if participation_failure is not None:
+        # A read that never returned. Recorded so a missing breadth signal can
+        # be told apart from a quiet one, and kept out of `provider_errors`,
+        # which would block the decision: whether it should is a rule decision
+        # (veto backtest plan, decision 5), not something to change here.
+        advisories.append(
+            f"{PARTICIPATION_SYMBOL.lower()}:read_failed:{participation_failure}"
+        )
     signals = (
         build_signals(bars, atm_iv, now, participation_bars) if not missing else []
     )
@@ -614,5 +624,6 @@ def build_snapshot(
             missing_fields=tuple(missing),
             stale_fields=tuple(stale),
             provider_errors=tuple(errors),
+            advisories=tuple(advisories),
         ),
     )

@@ -60,6 +60,60 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(broker.submits, [], "observe mode must not write")
 
 
+
+class FailedBreadthReadTests(unittest.TestCase):
+    """A failed RSP read is recorded, and blocks nothing (plan decision 5).
+
+    It used to be swallowed: the snapshot of a session whose breadth read
+    failed looked the same as one where breadth simply had nothing to say.
+    """
+
+    class Client(FakeClient):
+        def daily_bars(self, symbol: str):
+            if symbol == "RSP":
+                raise ProviderError("GET https://data.example/v2/stocks/bars?symbols=RSP "
+                                    "returned 503: upstream unavailable")
+            return super().daily_bars(symbol)
+
+    def test_the_failure_is_recorded_as_an_advisory(self) -> None:
+        snapshot, _ = agent(BASE_ENV, client=self.Client()).observe()
+        self.assertEqual(snapshot.data_quality.advisories,
+                         ("rsp:read_failed:ProviderError:status_503",))
+
+    def test_the_record_keeps_neither_the_url_nor_the_reply(self) -> None:
+        snapshot, _ = agent(BASE_ENV, client=self.Client()).observe()
+        text = " ".join(snapshot.data_quality.advisories)
+        self.assertNotIn("example", text)
+        self.assertNotIn("upstream", text)
+
+    def test_it_neither_blocks_the_decision_nor_becomes_a_reason(self) -> None:
+        snapshot, _ = agent(BASE_ENV, client=self.Client()).observe()
+        self.assertTrue(snapshot.data_quality.is_usable)
+        self.assertEqual(snapshot.data_quality.reason_codes, ())
+        self.assertEqual(agent(BASE_ENV, client=self.Client()).tick().action,
+                         "TRADE_CANDIDATE")
+
+    def test_a_healthy_read_records_nothing(self) -> None:
+        snapshot, _ = agent(BASE_ENV).observe()
+        self.assertEqual(snapshot.data_quality.advisories, ())
+
+    def test_the_record_survives_serialization(self) -> None:
+        import json
+
+        from options_alpha_lab.hashing import canonical_json
+        from options_alpha_lab.snapshot_io import snapshot_from_dict, snapshot_to_dict
+
+        snapshot, _ = agent(BASE_ENV, client=self.Client()).observe()
+        stored = json.loads(canonical_json(snapshot_to_dict(snapshot)))
+        again = snapshot_from_dict(stored)
+        self.assertEqual(again.data_quality.advisories, snapshot.data_quality.advisories)
+
+    def test_a_snapshot_without_one_serializes_as_before(self) -> None:
+        from options_alpha_lab.snapshot_io import snapshot_to_dict
+
+        snapshot, _ = agent(BASE_ENV).observe()
+        self.assertNotIn("advisories", snapshot_to_dict(snapshot)["data_quality"])
+
 class ExitsBeforeEntriesTests(DurableAgentCase):
     def test_an_open_position_is_managed_before_any_new_entry(self) -> None:
         agent = self.build(WRITE_ENV)

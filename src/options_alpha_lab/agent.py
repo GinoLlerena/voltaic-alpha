@@ -15,6 +15,7 @@ every guard still runs immediately before the write.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -176,6 +177,17 @@ class MarketDataClient(Protocol):
     ) -> ProviderRead: ...
 
 
+def provider_failure_code(exc: ProviderError) -> str:
+    """A short, safe label for a failed read: the error class and any HTTP status.
+
+    The message itself is not kept. It carries the request URL and up to 200
+    characters of the provider's reply, neither of which belongs in a snapshot.
+    """
+    status = re.search(r" returned (\d{3})\b", str(exc))
+    code = type(exc).__name__
+    return f"{code}:status_{status.group(1)}" if status else code
+
+
 def spread_value(snapshot: DecisionSnapshot, long_symbol: str, short_symbol: str) -> Decimal | None:
     """Conservative closing value: sell the long at the bid, buy the short at the ask."""
     quotes = {q.contract_symbol: q for q in snapshot.option_chain}
@@ -291,10 +303,11 @@ class TradingAgent:
         # the setup one possible confirmer and nothing else: an outage on a
         # second symbol must not halt the strategy on the first.
         participation = None
+        participation_failure = None
         try:
             participation = self.client.daily_bars(PARTICIPATION_SYMBOL)
-        except ProviderError:
-            participation = None
+        except ProviderError as exc:
+            participation_failure = provider_failure_code(exc)
         chain = self.client.option_chain(
             self.symbol,
             expiration_gte=(today + timedelta(days=CHAIN_DTE_LOW)).isoformat(),
@@ -338,6 +351,7 @@ class TradingAgent:
             bars_read=bars,
             chain_read=chain,
             participation_read=participation,
+            participation_failure=participation_failure,
             held_read=held_read,
             held_symbols=held_symbols,
             as_of=self._clock(),
