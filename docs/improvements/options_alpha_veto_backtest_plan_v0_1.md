@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md).** |
+| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md). Step 1 done ([coverage](../analysis/options_alpha_veto_step1_coverage_v0_1.md)). Step 2 done on the owner's "Agree ... go" of 15 October 2026 ([replay](../analysis/options_alpha_veto_step2_replay_v0_1.md)): parity 14/14, 241 Permitted and 161 Breadth-vetoed sessions. Step 3 (first outcomes) awaits the owner.** |
 | Requested by | Owner, 7 October 2026: "We can review the veto later with a longer backtest and results for the actual option spreads. I don't want to loosen it just to generate trades." |
 | Reviewed revision | `70e1493` |
 | Work prefix | `VBT-` |
