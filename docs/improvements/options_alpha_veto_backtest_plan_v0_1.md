@@ -726,7 +726,15 @@ Three things it does not cover:
   signals were enough for the feasibility check; the snapshots are needed for
   Step 1 and are a larger transfer, to be run with the same read-only limits.
 - **Decision 5** approves recording a failed RSP read as a separate change to
-  the live bot. It is not built yet and changes no entry rule.
+  the live bot. It changes no entry rule. **Built 15 October 2026:** a failed
+  read is kept in the snapshot's `data_quality.advisories` as
+  `rsp:read_failed:<error class>[:status_<code>]`, without the request URL or
+  the provider's reply. Advisories never make a snapshot unusable and never
+  become reason codes. One related behaviour is unchanged and needs a rule
+  decision of its own: RSP bars that *arrive but cannot be parsed* are already
+  a provider error (`rsp:bars_unreadable`), and a provider error blocks the
+  decision, which contradicts the code comment that breadth "must never be
+  able to fail a decision".
 
 **Owner's answer, 13 October 2026: "Approved".** It approves the historical
 option download as it was put to the owner that day: the same host through

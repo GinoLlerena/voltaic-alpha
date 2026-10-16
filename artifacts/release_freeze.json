@@ -36,7 +36,7 @@
       "scripts/veto_rates.py": "sha256:f514f7b2f9fad5840abdd9a53573a39a244f2fa443e912e4da58fe19b5922fe4",
       "src/options_alpha_lab/__init__.py": "sha256:e3aad86846fe4e3d86929adfd25c2a46c78de3349a59ef586beb8990d886d9b4",
       "src/options_alpha_lab/ablation.py": "sha256:25172bdf16d4de7b095d20beedb268a8ccdacd50d14c7e4ab3746460fb764196",
-      "src/options_alpha_lab/agent.py": "sha256:8ba8371c8e71c6e040c571da2560e61db8a934d017f8ebe33b71d5df50b55a7f",
+      "src/options_alpha_lab/agent.py": "sha256:92687781ff8f50d769b350ed3e2a356db0d2dd8ebf499582afe724b900ecfa86",
       "src/options_alpha_lab/agents.py": "sha256:3f23a14fc656aecd82aebc4116e6b77e39023de77fba85a3abadded059ee7de5",
       "src/options_alpha_lab/api/__init__.py": "sha256:4430b1f87ec17e889ded8dac44683c16c6906d0862b33cc14a02bfa9008f3e0c",
       "src/options_alpha_lab/api/__main__.py": "sha256:20571ffdb01f5602a76937e71794f135c38ab8cd9fcf0a995ebf0a41d4b6152f",
@@ -45,7 +45,7 @@
       "src/options_alpha_lab/api/server.py": "sha256:49d6be5ec9404f69fc2943cfcd31b76e1a9d2c19a7dbd80793d360a3f888f667",
       "src/options_alpha_lab/api/views.py": "sha256:f338fc4630e44536cff3515b51fa97c4fac81418178f832f148d5894c2003c75",
       "src/options_alpha_lab/architecture/__init__.py": "sha256:b9ec27fa878d4c68c402434339bad7a35db69868d14fad68ecb67b086b540d1a",
-      "src/options_alpha_lab/architecture/contracts.py": "sha256:ae85b7100b48ee9dd4d5baa2e4745f352296109dbb3ad22d0818dc17c82e4be7",
+      "src/options_alpha_lab/architecture/contracts.py": "sha256:4b857b3073e6c469d279ea8e9f201167566e676b99d21e083760de4e783e2f22",
       "src/options_alpha_lab/architecture/ports.py": "sha256:14d7ed75b364acb8b7be20fe8902b0007cec9423048bce3bee6fd5fe2719ab8f",
       "src/options_alpha_lab/architecture/workflow.py": "sha256:00a3651fe2d1e981f8980d7f4325a4e2f9e5bf8f0e17eaf4e8e1448a73e51ada",
       "src/options_alpha_lab/calendar.py": "sha256:977198e5ba670d10abdecd249088814edde50f672abbfd8761c6f74906cce02f",
@@ -55,7 +55,7 @@
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
       "src/options_alpha_lab/data/nyse_sessions.json": "sha256:20eeea78acefa6f2260706db3a2b74e6165d45ff14be8f8349fbd557c5fea601",
       "src/options_alpha_lab/evaluations.py": "sha256:f5d33745f1bc99fdb4829a38bff7488be3941b24448dfa9bc737e32c6515b8ce",
-      "src/options_alpha_lab/evidence.py": "sha256:33b84d31175ad1016012a68247922b4375bacf84292c2453a9c17af449ad5f86",
+      "src/options_alpha_lab/evidence.py": "sha256:4fcfe3850169c9460b02db7770cc0c5b35ed69b06fc3028845ade7a350fc953c",
       "src/options_alpha_lab/execution/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/execution/deadline.py": "sha256:5df778c8e738a5ccfae0a7a8ba48ac46588036a6eba1a2e15281c8e3b5c492b6",
       "src/options_alpha_lab/execution/gateway.py": "sha256:882e1122f8b539be1ef760980371ee7b1214fb98e3eb82056526bdc2c9402946",
@@ -105,7 +105,7 @@
       "src/options_alpha_lab/scheduler.py": "sha256:15d8a53c8ce932a895e11cc0416bf6f11e167398e47fb74f2632328133c1823c",
       "src/options_alpha_lab/secrets_setup.py": "sha256:c6c53abf89a8f6cc8a8594890cf419310826b7b1489fe5b09acfc81815d23acb",
       "src/options_alpha_lab/sensitivity.py": "sha256:58caf44c957ad8ffed2f0fb53204a87798a82e96ea29569de2a5970b7baf89aa",
-      "src/options_alpha_lab/snapshot_io.py": "sha256:37ad078ee0981aa1bbbe7343d0490b81d10eec7736787d8ee78485da2d2cf7fc",
+      "src/options_alpha_lab/snapshot_io.py": "sha256:176f2f51335aa8177bbc49d78f0421f3edd7112a37c13b81d2812d3a1d565f87",
       "src/options_alpha_lab/telemetry.py": "sha256:f3cf2c61c2a7ccc9caf0ec7fc5a9457bb13a423f47d4b09611a0ed7097808092",
       "src/options_alpha_lab/veto_calibration.py": "sha256:6be471e7154b97feb95312ee717d41ab09b76702f6f519e414ff7c6e94577e32",
       "src/options_alpha_lab/veto_pricing.py": "sha256:26503d6a2f9ee41530bf51b42c9ab0610b131b36097aa259d192efcf75ea9ee9",
@@ -142,14 +142,14 @@
     "policy": {
       "src/options_alpha_lab/components.py": "sha256:732e8462252654a107681e2174ae818a6c8bc33192d408c667cc965060b1ddde",
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
-      "src/options_alpha_lab/evidence.py": "sha256:33b84d31175ad1016012a68247922b4375bacf84292c2453a9c17af449ad5f86"
+      "src/options_alpha_lab/evidence.py": "sha256:4fcfe3850169c9460b02db7770cc0c5b35ed69b06fc3028845ade7a350fc953c"
     },
     "prompts": {
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:ab4fdf74029cdf764a20a6fac8f21fdb8fc338db",
-  "freeze_digest": "sha256:35dfc95e8b1ec53575c547f58d26c96f178a61d52aa19568734b1ff9f9d0801c",
-  "frozen_at": "2026-10-15T23:28:39.714580+00:00",
+  "commit": "git:e24140b74630eed282f7f78400169d4970e4bece",
+  "freeze_digest": "sha256:fd81e748f5d3334e47d581dd00f262f630e86e9d4842d5fd57d00e832f7fcba3",
+  "frozen_at": "2026-10-15T23:42:19.609514+00:00",
   "manifest_version": "release_freeze.v1"
 }

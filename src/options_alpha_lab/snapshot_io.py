@@ -173,6 +173,7 @@ def snapshot_from_dict(payload: Mapping[str, Any]) -> DecisionSnapshot:
         missing_fields=tuple(raw_quality.get("missing_fields", ())),
         stale_fields=tuple(raw_quality.get("stale_fields", ())),
         provider_errors=tuple(raw_quality.get("provider_errors", ())),
+        advisories=tuple(raw_quality.get("advisories", ())),
     )
 
     return DecisionSnapshot(
@@ -252,6 +253,13 @@ def snapshot_to_dict(snapshot: DecisionSnapshot) -> dict[str, Any]:
             "missing_fields": list(snapshot.data_quality.missing_fields),
             "stale_fields": list(snapshot.data_quality.stale_fields),
             "provider_errors": list(snapshot.data_quality.provider_errors),
+            # Written only when present, so every snapshot without one
+            # serializes, and hashes, exactly as it did before the field existed.
+            **(
+                {"advisories": list(snapshot.data_quality.advisories)}
+                if snapshot.data_quality.advisories
+                else {}
+            ),
         },
     }
 
