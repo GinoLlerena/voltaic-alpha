@@ -1,6 +1,6 @@
 [Unit]
 Description=Options Alpha presentation API (read-only, loopback)
-After=network-online.target postgresql.service
+After=network-online.target postgresql.service postgresql@16-main.service
 Wants=network-online.target
 
 [Service]

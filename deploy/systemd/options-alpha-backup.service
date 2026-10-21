@@ -1,6 +1,6 @@
 [Unit]
 Description=Verified PostgreSQL dump for Options Alpha
-After=postgresql.service
+After=postgresql.service postgresql@16-main.service
 Requires=postgresql.service
 
 [Service]

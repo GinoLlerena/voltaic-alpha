@@ -123,6 +123,30 @@ class UnitsParseTests(unittest.TestCase):
             self.assertEqual(parsed["Install"]["WantedBy"], "multi-user.target")
 
 
+CLUSTER = "postgresql@16-main.service"
+
+
+class DatabaseOrderingTests(unittest.TestCase):
+    """Order on the database cluster, not only on its wrapper.
+
+    `postgresql.service` is a wrapper that exits at once; the database runs as
+    the cluster unit. On 21 Oct 2026 needrestart restarted both together and the
+    database stopped first, so the worker could not release its lease and the
+    next worker refused to start until the lease expired.
+    """
+
+    def test_every_unit_ordered_on_the_wrapper_is_ordered_on_the_cluster(self) -> None:
+        ordered = [p for p in sorted(UNITS.glob("*.service"))
+                   if "postgresql.service" in _parse(p)["Unit"].get("After", "")]
+        self.assertIn(WORKER, ordered)
+        for path in ordered:
+            with self.subTest(unit=path.name):
+                self.assertIn(CLUSTER, _parse(path)["Unit"]["After"].split())
+
+    def test_the_worker_stops_and_restarts_with_the_cluster(self) -> None:
+        self.assertIn(CLUSTER, _parse(WORKER)["Unit"]["Requires"].split())
+
+
 class ConsolidatedUnitTests(unittest.TestCase):
     """`CIIP-I-016`, finished: one definition per unit, and the drift it found.
 
