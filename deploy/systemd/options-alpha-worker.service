@@ -1,8 +1,14 @@
 [Unit]
 Description=Options Alpha worker (single-writer decision agent)
-After=network-online.target postgresql.service
+# postgresql.service is only a wrapper; the database itself runs as the cluster
+# unit. Ordering on the wrapper alone let a restart of both at once (needrestart,
+# 21 Oct 2026, 08:50 ET) stop the database first. The worker's lease release then
+# failed, and the new worker refused to start for 80 s while the lease expired.
+# Ordering on the cluster makes systemd stop the worker first and start it last,
+# and Requires= restarts the worker with the database.
+After=network-online.target postgresql.service postgresql@16-main.service
 Wants=network-online.target
-Requires=postgresql.service
+Requires=postgresql.service postgresql@16-main.service
 
 [Service]
 Type=simple

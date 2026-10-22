@@ -1,7 +1,7 @@
 [Unit]
 Description=Sample host capacity every 30 s for the 2c2g resize baseline
 Documentation=file:///opt/options-alpha/docs/improvements/options_alpha_deployment_cost_analysis_v0_1.md
-After=postgresql.service
+After=postgresql.service postgresql@16-main.service
 
 [Service]
 Type=simple
