@@ -278,7 +278,9 @@ def load(cache: Path = CACHE, dividend: float = pricing.DIVIDEND_YIELD
     chains = {path.stem: json.loads(path.read_text())
               for path in (cache / "chains").glob("*.json")}
     return entries(rows, qualified, closes, chains, spot, rates, dividend), {
-        "rows_digest": vr.digest(rows)}
+        "rows_digest": vr.digest(rows),
+        # Every replayed session's place in the sequence, for Part 2's bootstrap.
+        "index": {row.session: row.index for row in rows}}
 
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - thin wrapper
