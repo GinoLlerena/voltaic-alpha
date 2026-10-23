@@ -177,3 +177,35 @@ and accepted ("Agree"):
   with no compounding conversion.
 - `k` counts calls only: they are the legs of the bullish spread the study
   covers.
+
+**23 October 2026: Step 3 implementation details, fixed before any outcome
+was computed.** The owner said to proceed with Step 3 on 23 October 2026.
+These notes fill in details §8 leaves open. None changes an approved value.
+
+- **Moves.** For a decision session, `C[-1]` is the last completed close the
+  decision read, and `C[0]`, `C[1]`, `C[2]` are the closes of the decision
+  session and the next two sessions in the cached daily bars. The h-session
+  move is `C[h-1] − C[-1]` in USD per share, and that divided by `C[-1]` in
+  percent. A horizon whose close is not in the cache is censored for that
+  horizon only; it is never read as zero.
+- **Invalidation and worst close.** A breach is a close strictly below the
+  setup's invalidation level at `C[0]`, `C[1]` or `C[2]`. The worst close is
+  the lowest of the three, reported as a move from `C[-1]`. Both are computed
+  only when all three closes exist.
+- **Bootstrap.** The sequence is every replayed session (all 676, every
+  bucket) in chronological order. A replicate draws ⌈n / L⌉ block starts
+  uniformly from 0 to n − L, concatenates the blocks of L sessions and keeps
+  the first n (moving blocks, not circular). The contrast is the mean over the
+  Permitted sessions drawn minus the mean over the Breadth-vetoed sessions
+  drawn, each counting only sessions with that metric. Sessions in other
+  buckets or with a censored metric stay in the sequence as gaps. A replicate
+  that draws no member of one group is counted and left out. The interval is
+  the 2.5th to 97.5th percentile of the replicates, with linear interpolation.
+  One random generator, Python's `random.Random(20261012)`, is used for each
+  block length.
+- **Realized volatility for the breakdown.** The standard deviation of the
+  20 daily log returns ending at `C[-1]`. The median is taken over the
+  Permitted and Breadth-vetoed sessions. A session at the median or below it
+  is "low"; above it is "high".
+- **Mode.** Only the reconstructed volatility input exists (Steps 1 and 2).
+  No proxy mode was run, so none is reported.
