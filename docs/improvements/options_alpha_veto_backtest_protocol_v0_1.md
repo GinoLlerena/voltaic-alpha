@@ -209,3 +209,31 @@ These notes fill in details §8 leaves open. None changes an approved value.
   is "low"; above it is "high".
 - **Mode.** Only the reconstructed volatility input exists (Steps 1 and 2).
   No proxy mode was run, so none is reported.
+
+**23 October 2026: Step 4 implementation details, fixed before any spread was
+selected.** The owner said to proceed with Part 2 and approved its download
+the same day (plan §9). None of these changes an approved value.
+
+- **Inputs.** The calls struck 0.94 to 1.07 of the previous close
+  (`chains/`, manifest). Each contract's implied volatility and delta come
+  from Step 1's `reconstruct`, unchanged: its last bar ending by 10:00 (age
+  15 minutes or less), volume of at least one contract, SPY's bar for the same
+  five minutes, BSM at the frozen rate and 1.2% dividend.
+- **Synthetic quote.** Bid `price − h` and ask `price + h`, with
+  `h = max($0.01, 0.006224 × price)`, in exact decimals and not rounded to a
+  cent. `crossing_debit` rounds its allowance up to a cent, as the bot does.
+- **Snapshot.** The underlying price is the previous completed close, as the
+  bot reads it. Days to expiry are counted as the worker counts them: expiry
+  date minus the decision's UTC date. The account has $100,000 of equity and
+  of options buying power, so the risk budget is $750 (0.75%) for every setup
+  in the independent analysis. Part 2's portfolio analysis uses its own
+  running equity.
+- **Order of gates.** The shipped selector, then the leg-synchronization limit
+  (the two legs' bars at most 10 minutes apart), then the shipped risk
+  governor. A chosen pair that fails synchronization is recorded as
+  rejected. The selector is not asked for a different pair, because the bot's
+  selector would not offer one.
+- **Fill reference.** `P` is the long leg's volume-weighted price minus the
+  short leg's, both in the 10:00–10:05 bar, each with a volume of at least one
+  contract. If either leg did not trade in that bar, the entry is recorded as
+  unfilled. No later bar is used.

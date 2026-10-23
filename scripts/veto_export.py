@@ -8,6 +8,7 @@ and 11, approved by the owner on 12 October 2026 for this export.
   veto_export.py snapshots  one stored decision snapshot a session, for calibration
   veto_export.py spot     SPY 5-minute bars from 09:30 to 10:05 New York
   veto_export.py options  traded option prices around the 10:00 decision
+  veto_export.py chains   Part 2: wide call chains for the qualifying sessions
 
 `options` is the long one: a call to the host per session. It keeps one file per
 session and skips the sessions it already has, so it can be stopped and run
@@ -217,13 +218,52 @@ WIDE_CALLS = (0.94, 1.07)
 OPTION_PAGE = 600
 
 
-def options(first: str, last: str, wide_first: str, wide_last: str) -> int:
+def _session_file(session: str, previous: float, bounds: list[str]) -> dict[str, Any]:
+    """One session's traded option prices, every page, checked for agreement."""
+    reply = unpack(on_host("option_bars.py", session, *bounds, "0", str(OPTION_PAGE))["gz"])
+    rows = list(reply["rows"])
+    requests = reply["requests"]
+    while len(rows) < reply["traded"]:
+        more = unpack(
+            on_host("option_bars.py", session, *bounds, str(len(rows)), str(OPTION_PAGE))["gz"]
+        )
+        if more["traded"] != reply["traded"] or not more["rows"]:
+            raise SystemExit(f"{session}: the pages do not agree; nothing kept, run again")
+        rows.extend(more["rows"])
+        requests += more["requests"]
+    symbols = [row[0] for row in rows]
+    if symbols != sorted(set(symbols)):
+        raise SystemExit(f"{session}: contracts are not unique and ordered")
+    call_low, call_high, put_low, put_high = (int(b) for b in bounds)
+    return {
+        **{k: reply[k] for k in ("session", "listed", "listed_inactive", "traded", "slots")},
+        "previous_close": previous,
+        "strikes": {"calls": [call_low, call_high], "puts": [put_low, put_high]},
+        "requests": requests,
+        "rows": rows,
+    }
+
+
+def _folder_digest(files: list[Path]) -> str:
+    digest = hashlib.sha256()
+    for file in files:
+        digest.update(file.name.encode() + b" " + hashlib.sha256(file.read_bytes()).digest())
+    return "sha256:" + digest.hexdigest()
+
+
+def _previous_closes() -> list[tuple[str, float]]:
+    """(session, previous completed close) for every cached SPY session."""
     spy = json.loads((CACHE / "daily_bars.json").read_text())["symbols"]["SPY"]["bars"]
     closes = [(bar["t"][:10], float(bar["c"])) for bar in spy]
+    return [(session, previous)
+            for (_, previous), (session, _) in zip(closes, closes[1:], strict=False)]
+
+
+def options(first: str, last: str, wide_first: str, wide_last: str) -> int:
     folder = CACHE / "options"
     folder.mkdir(parents=True, exist_ok=True)
     fetched = 0
-    for (_, previous), (session, _) in zip(closes, closes[1:], strict=False):
+    for session, previous in _previous_closes():
         if not first <= session <= last:
             continue
         path = folder / f"{session}.json"
@@ -235,37 +275,15 @@ def options(first: str, last: str, wide_first: str, wide_last: str) -> int:
         call_low = math.floor(previous * WIDE_CALLS[0]) if wide else put_low
         call_high = math.ceil(previous * WIDE_CALLS[1]) if wide else put_high
         bounds = [str(call_low), str(call_high), str(put_low), str(put_high)]
-        reply = unpack(on_host("option_bars.py", session, *bounds, "0", str(OPTION_PAGE))["gz"])
-        rows = list(reply["rows"])
-        requests = reply["requests"]
-        while len(rows) < reply["traded"]:
-            more = unpack(
-                on_host("option_bars.py", session, *bounds, str(len(rows)), str(OPTION_PAGE))["gz"]
-            )
-            if more["traded"] != reply["traded"] or not more["rows"]:
-                raise SystemExit(f"{session}: the pages do not agree; nothing kept, run again")
-            rows.extend(more["rows"])
-            requests += more["requests"]
-        symbols = [row[0] for row in rows]
-        if symbols != sorted(set(symbols)):
-            raise SystemExit(f"{session}: contracts are not unique and ordered")
-        path.write_text(json.dumps({
-            **{k: reply[k] for k in ("session", "listed", "listed_inactive", "traded", "slots")},
-            "previous_close": previous,
-            "strikes": {"calls": [call_low, call_high], "puts": [put_low, put_high]},
-            "requests": requests,
-            "rows": rows,
-        }, separators=(",", ":")))
+        data = _session_file(session, previous, bounds)
+        path.write_text(json.dumps(data, separators=(",", ":")))
         fetched += 1
-        print(f"{session}: {reply['traded']} of {reply['listed']} listed contracts traded"
+        print(f"{session}: {data['traded']} of {data['listed']} listed contracts traded"
               f"{' (wide)' if wide else ''}", flush=True)
     files = sorted(folder.glob("*.json"))
-    digest = hashlib.sha256()
-    for file in files:
-        digest.update(file.name.encode() + b" " + hashlib.sha256(file.read_bytes()).digest())
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"files": {}}
     manifest["files"]["options/"] = {
-        "digest": "sha256:" + digest.hexdigest(),
+        "digest": _folder_digest(files),
         "digest_of": "each file's name and SHA-256, in name order",
         "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "endpoints": ["/v2/options/contracts", "/v1beta1/options/bars"],
@@ -279,6 +297,61 @@ def options(first: str, last: str, wide_first: str, wide_last: str) -> int:
     }
     MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     print(f"fetched {fetched} sessions; {len(files)} held in {folder}")
+    return 0
+
+
+def qualifying_sessions() -> list[str]:
+    """Permitted and Breadth-vetoed sessions, from the Step 2 replay of the cache."""
+    from options_alpha_lab import veto_replay
+
+    rows, check = veto_replay.load(CACHE)
+    if not check["passes"]:
+        raise SystemExit("Step 2 parity fails; the qualifying sessions are not trusted")
+    return [row.session for row in rows
+            if row.bucket in (veto_replay.PERMITTED, veto_replay.BREADTH_VETOED)]
+
+
+def chains(limit: int | None) -> int:
+    """Part 2 entry chains: calls 0.94 to 1.07 of the previous close, no puts.
+
+    Its own folder, so the Step 1 to 3 inputs and their digests never change.
+    Approved by the owner on 23 October 2026 (plan section 9).
+    """
+    wanted = set(qualifying_sessions())
+    folder = CACHE / "chains"
+    folder.mkdir(parents=True, exist_ok=True)
+    fetched = 0
+    for session, previous in _previous_closes():
+        if session not in wanted or (folder / f"{session}.json").exists():
+            continue
+        if limit is not None and fetched >= limit:
+            break
+        bounds = [str(math.floor(previous * WIDE_CALLS[0])),
+                  str(math.ceil(previous * WIDE_CALLS[1])), "0", "0"]
+        data = _session_file(session, previous, bounds)
+        (folder / f"{session}.json").write_text(json.dumps(data, separators=(",", ":")))
+        fetched += 1
+        print(f"{session}: {data['traded']} of {data['listed']} listed calls traded, "
+              f"{data['requests']} requests", flush=True)
+    files = sorted(folder.glob("*.json"))
+    manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"files": {}}
+    manifest["files"]["chains/"] = {
+        "digest": _folder_digest(files),
+        "digest_of": "each file's name and SHA-256, in name order",
+        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "endpoints": ["/v2/options/contracts", "/v1beta1/options/bars"],
+        "params": {"timeframe": "5Min", "window": "09:45 to 10:05 New York",
+                   "expiry": "10 to 60 days after the session",
+                   "strikes": f"calls {WIDE_CALLS[0]} to {WIDE_CALLS[1]} of the previous "
+                              "close; no puts",
+                   "sessions": "Permitted and Breadth-vetoed sessions of the Step 2 replay"},
+        "coverage": {"sessions": len(files), "wanted": len(wanted),
+                     "first": files[0].stem if files else None,
+                     "last": files[-1].stem if files else None,
+                     "bytes": sum(file.stat().st_size for file in files)},
+    }
+    MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    print(f"fetched {fetched} sessions; {len(files)} of {len(wanted)} held in {folder}")
     return 0
 
 
@@ -299,10 +372,14 @@ def main() -> int:
     o.add_argument("--last", default="2026-10-12")
     o.add_argument("--wide-first", default="2026-09-22")
     o.add_argument("--wide-last", default="2026-10-08")
+    c = sub.add_parser("chains")
+    c.add_argument("--limit", type=int, help="fetch at most this many sessions (a trial)")
     args = parser.parse_args()
     try:
         if args.command == "spot":
             return spot(args.first_year)
+        if args.command == "chains":
+            return chains(args.limit)
         if args.command == "options":
             return options(args.first, args.last, args.wide_first, args.wide_last)
         if args.command == "bars":

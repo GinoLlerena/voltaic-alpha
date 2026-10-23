@@ -12,6 +12,29 @@
       "source": "FRED, series DGS3MO, percent a year",
       "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=2024-01-01"
     },
+    "chains/": {
+      "coverage": {
+        "bytes": 12578,
+        "first": "2024-02-06",
+        "last": "2024-02-06",
+        "sessions": 1,
+        "wanted": 402
+      },
+      "digest": "sha256:1b47606bb9b8448e40d0201b6fb5960f94ff401395bc97f3811f03f6491a156f",
+      "digest_of": "each file's name and SHA-256, in name order",
+      "endpoints": [
+        "/v2/options/contracts",
+        "/v1beta1/options/bars"
+      ],
+      "fetched_at": "2026-10-23T22:21:29+00:00",
+      "params": {
+        "expiry": "10 to 60 days after the session",
+        "sessions": "Permitted and Breadth-vetoed sessions of the Step 2 replay",
+        "strikes": "calls 0.94 to 1.07 of the previous close; no puts",
+        "timeframe": "5Min",
+        "window": "09:45 to 10:05 New York"
+      }
+    },
     "daily_bars.json": {
       "bytes": 162538,
       "coverage": {
