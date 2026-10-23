@@ -271,3 +271,28 @@ needed.
 - **Result.** `(exit fill − filled debit) × 100` dollars for one contract. A
   trade-derived value below zero or above the width is kept as computed and
   flagged, never clipped.
+
+**23 October 2026: Step 6 implementation details, fixed before any portfolio
+was simulated.** They fill in §6 and change none of its values.
+
+- **Arms.** *Baseline* may enter on Permitted sessions only. *Without the
+  breadth veto* may enter on Permitted and Breadth-vetoed sessions. Both arms
+  use the same Step 4 entries and Step 5 trades for each cost case, so an arm
+  differs only in which sessions it may use.
+- **Capacity.** One position at a time. An entry is possible at a session's
+  10:00 decision only if the previous position's exit filled on an earlier
+  session (§6's re-entry rule). A qualifying session that falls while a
+  position is open is recorded as "capacity in use". A session whose Step 4
+  entry did not happen (no pair, refused, unfilled) is recorded with that
+  reason, and the arm waits for the next qualifying session.
+- **Risk at the running equity.** The risk budget is 0.75% of the arm's
+  equity at that moment, not the fixed $100,000 of Step 4. If the entry's
+  estimated debit × 100 exceeds it, the entry is refused, and recorded.
+- **Unresolved exits.** An unresolved trade is charged the loss of its whole
+  filled debit, the bound of §5. It holds the position until the close of the
+  last session in its downloaded window, so a missing exit never frees
+  capacity early. Each one is listed.
+- **Reported.** For each arm and cost case: trades, wins, total result, final
+  equity, the largest peak-to-trough fall in equity, results per calendar
+  year, capacity and refusal counts, and unresolved trades. There is no
+  confidence interval (§8).
