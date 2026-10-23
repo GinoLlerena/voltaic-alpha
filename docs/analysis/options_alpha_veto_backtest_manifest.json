@@ -12,6 +12,28 @@
       "source": "FRED, series DGS3MO, percent a year",
       "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=2024-01-01"
     },
+    "calendar.json": {
+      "bytes": 55742,
+      "digest": "sha256:bae2ee398e7fd60b58da1cccf56fa78dba519143ec12c8fc72c1e055342a79bf",
+      "early_closes": [
+        "2024-07-03",
+        "2024-11-29",
+        "2024-12-24",
+        "2025-07-03",
+        "2025-11-28",
+        "2025-12-24",
+        "2026-11-27",
+        "2026-12-24"
+      ],
+      "fetched_at": "2026-10-23T22:28:11+00:00",
+      "sessions": 753,
+      "source": "Alpaca /v2/calendar via refresh_calendar.fetch",
+      "years": [
+        "2024",
+        "2025",
+        "2026"
+      ]
+    },
     "chains/": {
       "coverage": {
         "bytes": 12578,
@@ -90,6 +112,26 @@
         "strikes": "calls and puts within 1% of the previous close; calls 0.94 to 1.07 of it from 2026-09-22 to 2026-10-08",
         "timeframe": "5Min",
         "window": "09:45 to 10:05 New York"
+      }
+    },
+    "paths/": {
+      "coverage": {
+        "bytes": 11421,
+        "entries": 1,
+        "wanted": 5
+      },
+      "digest": "sha256:9416c2155d4de38afe20ac19496ff50c02ad76649dfee0c7d369618254877a8f",
+      "digest_of": "each file's name and SHA-256, in name order",
+      "endpoints": [
+        "/v1beta1/options/bars"
+      ],
+      "fetched_at": "2026-10-23T22:27:03+00:00",
+      "params": {
+        "contracts": "the two legs of each Step 4 entry",
+        "entries_digest": "sha256:3231abd280b07a3aa4e77911a43abe79dbf97d841036b0b8280e5401e48ccf29",
+        "rows_digest": "sha256:e959635b3dc7e1861ff3c9969b53fcc29528f53e552cd1741ee8877b02bb4080",
+        "timeframe": "5Min",
+        "window": "10:05 New York on the entry session to the close 5 sessions later"
       }
     },
     "spy_5min_open.json": {

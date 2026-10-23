@@ -9,6 +9,8 @@ and 11, approved by the owner on 12 October 2026 for this export.
   veto_export.py spot     SPY 5-minute bars from 09:30 to 10:05 New York
   veto_export.py options  traded option prices around the 10:00 decision
   veto_export.py chains   Part 2: wide call chains for the qualifying sessions
+  veto_export.py paths    Part 2: each entered spread's two legs after entry
+  veto_export.py calendar  the trading calendar for given years, early closes included
 
 `options` is the long one: a call to the host per session. It keeps one file per
 session and skips the sessions it already has, so it can be stopped and run
@@ -355,6 +357,83 @@ def chains(limit: int | None) -> int:
     return 0
 
 
+def calendar(years: list[str]) -> int:
+    """The trading calendar for the study years, with early closes.
+
+    The same read-only request as `refresh_calendar.py`, kept in the cache so
+    the calendar the bot ships is not touched. Plan Step 1 named it.
+    """
+    import refresh_calendar
+
+    sessions = [row for year in years for row in refresh_calendar.fetch(year)]
+    path = CACHE / "calendar.json"
+    path.write_text(json.dumps({"sessions": sessions}, indent=1))
+    record(path, source="Alpaca /v2/calendar via refresh_calendar.fetch",
+           years=years, sessions=len(sessions),
+           early_closes=[s["date"] for s in sessions if s["close"] != "16:00"])
+    print(f"{len(sessions)} sessions; early closes "
+          f"{[s['date'] for s in sessions if s['close'] != '16:00']}")
+    return 0
+
+
+#: Sessions of bars fetched after an entry: the session stop acts at the open
+#: after the third completed close, so five sessions hold every exit.
+PATH_SESSIONS = 5
+
+
+def paths(limit: int | None) -> int:
+    """Part 2 exit paths: both legs of each entered spread, from 10:05 on.
+
+    Approved by the owner on 23 October 2026 (plan section 9), Stage B.
+    """
+    from options_alpha_lab import veto_entries
+
+    found, facts = veto_entries.load(CACHE)
+    entered = [e for e in found if e.status == veto_entries.ENTERED]
+    sessions = [session for session, _ in _previous_closes()]
+    folder = CACHE / "paths"
+    folder.mkdir(parents=True, exist_ok=True)
+    fetched = 0
+    for e in entered:
+        path = folder / f"{e.session}.json"
+        if path.exists():
+            continue
+        if limit is not None and fetched >= limit:
+            break
+        at = sessions.index(e.session)
+        if at + PATH_SESSIONS - 1 < len(sessions):
+            last = sessions[at + PATH_SESSIONS - 1]
+        else:
+            # Past the cached bars: a week of calendar days covers five sessions.
+            last = (date.fromisoformat(e.session) + timedelta(days=8)).isoformat()
+        assert e.long_symbol and e.short_symbol
+        reply = unpack(on_host("leg_paths.py", e.session, last,
+                               f"{e.long_symbol},{e.short_symbol}")["gz"])
+        path.write_text(json.dumps(reply, separators=(",", ":")))
+        fetched += 1
+        bars = {symbol: len(rows) for symbol, rows in reply["legs"].items()}
+        print(f"{e.session}: {bars}", flush=True)
+    files = sorted(folder.glob("*.json"))
+    manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"files": {}}
+    manifest["files"]["paths/"] = {
+        "digest": _folder_digest(files),
+        "digest_of": "each file's name and SHA-256, in name order",
+        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "endpoints": ["/v1beta1/options/bars"],
+        "params": {"timeframe": "5Min",
+                   "window": f"10:05 New York on the entry session to the close "
+                             f"{PATH_SESSIONS} sessions later",
+                   "contracts": "the two legs of each Step 4 entry",
+                   "entries_digest": veto_entries.digest(found),
+                   "rows_digest": facts["rows_digest"]},
+        "coverage": {"entries": len(files), "wanted": len(entered),
+                     "bytes": sum(file.stat().st_size for file in files)},
+    }
+    MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    print(f"fetched {fetched} entries; {len(files)} of {len(entered)} held in {folder}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -374,10 +453,17 @@ def main() -> int:
     o.add_argument("--wide-last", default="2026-10-08")
     c = sub.add_parser("chains")
     c.add_argument("--limit", type=int, help="fetch at most this many sessions (a trial)")
+    sub.add_parser("calendar").add_argument("years", nargs="+")
+    q = sub.add_parser("paths")
+    q.add_argument("--limit", type=int, help="fetch at most this many entries (a trial)")
     args = parser.parse_args()
     try:
         if args.command == "spot":
             return spot(args.first_year)
+        if args.command == "calendar":
+            return calendar(args.years)
+        if args.command == "paths":
+            return paths(args.limit)
         if args.command == "chains":
             return chains(args.limit)
         if args.command == "options":

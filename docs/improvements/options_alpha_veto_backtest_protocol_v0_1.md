@@ -237,3 +237,37 @@ the same day (plan §9). None of these changes an approved value.
   short leg's, both in the 10:00–10:05 bar, each with a volume of at least one
   contract. If either leg did not trade in that bar, the entry is recorded as
   unfilled. No later bar is used.
+
+**23 October 2026: Step 5 implementation details, fixed before any exit was
+simulated.** They fill in §5 and change none of its values. The first exit-path
+download (one entry, a trial) showed each leg trading in under half of the
+5-minute bars and a few bars after 16:00. That is why the first two points are
+needed.
+
+- **Observations.** One at the end of each regular-session 5-minute bar after
+  the fill: from the bar opening 10:05 on the entry session, then from the bar
+  opening 09:30 on later sessions, up to the bar ending at that session's
+  close (13:00 on an early close). Bars outside regular hours are not used.
+  The calendar is Alpaca's, fetched with the study (`calendar.json`).
+- **Spread value at an observation.** Each leg's most recent trade bar that
+  ended at or before the observation and is no more than 15 minutes old. The
+  two legs' bars must be no more than 10 minutes apart: §3's limits, applied
+  as at entry. The value is the long leg's volume-weighted price minus the
+  short leg's, less the case's exit friction. If either leg has no such bar,
+  the value is unmeasurable there. Premium-independent rules still run, and
+  the stop and target are skipped, as in `evaluate_exit`.
+- **Inputs to `evaluate_exit`.** It is called unchanged. Its inputs: the filled
+  debit `P + friction`; days to expiry counted from the observation's date;
+  the last SPY close completed before the observation's session (on the
+  entry session that is `C[-1]`); and the setup's typed invalidation.
+  Completed sessions since the fill come from the shipped `TradingCalendar`,
+  with the fill at 10:05 on the entry session.
+- **Exit fill.** The first observation strictly after the trigger in which
+  **both** legs traded in that very bar. Its value is long minus short, less
+  the case's friction. If none comes before the downloaded window ends, the
+  exit is unresolved: reported, left out of averages, and bounded by the loss
+  of the whole debit. A position with no trigger by the window's end is
+  unresolved in the same way.
+- **Result.** `(exit fill − filled debit) × 100` dollars for one contract. A
+  trade-derived value below zero or above the width is kept as computed and
+  flagged, never clipped.
