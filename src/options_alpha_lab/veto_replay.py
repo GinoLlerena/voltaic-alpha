@@ -81,6 +81,8 @@ class Attribution:
     #: The level a qualifying setup would be invalidated at, from the baseline
     #: or, for a breadth veto, from its qualifying counterfactual.
     invalidation: str | None = None
+    #: That qualifying setup itself, for Part 2. Not part of a row or its digest.
+    setup: SetupCandidate | None = None
 
 
 @dataclass(frozen=True)
@@ -143,7 +145,7 @@ def attribute(signals: tuple[Signal, ...], price: Decimal, session: date | None,
 
     baseline = _CLASSIFIER.classify(_snapshot(signals, price, session, as_of))
     if baseline is not None:
-        return Attribution(PERMITTED, "qualified", _level(baseline))
+        return Attribution(PERMITTED, "qualified", _level(baseline), baseline)
 
     opposing = _opposing(signals, anchor.direction)
     if not opposing:
@@ -156,7 +158,7 @@ def attribute(signals: tuple[Signal, ...], price: Decimal, session: date | None,
     counterfactual = _CLASSIFIER.classify(_snapshot(without_breadth, price, session, as_of))
     if counterfactual is not None:
         return Attribution(BREADTH_VETOED, "qualifies without opposing breadth",
-                           _level(counterfactual))
+                           _level(counterfactual), counterfactual)
     # Not breadth alone. Does it qualify once every opposing signal is gone?
     without_any = tuple(s for s in signals if s not in opposing)
     if _CLASSIFIER.classify(_snapshot(without_any, price, session, as_of)) is not None:
@@ -175,8 +177,14 @@ def decision_moment(session: date) -> datetime:
     return datetime.combine(session, DECISION_TIME, tzinfo=NEW_YORK).astimezone(UTC)
 
 
-def replay(spy: list[Bar], rsp: list[Bar], readings: dict[str, float | None]) -> list[Row]:
-    """One row per session in `readings`, the session's ATM reading or None."""
+def replay(spy: list[Bar], rsp: list[Bar], readings: dict[str, float | None],
+           qualified: dict[str, tuple[SetupCandidate, tuple[Signal, ...]]] | None = None
+           ) -> list[Row]:
+    """One row per session in `readings`, the session's ATM reading or None.
+
+    If `qualified` is given, each Permitted or Breadth-vetoed session's setup and
+    signals are added to it, keyed by session, for Part 2 to select a spread.
+    """
     rsp_sessions = {bar.session for bar in rsp}
     rows: list[Row] = []
     for index, day in enumerate(sorted(readings)):
@@ -212,6 +220,8 @@ def replay(spy: list[Bar], rsp: list[Bar], readings: dict[str, float | None]) ->
         breadth = [bar for bar in rsp if first < bar.session <= last.session]
         signals = tuple(build_signals(window, Decimal(repr(iv)), as_of, breadth))
         verdict = attribute(signals, last.close, last.session, as_of)
+        if qualified is not None and verdict.setup is not None:
+            qualified[day] = (verdict.setup, signals)
         opposing = _opposing_breadth(signals)
         gap = _GAP.search(opposing.summary) if opposing else None
         rows.append(Row(

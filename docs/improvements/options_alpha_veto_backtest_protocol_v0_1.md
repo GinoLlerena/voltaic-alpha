@@ -209,3 +209,90 @@ These notes fill in details §8 leaves open. None changes an approved value.
   is "low"; above it is "high".
 - **Mode.** Only the reconstructed volatility input exists (Steps 1 and 2).
   No proxy mode was run, so none is reported.
+
+**23 October 2026: Step 4 implementation details, fixed before any spread was
+selected.** The owner said to proceed with Part 2 and approved its download
+the same day (plan §9). None of these changes an approved value.
+
+- **Inputs.** The calls struck 0.94 to 1.07 of the previous close
+  (`chains/`, manifest). Each contract's implied volatility and delta come
+  from Step 1's `reconstruct`, unchanged: its last bar ending by 10:00 (age
+  15 minutes or less), volume of at least one contract, SPY's bar for the same
+  five minutes, BSM at the frozen rate and 1.2% dividend.
+- **Synthetic quote.** Bid `price − h` and ask `price + h`, with
+  `h = max($0.01, 0.006224 × price)`, in exact decimals and not rounded to a
+  cent. `crossing_debit` rounds its allowance up to a cent, as the bot does.
+- **Snapshot.** The underlying price is the previous completed close, as the
+  bot reads it. Days to expiry are counted as the worker counts them: expiry
+  date minus the decision's UTC date. The account has $100,000 of equity and
+  of options buying power, so the risk budget is $750 (0.75%) for every setup
+  in the independent analysis. Part 2's portfolio analysis uses its own
+  running equity.
+- **Order of gates.** The shipped selector, then the leg-synchronization limit
+  (the two legs' bars at most 10 minutes apart), then the shipped risk
+  governor. A chosen pair that fails synchronization is recorded as
+  rejected. The selector is not asked for a different pair, because the bot's
+  selector would not offer one.
+- **Fill reference.** `P` is the long leg's volume-weighted price minus the
+  short leg's, both in the 10:00–10:05 bar, each with a volume of at least one
+  contract. If either leg did not trade in that bar, the entry is recorded as
+  unfilled. No later bar is used.
+
+**23 October 2026: Step 5 implementation details, fixed before any exit was
+simulated.** They fill in §5 and change none of its values. The first exit-path
+download (one entry, a trial) showed each leg trading in under half of the
+5-minute bars and a few bars after 16:00. That is why the first two points are
+needed.
+
+- **Observations.** One at the end of each regular-session 5-minute bar after
+  the fill: from the bar opening 10:05 on the entry session, then from the bar
+  opening 09:30 on later sessions, up to the bar ending at that session's
+  close (13:00 on an early close). Bars outside regular hours are not used.
+  The calendar is Alpaca's, fetched with the study (`calendar.json`).
+- **Spread value at an observation.** Each leg's most recent trade bar that
+  ended at or before the observation and is no more than 15 minutes old. The
+  two legs' bars must be no more than 10 minutes apart: §3's limits, applied
+  as at entry. The value is the long leg's volume-weighted price minus the
+  short leg's, less the case's exit friction. If either leg has no such bar,
+  the value is unmeasurable there. Premium-independent rules still run, and
+  the stop and target are skipped, as in `evaluate_exit`.
+- **Inputs to `evaluate_exit`.** It is called unchanged. Its inputs: the filled
+  debit `P + friction`; days to expiry counted from the observation's date;
+  the last SPY close completed before the observation's session (on the
+  entry session that is `C[-1]`); and the setup's typed invalidation.
+  Completed sessions since the fill come from the shipped `TradingCalendar`,
+  with the fill at 10:05 on the entry session.
+- **Exit fill.** The first observation strictly after the trigger in which
+  **both** legs traded in that very bar. Its value is long minus short, less
+  the case's friction. If none comes before the downloaded window ends, the
+  exit is unresolved: reported, left out of averages, and bounded by the loss
+  of the whole debit. A position with no trigger by the window's end is
+  unresolved in the same way.
+- **Result.** `(exit fill − filled debit) × 100` dollars for one contract. A
+  trade-derived value below zero or above the width is kept as computed and
+  flagged, never clipped.
+
+**23 October 2026: Step 6 implementation details, fixed before any portfolio
+was simulated.** They fill in §6 and change none of its values.
+
+- **Arms.** *Baseline* may enter on Permitted sessions only. *Without the
+  breadth veto* may enter on Permitted and Breadth-vetoed sessions. Both arms
+  use the same Step 4 entries and Step 5 trades for each cost case, so an arm
+  differs only in which sessions it may use.
+- **Capacity.** One position at a time. An entry is possible at a session's
+  10:00 decision only if the previous position's exit filled on an earlier
+  session (§6's re-entry rule). A qualifying session that falls while a
+  position is open is recorded as "capacity in use". A session whose Step 4
+  entry did not happen (no pair, refused, unfilled) is recorded with that
+  reason, and the arm waits for the next qualifying session.
+- **Risk at the running equity.** The risk budget is 0.75% of the arm's
+  equity at that moment, not the fixed $100,000 of Step 4. If the entry's
+  estimated debit × 100 exceeds it, the entry is refused, and recorded.
+- **Unresolved exits.** An unresolved trade is charged the loss of its whole
+  filled debit, the bound of §5. It holds the position until the close of the
+  last session in its downloaded window, so a missing exit never frees
+  capacity early. Each one is listed.
+- **Reported.** For each arm and cost case: trades, wins, total result, final
+  equity, the largest peak-to-trough fall in equity, results per calendar
+  year, capacity and refusal counts, and unresolved trades. There is no
+  confidence interval (§8).
