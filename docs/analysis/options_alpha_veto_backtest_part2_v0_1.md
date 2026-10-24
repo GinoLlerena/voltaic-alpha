@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 23 October 2026, America/Lima |
-| Status | **Steps 4 to 6 complete. Stop point: the owner reviews this report (plan §8 Step 6, then Step 7). No result changes the bot.** |
+| Status | **Steps 4 to 6 complete. Owner's decision, 23 October 2026: keep the veto as it is. The veto study is closed; no rule changes.** |
 | Plan | [Breadth veto backtest: plan](../improvements/options_alpha_veto_backtest_plan_v0_1.md) §5 and §8 Steps 4 to 6 |
 | Protocol | [Numeric protocol](../improvements/options_alpha_veto_backtest_protocol_v0_1.md) §§1–8, frozen 12 October 2026. The Step 4, 5 and 6 details in §11 were each committed before that step ran |
 | Part 1 | [SPY outcomes](options_alpha_veto_backtest_part1_v0_1.md): no measurable separation on SPY's move |

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md). Step 1 done ([coverage](../analysis/options_alpha_veto_step1_coverage_v0_1.md)). Step 2 done on the owner's "Agree ... go" of 15 October 2026 ([replay](../analysis/options_alpha_veto_step2_replay_v0_1.md)): parity 14/14, 241 Permitted and 161 Breadth-vetoed sessions. Step 3 done on the owner's "proceed" of 23 October 2026 ([Part 1 report](../analysis/options_alpha_veto_backtest_part1_v0_1.md)): no measurable separation on SPY's move (Permitted minus Breadth-vetoed −0.201%, 95% interval −0.511% to +0.127%). Part 2 built on the owner's "proceed" of 23 October 2026 ([Part 2 report](../analysis/options_alpha_veto_backtest_part2_v0_1.md)): vetoed trades meet the no-worse test in all three cost cases, but both portfolios lose and removing the veto loses more. The owner reviews (Step 6 stop point, then Step 7).** |
+| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md). Step 1 done ([coverage](../analysis/options_alpha_veto_step1_coverage_v0_1.md)). Step 2 done on the owner's "Agree ... go" of 15 October 2026 ([replay](../analysis/options_alpha_veto_step2_replay_v0_1.md)): parity 14/14, 241 Permitted and 161 Breadth-vetoed sessions. Step 3 done on the owner's "proceed" of 23 October 2026 ([Part 1 report](../analysis/options_alpha_veto_backtest_part1_v0_1.md)): no measurable separation on SPY's move (Permitted minus Breadth-vetoed −0.201%, 95% interval −0.511% to +0.127%). Part 2 built on the owner's "proceed" of 23 October 2026 ([Part 2 report](../analysis/options_alpha_veto_backtest_part2_v0_1.md)): vetoed trades meet the no-worse test in all three cost cases, but both portfolios lose and removing the veto loses more. **Step 7, owner's decision of 23 October 2026: "The veto keep as it is".** The breadth veto stays unchanged at 0.70; the study is closed.** |
 | Requested by | Owner, 7 October 2026: "We can review the veto later with a longer backtest and results for the actual option spreads. I don't want to loosen it just to generate trades." |
 | Reviewed revision | `70e1493` |
 | Work prefix | `VBT-` |
@@ -683,6 +683,11 @@ The report supports one of three outcomes. None is taken automatically.
 | Breadth-vetoed trades are materially worse under the prespecified comparison and central costs | Keep the veto as it is; attach evidence and limitations to DEC-008, without claiming proof of an edge |
 | No measurable difference, or too few trades to tell | Keep the veto unchanged and keep collecting Paper evidence |
 | Breadth-vetoed trades meet the predeclared non-inferiority criterion in all three cost cases, with acceptable reconstruction quality and portfolio results reviewed | Consider a separate proposal with its own review and Paper testing; this study alone does not authorize a change |
+
+**Decision, 23 October 2026.** The owner kept the veto as it is ("The veto
+keep as it is"), after the [Part 2 report](../analysis/options_alpha_veto_backtest_part2_v0_1.md).
+The single-trade "no worse" test passed narrowly, but both portfolios lost and
+removing the veto lost more. No rule changes; this study is closed.
 
 “No worse” requires an approved practical margin and interval-based criterion,
 not a non-significant difference. Preserve the veto if evidence is inconclusive.
