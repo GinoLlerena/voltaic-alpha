@@ -361,7 +361,8 @@ if wants port80; then
   say "5. Serve the dashboard on port 80"
   # A redirect rather than moving Streamlit itself: it needs no knowledge of the
   # unit file, no capability grant to bind a privileged port, and it is undone
-  # by deleting one rule. Port 8501 stays open so a rollback needs no change.
+  # by deleting one rule. Port 8501 is not public: its security-group rule was
+  # revoked on 23 October 2026, and a rollback points port 80 back at Streamlit.
   note "opening $PUBLIC_PORT/tcp on $DEMO_SG"
   run aliyun ecs AuthorizeSecurityGroup --RegionId "$REGION" --SecurityGroupId "$DEMO_SG" \
     --IpProtocol tcp --PortRange "$PUBLIC_PORT/$PUBLIC_PORT" --SourceCidrIp 0.0.0.0/0 \
