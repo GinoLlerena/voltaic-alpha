@@ -36,19 +36,19 @@
     },
     "chains/": {
       "coverage": {
-        "bytes": 12578,
+        "bytes": 5953958,
         "first": "2024-02-06",
-        "last": "2024-02-06",
-        "sessions": 1,
+        "last": "2026-10-12",
+        "sessions": 402,
         "wanted": 402
       },
-      "digest": "sha256:1b47606bb9b8448e40d0201b6fb5960f94ff401395bc97f3811f03f6491a156f",
+      "digest": "sha256:9386b892055ec09060c613cda6dfc725c5cfda7fb761981f591baafa3bfa4c01",
       "digest_of": "each file's name and SHA-256, in name order",
       "endpoints": [
         "/v2/options/contracts",
         "/v1beta1/options/bars"
       ],
-      "fetched_at": "2026-10-23T22:21:29+00:00",
+      "fetched_at": "2026-10-24T01:42:59+00:00",
       "params": {
         "expiry": "10 to 60 days after the session",
         "sessions": "Permitted and Breadth-vetoed sessions of the Step 2 replay",
@@ -116,19 +116,19 @@
     },
     "paths/": {
       "coverage": {
-        "bytes": 11421,
-        "entries": 1,
-        "wanted": 5
+        "bytes": 2475522,
+        "entries": 149,
+        "wanted": 149
       },
-      "digest": "sha256:9416c2155d4de38afe20ac19496ff50c02ad76649dfee0c7d369618254877a8f",
+      "digest": "sha256:5d1715f93978e5ef726fd48a0b75b7a1fe4c6fbd2b30a4bf8fafb72ab481fbe7",
       "digest_of": "each file's name and SHA-256, in name order",
       "endpoints": [
         "/v1beta1/options/bars"
       ],
-      "fetched_at": "2026-10-23T22:27:03+00:00",
+      "fetched_at": "2026-10-24T02:06:08+00:00",
       "params": {
         "contracts": "the two legs of each Step 4 entry",
-        "entries_digest": "sha256:3231abd280b07a3aa4e77911a43abe79dbf97d841036b0b8280e5401e48ccf29",
+        "entries_digest": "sha256:6b8227c52017c5d5180d3641d96ed8d5ab479eca3585ca610a42d6f4633b2633",
         "rows_digest": "sha256:e959635b3dc7e1861ff3c9969b53fcc29528f53e552cd1741ee8877b02bb4080",
         "timeframe": "5Min",
         "window": "10:05 New York on the entry session to the close 5 sessions later"
