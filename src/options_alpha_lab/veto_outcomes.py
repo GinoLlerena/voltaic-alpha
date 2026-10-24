@@ -184,16 +184,16 @@ def starts(sequence_length: int, block: int, rng: random.Random) -> list[int]:
     return [rng.randint(0, sequence_length - block) for _ in range(count)]
 
 
-def contrast(sequence_length: int, members: Sequence[Outcome], metric: str,
-             group_of: Callable[[Outcome], str | None] = lambda o: o.group,
-             block: int = BLOCK_LENGTH, repetitions: int = REPETITIONS,
-             seed: int = SEED) -> Contrast:
-    """Permitted minus Breadth-vetoed, with its moving-block bootstrap interval."""
-    value = metrics()[metric]
-    group = labels(sequence_length, members, group_of)
-    values: list[float | None] = [None] * sequence_length
-    for o in members:
-        values[o.index] = value(o)
+def block_contrast(metric: str, group: Sequence[str | None], values: Sequence[float | None],
+                   block: int = BLOCK_LENGTH, repetitions: int = REPETITIONS,
+                   seed: int = SEED) -> Contrast:
+    """Permitted minus Breadth-vetoed over a session sequence, with its interval.
+
+    `group` and `values` run over the whole chronological sequence; a position
+    with no group, or with no value, is a gap. Part 2 calls this with spread
+    results, so both parts share one bootstrap.
+    """
+    sequence_length = len(group)
     usable = {g: [v for v, label in zip(values, group, strict=True)
                   if label == g and v is not None] for g in GROUPS}
     excluded = {g: sum(1 for i in range(sequence_length)
@@ -240,6 +240,19 @@ def contrast(sequence_length: int, members: Sequence[Outcome], metric: str,
         high=_percentile(draws, 1 - tail) if draws else None,
         empty_replicates=empty,
     )
+
+
+def contrast(sequence_length: int, members: Sequence[Outcome], metric: str,
+             group_of: Callable[[Outcome], str | None] = lambda o: o.group,
+             block: int = BLOCK_LENGTH, repetitions: int = REPETITIONS,
+             seed: int = SEED) -> Contrast:
+    """Permitted minus Breadth-vetoed for one Step 3 metric."""
+    value = metrics()[metric]
+    group = labels(sequence_length, members, group_of)
+    values: list[float | None] = [None] * sequence_length
+    for o in members:
+        values[o.index] = value(o)
+    return block_contrast(metric, group, values, block, repetitions, seed)
 
 
 def at_line(line: Decimal) -> Callable[[Outcome], str]:

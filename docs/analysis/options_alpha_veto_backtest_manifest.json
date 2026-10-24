@@ -12,6 +12,51 @@
       "source": "FRED, series DGS3MO, percent a year",
       "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=2024-01-01"
     },
+    "calendar.json": {
+      "bytes": 55742,
+      "digest": "sha256:bae2ee398e7fd60b58da1cccf56fa78dba519143ec12c8fc72c1e055342a79bf",
+      "early_closes": [
+        "2024-07-03",
+        "2024-11-29",
+        "2024-12-24",
+        "2025-07-03",
+        "2025-11-28",
+        "2025-12-24",
+        "2026-11-27",
+        "2026-12-24"
+      ],
+      "fetched_at": "2026-10-23T22:28:11+00:00",
+      "sessions": 753,
+      "source": "Alpaca /v2/calendar via refresh_calendar.fetch",
+      "years": [
+        "2024",
+        "2025",
+        "2026"
+      ]
+    },
+    "chains/": {
+      "coverage": {
+        "bytes": 5953958,
+        "first": "2024-02-06",
+        "last": "2026-10-12",
+        "sessions": 402,
+        "wanted": 402
+      },
+      "digest": "sha256:9386b892055ec09060c613cda6dfc725c5cfda7fb761981f591baafa3bfa4c01",
+      "digest_of": "each file's name and SHA-256, in name order",
+      "endpoints": [
+        "/v2/options/contracts",
+        "/v1beta1/options/bars"
+      ],
+      "fetched_at": "2026-10-24T01:42:59+00:00",
+      "params": {
+        "expiry": "10 to 60 days after the session",
+        "sessions": "Permitted and Breadth-vetoed sessions of the Step 2 replay",
+        "strikes": "calls 0.94 to 1.07 of the previous close; no puts",
+        "timeframe": "5Min",
+        "window": "09:45 to 10:05 New York"
+      }
+    },
     "daily_bars.json": {
       "bytes": 162538,
       "coverage": {
@@ -67,6 +112,26 @@
         "strikes": "calls and puts within 1% of the previous close; calls 0.94 to 1.07 of it from 2026-09-22 to 2026-10-08",
         "timeframe": "5Min",
         "window": "09:45 to 10:05 New York"
+      }
+    },
+    "paths/": {
+      "coverage": {
+        "bytes": 2475522,
+        "entries": 149,
+        "wanted": 149
+      },
+      "digest": "sha256:5d1715f93978e5ef726fd48a0b75b7a1fe4c6fbd2b30a4bf8fafb72ab481fbe7",
+      "digest_of": "each file's name and SHA-256, in name order",
+      "endpoints": [
+        "/v1beta1/options/bars"
+      ],
+      "fetched_at": "2026-10-24T02:06:08+00:00",
+      "params": {
+        "contracts": "the two legs of each Step 4 entry",
+        "entries_digest": "sha256:6b8227c52017c5d5180d3641d96ed8d5ab479eca3585ca610a42d6f4633b2633",
+        "rows_digest": "sha256:e959635b3dc7e1861ff3c9969b53fcc29528f53e552cd1741ee8877b02bb4080",
+        "timeframe": "5Min",
+        "window": "10:05 New York on the entry session to the close 5 sessions later"
       }
     },
     "spy_5min_open.json": {

@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 12 October 2026, America/Lima |
-| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md). Step 1 done ([coverage](../analysis/options_alpha_veto_step1_coverage_v0_1.md)). Step 2 done on the owner's "Agree ... go" of 15 October 2026 ([replay](../analysis/options_alpha_veto_step2_replay_v0_1.md)): parity 14/14, 241 Permitted and 161 Breadth-vetoed sessions. Step 3 done on the owner's "proceed" of 23 October 2026 ([Part 1 report](../analysis/options_alpha_veto_backtest_part1_v0_1.md)): no measurable separation on SPY's move (Permitted minus Breadth-vetoed −0.201%, 95% interval −0.511% to +0.127%). Whether to build Part 2 awaits the owner.** |
+| Status | **Decisions 1–8, 10 and 11 approved by the owner on 12 October 2026 (§9). Feasibility count done: go. Decision 9 (numeric protocol) approved the same day, values in the [protocol](options_alpha_veto_backtest_protocol_v0_1.md). Step 1 done ([coverage](../analysis/options_alpha_veto_step1_coverage_v0_1.md)). Step 2 done on the owner's "Agree ... go" of 15 October 2026 ([replay](../analysis/options_alpha_veto_step2_replay_v0_1.md)): parity 14/14, 241 Permitted and 161 Breadth-vetoed sessions. Step 3 done on the owner's "proceed" of 23 October 2026 ([Part 1 report](../analysis/options_alpha_veto_backtest_part1_v0_1.md)): no measurable separation on SPY's move (Permitted minus Breadth-vetoed −0.201%, 95% interval −0.511% to +0.127%). Part 2 built on the owner's "proceed" of 23 October 2026 ([Part 2 report](../analysis/options_alpha_veto_backtest_part2_v0_1.md)): vetoed trades meet the no-worse test in all three cost cases, but both portfolios lose and removing the veto loses more. **Step 7, owner's decision of 23 October 2026: "The veto keep as it is".** The breadth veto stays unchanged at 0.70; the study is closed.** |
 | Requested by | Owner, 7 October 2026: "We can review the veto later with a longer backtest and results for the actual option spreads. I don't want to loosen it just to generate trades." |
 | Reviewed revision | `70e1493` |
 | Work prefix | `VBT-` |
@@ -684,6 +684,11 @@ The report supports one of three outcomes. None is taken automatically.
 | No measurable difference, or too few trades to tell | Keep the veto unchanged and keep collecting Paper evidence |
 | Breadth-vetoed trades meet the predeclared non-inferiority criterion in all three cost cases, with acceptable reconstruction quality and portfolio results reviewed | Consider a separate proposal with its own review and Paper testing; this study alone does not authorize a change |
 
+**Decision, 23 October 2026.** The owner kept the veto as it is ("The veto
+keep as it is"), after the [Part 2 report](../analysis/options_alpha_veto_backtest_part2_v0_1.md).
+The single-trade "no worse" test passed narrowly, but both portfolios lost and
+removing the veto lost more. No rule changes; this study is closed.
+
 “No worse” requires an approved practical margin and interval-based criterion,
 not a non-significant difference. Preserve the veto if evidence is inconclusive.
 
@@ -748,6 +753,24 @@ git; nothing written on the host, nothing restarted, no credential leaving it,
 no new subscription and no added host hours. The tool is
 `scripts/veto_export.py options` and `spot`. Exit-path prices for Part 2 are
 not covered and need a later request.
+
+**Owner's answer, 23 October 2026: "Proceed".** It was given to the Part 2
+download as it was put to the owner that day. That request named two stages:
+
+- **Stage A, entry chains:** 5-minute call trade bars from 09:45 to 10:05 New
+  York, struck 0.94 to 1.07 of the previous close, expiring 10 to 60 days out,
+  for the Permitted and Breadth-vetoed sessions of the Step 2 replay. About
+  8,700 requests. The tool is `scripts/veto_export.py chains`. The data goes to
+  its own folder, so the Step 1 to 3 inputs keep their digests.
+- **Stage B, exit paths:** after Step 4 has chosen each spread, the two legs'
+  5-minute bars from the entry to the exit, up to about four sessions. About
+  1,000 to 2,000 requests.
+
+Both use the same host and GET requests as on 13 October, spaced 0.5 seconds
+apart, with nothing written on the host and no credential leaving it. Unlike
+13 October, they **add host hours**: they run after 16:15 New York with no
+position open, keeping the server up with `scripts/session.py` for about five
+hours in all (roughly $0.15).
 
 Decision 4(a) authorizes neither a deployment nor copying credentials. The owner
 must separately approve the export's target, read-only commands and transfer;
