@@ -6,7 +6,7 @@
 | Plan | [Setup and exit study plan](../improvements/options_alpha_setup_exit_study_plan_v0_1.md), §3, with the definitions fixed in §3.1 before computing |
 | Inputs | The Part 2 entries, trades and exit paths, unchanged. Trades digest `sha256:59d5e170cb6a564e27ea09c35dbb992e38c6e399ed9040f656de223112dc8fa7`, the same as the Part 2 report |
 | Code | `src/options_alpha_lab/study_decomposition.py`; run `uv run python -m options_alpha_lab.study_decomposition --all-cases` |
-| Status | Descriptive only. No rule is changed and nothing here is a test |
+| Status | Descriptive only. No rule is changed and nothing here is a test. Computed before the owner approved the plan; see the plan's §7 correction |
 
 ## 1. Summary
 
@@ -126,8 +126,8 @@ descriptive:
 
 ## 4. What it means for Part B
 
-The plan (§4) is frozen and this does not change it. On the open decision 3,
-the two downloads:
+The plan (§4) is not yet approved; nothing here changes it. On decision 3, the
+two downloads:
 
 - **B5, 21–45 days to expiry:** Part A points to time decay while held, with
   no directional gain to offset it. A longer expiry loses less value a day, so
