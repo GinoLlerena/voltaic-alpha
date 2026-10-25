@@ -478,7 +478,9 @@ def deploy(args: argparse.Namespace) -> int:
         out.write_text(json.dumps(record, indent=2))
     print(f"\n{record['result']}  (record: {out})")
     if record["result"] == "DEPLOYED":
-        print(f"React UI: http://{EIP}/   Streamlit (rollback): http://{EIP}:{STREAMLIT_PORT}/")
+        # Streamlit still serves on 8501 on the host, but that port has not been
+        # public since 23 October 2026: `rollback` points port 80 back at it.
+        print(f"React UI: http://{EIP}/   Streamlit rollback: deploy_react.py rollback")
     return 0 if record["result"] == "DEPLOYED" else 1
 
 
