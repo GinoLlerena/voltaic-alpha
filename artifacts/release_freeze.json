@@ -56,7 +56,7 @@
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
       "src/options_alpha_lab/data/nyse_sessions.json": "sha256:20eeea78acefa6f2260706db3a2b74e6165d45ff14be8f8349fbd557c5fea601",
       "src/options_alpha_lab/evaluations.py": "sha256:f5d33745f1bc99fdb4829a38bff7488be3941b24448dfa9bc737e32c6515b8ce",
-      "src/options_alpha_lab/evidence.py": "sha256:4fcfe3850169c9460b02db7770cc0c5b35ed69b06fc3028845ade7a350fc953c",
+      "src/options_alpha_lab/evidence.py": "sha256:1de0170d77463ab0391b6b9bcd697cf766c54f48587892c51e92bcacfc3d2d3b",
       "src/options_alpha_lab/execution/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "src/options_alpha_lab/execution/deadline.py": "sha256:5df778c8e738a5ccfae0a7a8ba48ac46588036a6eba1a2e15281c8e3b5c492b6",
       "src/options_alpha_lab/execution/gateway.py": "sha256:882e1122f8b539be1ef760980371ee7b1214fb98e3eb82056526bdc2c9402946",
@@ -148,14 +148,14 @@
     "policy": {
       "src/options_alpha_lab/components.py": "sha256:732e8462252654a107681e2174ae818a6c8bc33192d408c667cc965060b1ddde",
       "src/options_alpha_lab/config.py": "sha256:a2fd1c065e1bded1d47c0fe637b22dd926e96c6c8484a1b1b1ca29582ccc7806",
-      "src/options_alpha_lab/evidence.py": "sha256:4fcfe3850169c9460b02db7770cc0c5b35ed69b06fc3028845ade7a350fc953c"
+      "src/options_alpha_lab/evidence.py": "sha256:1de0170d77463ab0391b6b9bcd697cf766c54f48587892c51e92bcacfc3d2d3b"
     },
     "prompts": {
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:917aeab30c476eb5c1953bf251b0f394d9778c0a",
-  "freeze_digest": "sha256:f7d44be2ebe12b6c4ca4bde7fbbc955cf08c340dcde7a5536ed390a36b029b55",
-  "frozen_at": "2026-10-25T01:42:37.066591+00:00",
+  "commit": "git:8e6e173bdd67d445deb91feac6f285c5c241614e",
+  "freeze_digest": "sha256:14152d77020ec9cc595604a6be48808d3c774dc38817f9f080e36aa0e1b2509f",
+  "frozen_at": "2026-10-25T04:54:47.742626+00:00",
   "manifest_version": "release_freeze.v1"
 }

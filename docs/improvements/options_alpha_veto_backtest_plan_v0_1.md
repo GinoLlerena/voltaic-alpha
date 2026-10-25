@@ -740,6 +740,10 @@ Three things it does not cover:
   a provider error (`rsp:bars_unreadable`), and a provider error blocks the
   decision, which contradicts the code comment that breadth "must never be
   able to fail a decision".
+  **Decided 24 October 2026 by the owner:** malformed RSP bars are now an
+  advisory (`rsp:bars_unreadable`) like a failed read, and block nothing. A
+  bar whose time does not parse is included; it used to raise out of the
+  observation altogether.
 
 **Owner's answer, 13 October 2026: "Approved".** It approves the historical
 option download as it was put to the owner that day: the same host through

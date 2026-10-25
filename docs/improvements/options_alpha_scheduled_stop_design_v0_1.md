@@ -12,7 +12,8 @@
 
 The server is only useful around US market hours. Running it all the time on 2c2g
 costs about **$20.37/month** in compute and disk; stopped in economical mode
-(`StopCharging`) outside those hours, about **$10.74/month**. That comes from
+(`StopCharging`) outside those hours, about **$10.74/month** (revised to
+**$16.50/month** on 24 October 2026, §13). That comes from
 DescribePrice: 2c2g compute $0.0178/h, PL1 disk $0.0101/h (billed all 730 hours,
 stopped or not), and the §3 window of about 9 h across 21 sessions a month,
 roughly 189 running hours. The earlier estimate of $10.36 assumed 168 hours. Backup, network and tax are extra, as in the
@@ -391,3 +392,28 @@ billed unit prices, to be confirmed on the first mostly-stopped day's bill.
 - `python3 scripts/provision_scheduler.py disable` turns the timer off.
 - `python3 scripts/session.py start --hours N --reason demo|dev` holds the server up for at most 24 h (or set the tags from a phone, §4.3); `end` releases it.
 - In the ECS console, Start brings the server up by hand.
+
+## 13. Cost plan revised (24 October 2026)
+
+The owner asked to raise the plan. The $10.74 projection in §1 counted only
+compute in the window and the disk. October's bill shows three costs it left out:
+
+| Cost | Per month | Source |
+|---|---|---|
+| Disk, billed stopped or not | $7.39 | $0.2431 a day |
+| Function Compute, hourly minimum | $1.46 | $0.048 a day |
+| Compute in the window, 21 to 22 sessions | about $4.0 | about $0.19 a session |
+| Manual development and deploy sessions | about $0.5 to $1.0 | observed in October |
+| **Holding a Paper position** | about $1.4 a trade | the server does not stop while a position is open (PER-R-3): a held weekday costs about $0.72 instead of $0.47, and a held weekend day $0.72 instead of $0.29 |
+
+**October 2026, measured** (billing days UTC+8, queried 24 October): $13.76
+to date (ECS $12.59, Function Compute $1.16, snapshots $0.01). Held days bill
+$0.718 (20 and 21 October); ordinary trading days $0.47 to $0.49 (22 to 24
+October). With the rest of the month flat, October ends near **$16.7**,
+including two Paper trades held 11 days in all.
+
+**New plan: $16.50 a month,** about $14 with no position held, plus about
+$1.40 for each Paper trade, at about two trades a month. Re-check at month
+end. A month above **$20** without a matching increase in held days is a cause
+to look into, not a reason to change the schedule. Backup, network and tax
+remain extra, as before.
