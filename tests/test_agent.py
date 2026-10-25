@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import agent_support as support
 from agent_support import (
     BASE_ENV,
     LONG,
@@ -59,6 +60,43 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(result.action, "TRADE_CANDIDATE")
         self.assertEqual(broker.submits, [], "observe mode must not write")
 
+
+
+class MalformedBreadthBarsTests(unittest.TestCase):
+    """Malformed RSP bars are recorded like a failed read, and block nothing.
+
+    They used to land in `provider_errors`, which made the snapshot unusable:
+    a broken optional input halted the decision, against the rule that
+    breadth must never fail an otherwise sound one.
+    """
+
+    #: A payload whose bars are not a list, and a bar whose time does not parse.
+    MALFORMED = ({"symbol": "RSP", "bars": "not a list"},
+                 {"symbol": "RSP", "bars": [{"t": "not a time"}]})
+
+    @staticmethod
+    def client(payload: dict) -> FakeClient:
+        class Client(FakeClient):
+            def daily_bars(self, symbol: str):
+                if symbol != "RSP":
+                    return super().daily_bars(symbol)
+                return support.read(payload, feed="sip")
+        return Client()
+
+    def test_recorded_as_an_advisory_not_a_provider_error(self) -> None:
+        for payload in self.MALFORMED:
+            with self.subTest(payload=payload):
+                snapshot, _ = agent(BASE_ENV, client=self.client(payload)).observe()
+                self.assertEqual(snapshot.data_quality.advisories, ("rsp:bars_unreadable",))
+                self.assertEqual(snapshot.data_quality.provider_errors, ())
+
+    def test_it_does_not_block_the_decision(self) -> None:
+        for payload in self.MALFORMED:
+            with self.subTest(payload=payload):
+                snapshot, _ = agent(BASE_ENV, client=self.client(payload)).observe()
+                self.assertTrue(snapshot.data_quality.is_usable)
+                self.assertEqual(agent(BASE_ENV, client=self.client(payload)).tick().action,
+                                 "TRADE_CANDIDATE")
 
 
 class FailedBreadthReadTests(unittest.TestCase):
