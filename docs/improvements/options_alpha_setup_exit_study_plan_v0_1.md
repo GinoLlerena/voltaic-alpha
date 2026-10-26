@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 23 October 2026, America/Lima |
-| Status | **Not yet approved.** On 24 October an approval was recorded here by mistake (see §7). Part A has been computed, with its definitions fixed in §3.1 first. §4 is not yet frozen; the owner approves, edits or rejects it |
+| Status | **Approved by the owner, 26 October 2026, after seeing Part A** (see §7). §4 is frozen from that date. An earlier approval recorded on 24 October was a mistake and is withdrawn (§7) |
 | Why | [Veto backtest Part 2](../analysis/options_alpha_veto_backtest_part2_v0_1.md): in simulation, the strategy's average trade is negative in every cost case (central: −$29.64 a trade over 84 Permitted trades). Three in four trades end on the session stop; the profit target was reached 5 times in 149 |
 | Boundary | Offline research only. No trading rule, threshold or worker setting changes. Any change found here needs its own proposal, review and Paper testing |
 
@@ -162,3 +162,11 @@ is.
 
 Approval of this document freezes §4. A later change needs a dated note
 saying what changed and why, made before the affected results are computed.
+
+**Approval, 26 October 2026.** The owner approved this plan, answering the
+four decisions above with the recommendations, and decision 3 with the
+recommendation Part A made: download for B5, not for B4. The owner saw Part A
+first. §4 is not edited: B4 stays on the list and is reported as not run, and
+the reading rule stays written for six comparisons, which is stricter for
+five. B5's download is sized and shown to the owner before it is run, as §4
+requires. Paper stays armed.
