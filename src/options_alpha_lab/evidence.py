@@ -590,13 +590,16 @@ def build_snapshot(
             participation_bars = parse_bars(
                 participation_read, as_of=now, market_open=market_open
             )
-        except EvidenceError:
-            errors.append(f"{PARTICIPATION_SYMBOL.lower()}:bars_unreadable")
+        except (EvidenceError, ValueError):
+            # Malformed bars (a payload that is not a list, or a bar whose time
+            # does not parse) are a broken read like a failed one: recorded, and
+            # kept out of `provider_errors`, which would block the decision
+            # (owner's decision of 24 October 2026).
+            advisories.append(f"{PARTICIPATION_SYMBOL.lower()}:bars_unreadable")
     if participation_failure is not None:
         # A read that never returned. Recorded so a missing breadth signal can
-        # be told apart from a quiet one, and kept out of `provider_errors`,
-        # which would block the decision: whether it should is a rule decision
-        # (veto backtest plan, decision 5), not something to change here.
+        # be told apart from a quiet one, and kept out of `provider_errors`
+        # (veto backtest plan, decision 5).
         advisories.append(
             f"{PARTICIPATION_SYMBOL.lower()}:read_failed:{participation_failure}"
         )
