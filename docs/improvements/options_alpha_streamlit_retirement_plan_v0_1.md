@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 24 October 2026, America/Lima |
-| Status | **Draft. Nothing is removed and nothing on the host is changed until the owner answers §5.** |
+| Status | **Approved by the owner, 26 October 2026, with the recommendations in §5.** Each phase is still its own PR, merged and deployed only after the one before it is verified |
 | Why | React has served port 80 since 29 September. Streamlit still runs on the host as the rollback surface. Port 8501 has been closed to the world since 23 October, so nobody outside reaches it |
 | Rule | Code simplicity audit, principle 8: retire deliberately. Check callers, commands, services, rollback and tests, and keep it working until the retirement and the rollback replacement are approved |
 
@@ -61,3 +61,16 @@ endpoints and read model.
 | D2 | The Docker image (the judges' self-run demo): switch it to React and the API, or freeze it as the submission record? | **Freeze it as the submission record**: tag the current commit and point the README's Docker section at that tag, so the record still runs. Switching the image is a separate, larger job |
 | D3 | The rollback in §3 replaces "port 80 back to Streamlit". Accept it? | **Yes** |
 | D4 | Phase 1 on the host needs a session outside market hours (`session.py start --reason dev`), with no position open. When? | The first evening this week with no position open |
+
+**Decisions, 26 October 2026.** The owner approved all four recommendations:
+
+- D1: all three phases, one at a time.
+- D2: the Docker image is frozen as the submission record. The current
+  commit is tagged, and the README's Docker section points at that tag.
+- D3: the rollback in §3 replaces "port 80 back to Streamlit".
+- D4: phase 1 on the host on the first evening this week with no position
+  open, in a `session.py start --reason dev` session.
+
+Between phases 1 and 2, today's rollback still works in two steps: start
+`options-alpha.service` again (phase 1's undo), then `deploy_react.py
+rollback`. Phase 2 removes the need for the first step.
