@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 23 October 2026, America/Lima |
-| Status | **Approved by the owner, 24 October 2026 (§7, decisions 1 to 3). §4 is frozen. Part A's definitions are fixed in §3.1 before any of it is computed.** |
+| Status | **Approved by the owner, 26 October 2026, after seeing Part A** (see §7). §4 is frozen from that date. An earlier approval recorded on 24 October was a mistake and is withdrawn (§7) |
 | Why | [Veto backtest Part 2](../analysis/options_alpha_veto_backtest_part2_v0_1.md): in simulation, the strategy's average trade is negative in every cost case (central: −$29.64 a trade over 84 Permitted trades). Three in four trades end on the session stop; the profit target was reached 5 times in 149 |
 | Boundary | Offline research only. No trading rule, threshold or worker setting changes. Any change found here needs its own proposal, review and Paper testing |
 
@@ -152,9 +152,21 @@ alternating by week. A fixed number of trades is set in advance, at least
 | 3 | B4 and B5 need new downloads. Approve now, or decide after Part A? | After Part A: it may show they are not needed |
 | 4 | Keep Paper armed meanwhile? | Yes. It costs no money and it is the only source of real fills |
 
-**Owner's answers, 24 October 2026:** "Proceed from 1 to 3": Part A
-approved; §4 approved as written and frozen; the B4 and B5 downloads to be
-decided after Part A. Decision 4 was not raised: Paper stays armed, as it is.
+**Correction, 24 October 2026.** An approval of decisions 1 to 3 was
+recorded here, and merged in #106, from a misread instruction: the owner's
+"Proceed from 1 to 3" referred to three backlog items, not to this table. The
+owner has not answered §7. Part A was computed on that misreading, with its
+definitions fixed in §3.1 before computing. If the owner now edits §4, the
+edit is made after Part A was seen, and must say so. Paper stays armed, as it
+is.
 
 Approval of this document freezes §4. A later change needs a dated note
 saying what changed and why, made before the affected results are computed.
+
+**Approval, 26 October 2026.** The owner approved this plan, answering the
+four decisions above with the recommendations, and decision 3 with the
+recommendation Part A made: download for B5, not for B4. The owner saw Part A
+first. §4 is not edited: B4 stays on the list and is reported as not run, and
+the reading rule stays written for six comparisons, which is stricter for
+five. B5's download is sized and shown to the owner before it is run, as §4
+requires. Paper stays armed.
