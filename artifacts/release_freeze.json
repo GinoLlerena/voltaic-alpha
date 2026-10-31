@@ -128,7 +128,7 @@
       "Dockerfile": "sha256:7678c301df3c3883197b5ddadb2ebb0111649552ade3fa6a0c37186be9c8abd9",
       "docker-compose.yml": "sha256:9b0ab104722d8c14fa8336e2cf24f68950719a389cfbf198d72c7b63aa564127",
       "pyproject.toml": "sha256:05c89f3f005416b520bb5f3d32d82c3e156aeaa8c1d981235f52db0f5b90c724",
-      "uv.lock": "sha256:3e3cbe168da589c0c9cdede035058ffed92206e85658b52e8f7478eb407f5e62"
+      "uv.lock": "sha256:eaf8fb246a92dcd8de26bdfe25eb1b9f66b290896d0c25eeabd10957dd03fc1a"
     },
     "demo_data": {
       "artifacts/h0_paper_lifecycle.json": "sha256:a09aea77c418e7d53d12ba2db1b6e77274cdfd58d01654245f73c8336713bf4c",
@@ -155,8 +155,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:bbc8ebce4f295a98e3099342b6fd9a351caded20",
-  "freeze_digest": "sha256:35b1204e7d6cd3181201027a2bb9e8e0739fb4cb4debef0b4460b2c02930f6a3",
-  "frozen_at": "2026-10-26T22:57:15.166861+00:00",
+  "commit": "git:84ce16c20bb021f2bdb136cac4315aef3adb2c19",
+  "freeze_digest": "sha256:5c2701bf7867e93e37b9bb5863b9b19c8926ed7544c01c90224a615c5ae33393",
+  "frozen_at": "2026-10-31T15:43:08.081489+00:00",
   "manifest_version": "release_freeze.v1"
 }
