@@ -380,7 +380,6 @@ echo "api_status=$(code http://127.0.0.1:8600/api/v1/system/status)"
 echo "stop_readiness=$(code http://127.0.0.1:8600/api/v1/system/stop-readiness)"
 echo "worker=$(systemctl is-active {WORKER}) steady=$steady"
 echo "api=$(systemctl is-active options-alpha-api)"
-echo "streamlit=$(code http://127.0.0.1:8501/)"
 systemctl start options-alpha-watchdog.service || true
 python3 - <<'PY'
 import json

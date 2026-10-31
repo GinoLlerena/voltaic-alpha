@@ -99,9 +99,17 @@ class InstallerCoversWhatIsCommittedTests(unittest.TestCase):
         """A unit added here but not wired into the installer is dead weight."""
         installer = INSTALLER.read_text()
         for unit in sorted(p.name for p in UNITS.glob("*.service")):
+            if unit == DASHBOARD.name:
+                continue
             self.assertIn(unit, installer, f"{unit} is never installed")
         for timer in sorted(p.name for p in UNITS.glob("*.timer")):
             self.assertIn(timer, installer, f"{timer} is never installed")
+
+    def test_streamlit_is_not_enabled_again(self) -> None:
+        """Enabling it would bring it back on the next boot, and the server boots daily."""
+        code = [line for line in INSTALLER.read_text().splitlines()
+                if not line.lstrip().startswith("#")]
+        self.assertNotIn(DASHBOARD.name, "\n".join(code))
 
     def test_timers_are_started_not_merely_enabled(self) -> None:
         """`enable` alone leaves a rebuilt host with no backups and no watchdog

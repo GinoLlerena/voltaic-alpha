@@ -22,7 +22,7 @@ host-side safety net. What keeps a revert small:
   - the old API module is kept on the host, and the API change is a systemd
     drop-in, so undoing it is deleting a file and restarting one service;
   - port 80 is switched by a second drop-in, on the port-80 unit, so the
-    rollback is removing that drop-in: Streamlit never stops serving on 8501;
+    rollback is starting Streamlit on 8501 and removing that drop-in;
   - the temporary security-group rule for 8600 is revoked in a `finally`.
 """
 
@@ -78,8 +78,8 @@ REDIRECT = (
 )
 PORT80_DROPIN_TEXT = f"""\
 # React UI (runbook §11.2): port 80 goes to the API, which serves the UI.
-# Rollback: delete this file, daemon-reload, restart the unit. Streamlit keeps
-# serving on {STREAMLIT_PORT} throughout.
+# Rollback: start Streamlit (it serves on {STREAMLIT_PORT}), delete this file,
+# daemon-reload, restart the unit.
 [Service]
 ExecStart=
 ExecStart={REDIRECT.format(op="-A", port=API_PORT)}
@@ -209,9 +209,7 @@ echo "api_status=$(code http://127.0.0.1:{API_PORT}/api/v1/system/status)"
 echo "ui_shell=$(curl -s --max-time 10 http://127.0.0.1:{API_PORT}/ | grep -c 'id=.root')"
 echo "deep_link=$(code http://127.0.0.1:{API_PORT}/activity)"
 echo "unknown_api=$(code http://127.0.0.1:{API_PORT}/api/v1/no-such-route)"
-echo "streamlit=$(code http://127.0.0.1:{STREAMLIT_PORT}/)"
 echo "worker=$(systemctl is-active options-alpha-worker)"
-echo "dashboard_unit=$(systemctl is-active options-alpha)"
 echo "api_unit=$(systemctl is-active options-alpha-api)"
 """
 
@@ -222,8 +220,8 @@ def parse_checks(output: str) -> dict[str, str]:
 
 def check_failures(c: dict[str, str]) -> list[str]:
     want = {
-        "api_status": "200", "deep_link": "200", "unknown_api": "404", "streamlit": "200",
-        "worker": "active", "dashboard_unit": "active", "api_unit": "active",
+        "api_status": "200", "deep_link": "200", "unknown_api": "404",
+        "worker": "active", "api_unit": "active",
     }
     bad = [f"{k}={c.get(k)} (want {v})" for k, v in want.items() if c.get(k) != v]
     if c.get("ui_shell", "0") == "0":
@@ -241,6 +239,9 @@ iptables -t nat -S PREROUTING | grep -- '--dport 80 '
 """
 
 REVERT_PORT80 = f"""set -euo pipefail
+# Streamlit no longer runs by default (retirement plan, phase 1); this is what
+# port 80 is about to point at.
+systemctl start options-alpha
 systemctl stop options-alpha-port80 || true
 rm -f {PORT80_DROPIN}
 rmdir --ignore-fail-on-non-empty {os.path.dirname(PORT80_DROPIN)} 2>/dev/null || true
@@ -478,8 +479,8 @@ def deploy(args: argparse.Namespace) -> int:
         out.write_text(json.dumps(record, indent=2))
     print(f"\n{record['result']}  (record: {out})")
     if record["result"] == "DEPLOYED":
-        # Streamlit still serves on 8501 on the host, but that port has not been
-        # public since 23 October 2026: `rollback` points port 80 back at it.
+        # `rollback` starts Streamlit on 8501, which has not been public since
+        # 23 October 2026, and points port 80 back at it.
         print(f"React UI: http://{EIP}/   Streamlit rollback: deploy_react.py rollback")
     return 0 if record["result"] == "DEPLOYED" else 1
 

@@ -67,7 +67,7 @@ class ShipTests(unittest.TestCase):
 class CheckTests(unittest.TestCase):
     GOOD = {
         "api_status": "200", "ui_shell": "1", "deep_link": "200", "unknown_api": "404",
-        "streamlit": "200", "worker": "active", "dashboard_unit": "active", "api_unit": "active",
+        "worker": "active", "api_unit": "active",
     }
 
     def test_a_healthy_host_passes(self) -> None:
@@ -76,8 +76,9 @@ class CheckTests(unittest.TestCase):
     def test_the_shell_on_an_api_path_fails(self) -> None:
         self.assertTrue(dr.check_failures({**self.GOOD, "unknown_api": "200"}))
 
-    def test_streamlit_must_keep_serving(self) -> None:
-        self.assertTrue(dr.check_failures({**self.GOOD, "streamlit": "000"}))
+    def test_a_stopped_streamlit_is_not_a_failure(self) -> None:
+        self.assertNotIn("options-alpha)", dr.HOST_CHECKS)
+        self.assertNotIn(str(dr.STREAMLIT_PORT), dr.HOST_CHECKS)
 
     def test_a_missing_shell_fails(self) -> None:
         self.assertTrue(dr.check_failures({**self.GOOD, "ui_shell": "0"}))
@@ -87,6 +88,11 @@ class CheckTests(unittest.TestCase):
 
 
 class UnitTextTests(unittest.TestCase):
+    def test_reverting_port80_starts_streamlit_before_pointing_at_it(self) -> None:
+        text = dr.REVERT_PORT80
+        self.assertLess(text.index("systemctl start options-alpha\n"),
+                        text.index("systemctl stop options-alpha-port80"))
+
     def test_the_port80_dropin_replaces_both_commands(self) -> None:
         lines = dr.PORT80_DROPIN_TEXT.splitlines()
         self.assertEqual(lines.count("ExecStart="), 1)

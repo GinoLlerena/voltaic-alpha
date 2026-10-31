@@ -19,7 +19,7 @@ import deploy_all as da  # noqa: E402
 import ship_host as sh  # noqa: E402
 
 DAY = "Mon 13:00 ET is inside the trading day plus the post-close backup"
-RESTARTS = ["--restart", "options-alpha-api", "--restart", "options-alpha"]
+RESTARTS = ["--restart", "options-alpha-api"]
 
 
 class StepsFor(unittest.TestCase):
