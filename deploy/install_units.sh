@@ -19,7 +19,6 @@ DEST=/etc/systemd/system
 # unit -> the EnvironmentFile it cannot start without
 declare -A REQUIRES=(
   [options-alpha-worker.service]=/etc/options-alpha.env
-  [options-alpha.service]=/etc/options-alpha-dashboard.env
   [options-alpha-api.service]=/etc/options-alpha-dashboard.env
   [options-alpha-watchdog.service]=/etc/options-alpha.env
   [options-alpha-backup.service]=/etc/options-alpha.env
@@ -36,7 +35,6 @@ TIMERS=(options-alpha-backup.timer options-alpha-watchdog.timer options-alpha-ba
 
 ALL=(
   options-alpha-worker.service
-  options-alpha.service
   options-alpha-api.service
   options-alpha-watchdog.service
   options-alpha-backup.service
@@ -44,6 +42,10 @@ ALL=(
   "${UNCONDITIONAL[@]}"
   "${TIMERS[@]}"
 )
+
+# options-alpha.service (Streamlit) is deliberately absent: enabling it would
+# bring it back on the next boot (retirement plan, phase 1). The unit file stays
+# until phase 3, because phase 1's undo and `deploy_react.py rollback` start it.
 
 changed=0
 for unit in "${ALL[@]}"; do

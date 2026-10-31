@@ -12,9 +12,9 @@ Every unit lives here, and only here. `scripts/restore_hosted_demo.sh` calls
 | Unit | Purpose |
 |---|---|
 | `options-alpha-worker.service` | the base unit `arm_worker.sh` overrides |
-| `options-alpha.service` | the Streamlit dashboard |
+| `options-alpha.service` | the Streamlit dashboard: retired from serving, not installed or enabled by `install_units.sh`; kept until phase 3 of the retirement plan for rollback |
 | `options-alpha-api.service` | the read-only presentation API, loopback only |
-| `options-alpha-port80.service` | redirects 80 to 8501 |
+| `options-alpha-port80.service` | redirects 80 to 8501; on the host a drop-in from `deploy_react.py` sends it to the API on 8600 |
 | `options-alpha-backup.{service,timer}` | hourly verified dump |
 | `options-alpha-watchdog.{service,timer}` | five-minute liveness check |
 

@@ -74,3 +74,28 @@ endpoints and read model.
 Between phases 1 and 2, today's rollback still works in two steps: start
 `options-alpha.service` again (phase 1's undo), then `deploy_react.py
 rollback`. Phase 2 removes the need for the first step.
+
+**Phase 1 as built, 31 October 2026.** Two changes from §2, found while writing
+it, made before anything on the host changed:
+
+- **The port-80 unit is not rewritten in phase 1; it moves to phase 2.** Its
+  base text is where `deploy_react.py rollback` returns to. Rewriting it now
+  would leave no rollback until phase 2. React is unaffected: the host's drop-in
+  already sends port 80 to the API.
+- **The deploy scripts change in phase 1, not only in phase 2.** With Streamlit
+  stopped, `deploy_react.py` would fail its Streamlit checks and `deploy_all.py`
+  would start Streamlit again. `install_units.sh` would also re-enable it, and
+  the server boots daily. So those are removed now. `deploy_react.py rollback`
+  and its automatic revert now start Streamlit first, so the rollback is one
+  command, not the two steps noted above.
+
+Host step, after this is merged and shipped, outside market hours with no
+position open, in a `session.py start --reason dev` session:
+
+```
+systemctl disable --now options-alpha
+```
+
+Check: port 80 and the API return 200, the worker is unaffected, and
+`systemctl is-enabled options-alpha` says `disabled`. Undo:
+`systemctl enable --now options-alpha`.

@@ -57,14 +57,13 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 PACKAGE = "src/options_alpha_lab/"
 PACKAGE_NAME = "options_alpha_lab"
-API, DASHBOARD = "options-alpha-api", "options-alpha"
+API = "options-alpha-api"
 WORKER = sh.WORKER
 #: What each long-running service starts from. A service is restarted only
 #: when a file it actually loads has changed.
 ENTRY_POINTS = {
     WORKER: f"{PACKAGE}worker.py",
     API: f"{PACKAGE}api/__main__.py",
-    DASHBOARD: "app.py",
 }
 SESSION_HOURS = "1"
 #: A lock with less than this left is extended: a full deploy takes about ten minutes.
@@ -182,9 +181,8 @@ def steps_for(
         args.append("--migrate")
     elif worker:
         args.append("--restart-worker")
-    for service in (API, DASHBOARD):
-        if service in restart:
-            args += ["--restart", service]
+    if API in restart:
+        args += ["--restart", API]
     blocked = None
     if worker and window and not ignore_window:
         blocked = (
