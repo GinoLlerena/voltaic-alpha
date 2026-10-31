@@ -170,3 +170,16 @@ first. §4 is not edited: B4 stays on the list and is reported as not run, and
 the reading rule stays written for six comparisons, which is stricter for
 five. B5's download is sized and shown to the owner before it is run, as §4
 requires. Paper stays armed.
+
+**B5's download, 31 October 2026.** §4 says B5 needs "chains for the longer
+expiries". That was wrong: the 23 October chains already cover expiries 10 to 60
+days out. Only exit prices were missing. Sizing selected the B5 entries and
+counted them, computing no profit or loss: 121 Permitted trades, none with the
+same spread as today's rules, so one read-only request each, about 20 minutes
+and 2 MB. The owner approved this on 31 October: the same host and GET requests
+as the 23 October download, spaced 0.5 seconds apart, nothing written on the
+host and no credential leaving it, in a `session.py` session outside market
+hours with no position open. The tool is `scripts/veto_export.py paths
+--min-dte 21`; the data has its own folder, so `paths/` keeps its digest. §4's
+list of variants and its reading rule are unchanged. B1's five-session stop needs
+no download, because `paths/` already holds five sessions.

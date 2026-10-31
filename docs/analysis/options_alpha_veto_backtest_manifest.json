@@ -134,6 +134,26 @@
         "window": "10:05 New York on the entry session to the close 5 sessions later"
       }
     },
+    "paths_dte21/": {
+      "coverage": {
+        "bytes": 1852010,
+        "entries": 121,
+        "wanted": 121
+      },
+      "digest": "sha256:75b8f854d45e84c477a876d73e40c833f580c6eebd4c7eb5ea6a7d2b9de791b2",
+      "digest_of": "each file's name and SHA-256, in name order",
+      "endpoints": [
+        "/v1beta1/options/bars"
+      ],
+      "fetched_at": "2026-10-31T17:25:44+00:00",
+      "params": {
+        "contracts": "the two legs of each Step 4 entry",
+        "entries_digest": "sha256:75be74a31d4e5ebd0d528e1667f7513fd182493e0bb7f198deda8b5a506801be",
+        "rows_digest": "sha256:e959635b3dc7e1861ff3c9969b53fcc29528f53e552cd1741ee8877b02bb4080",
+        "timeframe": "5Min",
+        "window": "10:05 New York on the entry session to the close 5 sessions later"
+      }
+    },
     "spy_5min_open.json": {
       "bytes": 237427,
       "coverage": {
