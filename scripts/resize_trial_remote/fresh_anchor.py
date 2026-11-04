@@ -22,7 +22,8 @@ from options_alpha_lab.offsite import (
 now = datetime.now(UTC)
 src = verify_source(json.loads(pathlib.Path("/var/lib/options-alpha/backup.json").read_text()), now)
 key = f"daily/{src.at.strftime('%Y-%m-%dT%H%MZ')}-preresize.dump.age"
-staged = pathlib.Path("/run/options-alpha-backup-offsite-anchor.age")
+# On disk, not /run: the ciphertext no longer fits that tmpfs (4 Nov 2026).
+staged = pathlib.Path("/var/cache/options-alpha-backup-offsite-anchor.age")
 try:
     subprocess.run(  # noqa: S603 - fixed argv, no shell
         [

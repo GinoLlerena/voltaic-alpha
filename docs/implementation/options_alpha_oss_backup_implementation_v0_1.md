@@ -501,9 +501,15 @@ source.
 On the weekly day the dump belongs under both prefixes. **When both keys are
 missing — the ordinary case — encrypt once and upload that ciphertext twice:**
 
-1. Stage the ciphertext in a **root-only** runtime location **of its own** —
-   `RuntimeDirectory=options-alpha-backup-offsite`, giving
-   `/run/options-alpha-backup-offsite/`, mode `0700`.
+1. Stage the ciphertext in a **root-only** location **of its own** —
+   `CacheDirectory=options-alpha-backup-offsite`, giving
+   `/var/cache/options-alpha-backup-offsite/`, mode `0700`. The program
+   deletes the staged file after every run and any stale one before
+   encrypting.
+
+   *Amended 4 Nov 2026:* this was `RuntimeDirectory`, under `/run`. That tmpfs
+   is 10% of RAM (161 MiB on 2c2g), and the 171 MB ciphertext of 4 Nov did not
+   fit: the copy failed with "no space left on device" and held the server up.
 
    **Not** `/run/options-alpha/`: that is the worker's existing
    `RuntimeDirectory` and the repository treats its lifecycle as worker-owned.
@@ -659,7 +665,7 @@ Decisions this section did not make, recorded:
 | Encryption | first bytes read back as the restore role: `age-encryption.org/v1`; no `PGDMP` signature |
 | Metadata | `dump-at`, `dump-sha256`, `alembic-revision` `0008_evaluation_runs`, `tables` 28, `rows-restored` 3,568 present on the object |
 | Retry idempotence | second run the same day: exit 0, "all destinations already hold this dump", one version in the bucket |
-| Staging isolation | `/run/options-alpha-backup-offsite/` absent after the run; the worker's `/run/options-alpha/` untouched and the worker `active` throughout |
+| Staging isolation | `/var/cache/options-alpha-backup-offsite/` empty after the run; the worker's `/run/options-alpha/` untouched and the worker `active` throughout |
 | Monitor | a failed run record made `offsite_run` fail — with the copy still fresh — and the watchdog exit 1. Run without `--record`, so the test wrote no production incident |
 | Timer | `options-alpha-backup-offsite.timer` enabled, next run scheduled |
 | Weekly path, weekly retry | covered by unit tests; the first live weekly write is Sunday 27 September. Not simulated on the live bucket: a fabricated Sunday upload would occupy the real key and make that day's genuine run skip it |
@@ -832,7 +838,7 @@ operator chooses; until then rule 4 is unmet.
 | Timer | `systemctl list-timers options-alpha-backup-offsite` | scheduled, next run shown |
 | Source dump | run with `verified:false` in `backup.json` | service **refuses** and uploads nothing |
 | End to end | run the service once; list `daily/` | one object, size ≈ dump, **not** plaintext |
-| Weekly path | run on the weekly day | two keys written, staging under `/run/options-alpha-backup-offsite/` removed afterwards |
+| Weekly path | run on the weekly day | two keys written, staging under `/var/cache/options-alpha-backup-offsite/` emptied afterwards |
 | **Weekly retry** | force `weekly/` to fail after `daily/` succeeds, then run again | second run creates `weekly/` and **leaves `daily/` untouched** — same size, same `LastModified` |
 | Staging isolation | restart `options-alpha-worker` mid-cycle | `/run/options-alpha/health.json` unaffected; offsite staging is in its own directory |
 | Encryption | `ossutil cat` the first bytes | `age-encryption.org/v1`, never SQL |

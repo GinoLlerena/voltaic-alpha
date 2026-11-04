@@ -19,6 +19,7 @@ from pathlib import Path
 from options_alpha_lab import offsite, watchdog
 from options_alpha_lab.calendar import committed_calendar
 from options_alpha_lab.offsite import (
+    DEFAULT_STAGING_DIR,
     MAX_DUMP_AGE_SECONDS,
     OffsiteError,
     OssConfig,
@@ -201,6 +202,20 @@ class Uploads(OffsiteCase):
         self.assertIn(str(self.staging), put[put.index("--body") + 1])
         self.assertNotIn(str(self.dump), " ".join(put))
         self.assertEqual(list(self.staging.iterdir()), [])
+
+    def test_a_stale_ciphertext_from_a_crashed_run_is_removed(self) -> None:
+        self.staging.mkdir()
+        (self.staging / "2026-01-02.dump.age").write_bytes(b"old ciphertext")
+        self.run_once(FakeOss(MONDAY), MONDAY)
+        self.assertEqual(list(self.staging.iterdir()), [])
+
+    def test_staging_is_on_disk_not_the_run_tmpfs(self) -> None:
+        # /run is 10% of RAM; the ciphertext outgrew it on 4 Nov 2026.
+        self.assertFalse(DEFAULT_STAGING_DIR.startswith("/run"))
+        unit = (Path(__file__).resolve().parents[1] / "deploy" / "systemd"
+                / "options-alpha-backup-offsite.service").read_text()
+        self.assertIn("CacheDirectory=options-alpha-backup-offsite", unit)
+        self.assertNotIn("RuntimeDirectory=", unit)
 
     def test_metadata_tells_a_restorer_what_they_hold(self) -> None:
         fake = FakeOss(MONDAY)
