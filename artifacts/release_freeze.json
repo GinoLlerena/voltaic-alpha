@@ -19,7 +19,7 @@
       "scripts/provision_scheduler.py": "sha256:991176b5067c7b4250eb5f3db7585c2f84ec308a60ba8b8bf655993a8133a6a6",
       "scripts/refresh_calendar.py": "sha256:505c6127bac27a9b2f822e13190478d0ad470085f4d7461615101912ee2cc3b9",
       "scripts/resize_trial.py": "sha256:1ece46c6150fbed381ab4b98478a2a33c7a2d07664988c175d421a6e6747815a",
-      "scripts/resize_trial_remote/fresh_anchor.py": "sha256:e7b0cd6b11dfe6f3dfa5336d449295ea8b3926d631580c4927f3703fb6092e3d",
+      "scripts/resize_trial_remote/fresh_anchor.py": "sha256:1a26a767f4437bc81d64374867c11898f08c65455625e5b67af119946cb588f2",
       "scripts/resize_trial_remote/health.py": "sha256:5118527fecbf4116e9e3146694956a67edebeb492214c529515192592ae6ceaf",
       "scripts/resize_trial_remote/host_state.py": "sha256:2c69a3aa4829eac61fd1b51a7a0476a2dc7d1b35bb7b1e813e1043f7f6ca21d1",
       "scripts/resize_trial_remote/session_stats.py": "sha256:191bc6b71188979576dd4be1e65458bb868adfa427c8a55fd6d2e48110391825",
@@ -71,7 +71,7 @@
       "src/options_alpha_lab/incidents.py": "sha256:13a8f0e90aefae536f83c40ed9b560911811d838ee5b790e367517c84619d7dc",
       "src/options_alpha_lab/lifecycle.py": "sha256:69db7c3e2182cd40bab62e57a86e74b5a08146c7e8e3b9bbdf307dce4229c7d3",
       "src/options_alpha_lab/models.py": "sha256:7ecd96768d341af63f461fffb743c88bfd4f868afb787cc545f6ce02467b3e1f",
-      "src/options_alpha_lab/offsite.py": "sha256:b3805616adbf866772e6141091616ca4cfebfed9ddce0005fea89b8348a851c8",
+      "src/options_alpha_lab/offsite.py": "sha256:568b46b0a1f092c123e9d054afbe08695af4f4ca1454e5cfc992cbe56b65085f",
       "src/options_alpha_lab/orchestrator.py": "sha256:f77958773038cccd00ce2a8ddfe3bbfa9b37a9a69acd51410f77b774b2ae8f48",
       "src/options_alpha_lab/outcomes.py": "sha256:d60fd03cd21ca734fb6e64466fa754aa39e875c4597bcb2fe12cdcfd362ab34e",
       "src/options_alpha_lab/persistence/__init__.py": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -155,8 +155,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:cc51a0ffdd8ed06f7b3fe19ce38019f07dbf3d17",
-  "freeze_digest": "sha256:b48687201dc6d8b7f1d0b895285ac42bdf8922854ecd43dedaef91512a84ee91",
-  "frozen_at": "2026-10-31T16:19:47.048733+00:00",
+  "commit": "git:bae4855a3df8f2a74c670e64fb3b6f5a0ff83572",
+  "freeze_digest": "sha256:1594ff4aadd2cb326269f2e84a50e5b77063d6f2a6b09b059a254616c1ce9972",
+  "frozen_at": "2026-11-04T23:39:09.731140+00:00",
   "manifest_version": "release_freeze.v1"
 }

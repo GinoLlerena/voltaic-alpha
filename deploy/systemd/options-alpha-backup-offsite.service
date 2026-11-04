@@ -12,10 +12,13 @@ WorkingDirectory=/opt/options-alpha
 # database URL, so a fault here cannot reach either (plan §4.1). It holds no
 # OSS key either - it authenticates as the ECS instance RAM role.
 EnvironmentFile=/etc/options-alpha-backup.env
-# Its own staging directory, removed by systemd when the run ends. Never the
-# worker's /run/options-alpha, whose lifecycle belongs to the worker (§6.3).
-RuntimeDirectory=options-alpha-backup-offsite
-RuntimeDirectoryMode=0700
+# Its own staging directory, on disk: /var/cache/options-alpha-backup-offsite.
+# Not /run: that tmpfs is 10% of RAM (161 MiB on 2c2g) and the ciphertext
+# outgrew it on 4 Nov 2026 (171 MB). The program deletes the staged file after
+# every run, and any stale one before encrypting. Never the worker's
+# /run/options-alpha, whose lifecycle belongs to the worker (§6.3).
+CacheDirectory=options-alpha-backup-offsite
+CacheDirectoryMode=0700
 # It reads the dump the hourly job already verified; it never runs pg_dump (§6.1).
 ExecStart=/opt/options-alpha/.venv/bin/python -m options_alpha_lab.offsite
 NoNewPrivileges=yes

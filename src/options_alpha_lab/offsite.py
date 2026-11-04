@@ -54,9 +54,10 @@ DEFAULT_ENV_FILE = "/etc/options-alpha-backup.env"
 DEFAULT_RECIPIENT_FILE = "/etc/options-alpha-backup.pub"
 DEFAULT_OSSUTIL = "/usr/local/bin/ossutil"
 DEFAULT_AGE = "/usr/bin/age"
-#: The unit's own RuntimeDirectory. Never /run/options-alpha, which belongs to
-#: the worker unit and is removed whenever the worker stops (§6.3).
-DEFAULT_STAGING_DIR = "/run/options-alpha-backup-offsite"
+#: The unit's own CacheDirectory, on disk. Not under /run: that tmpfs is 10%
+#: of RAM and the ciphertext outgrew it on 4 Nov 2026. Never /run/options-alpha,
+#: which belongs to the worker unit and is removed whenever the worker stops (§6.3).
+DEFAULT_STAGING_DIR = "/var/cache/options-alpha-backup-offsite"
 
 #: Same bound the watchdog applies to the hourly job: two missed runs. A record
 #: older than this is a stale record, not this cycle's dump.
@@ -374,6 +375,10 @@ def run_offsite(
     if missing:
         staged = Path(staging_dir) / f"{source.at.date().isoformat()}.dump.age"
         staged.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        # The directory is on disk and outlives the run, so a crash or power
+        # loss mid-run would otherwise leave ciphertext behind for good.
+        for stale in staged.parent.glob("*.dump.age"):
+            stale.unlink(missing_ok=True)
         try:
             code, output = runner([age, "-r", recipient, "-o", str(staged), str(source.path)])
             if code != 0 or not staged.exists():
@@ -432,7 +437,7 @@ def main(argv: list[str] | None = None, *, uptime: timedelta | None = None) -> i
     parser.add_argument("--status-file", default=DEFAULT_STATUS_FILE)
     parser.add_argument("--recipient-file", default=DEFAULT_RECIPIENT_FILE)
     parser.add_argument("--staging-dir",
-                        default=os.environ.get("RUNTIME_DIRECTORY", DEFAULT_STAGING_DIR))
+                        default=os.environ.get("CACHE_DIRECTORY", DEFAULT_STAGING_DIR))
     args = parser.parse_args(argv)
 
     now = datetime.now(UTC)
