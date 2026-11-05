@@ -38,7 +38,6 @@ PART2_DIGEST = "sha256:59d5e170cb6a564e27ea09c35dbb992e38c6e399ed9040f656de22311
 BLOCKS = (BLOCK_LENGTH, *SENSITIVITY_BLOCKS)
 #: Section 4.1, reading rule: the cases whose lower ends must clear zero.
 READ_CASES = ("central", "pessimistic")
-NOT_RUN_DATA = "not run: the exit window does not reach the sixth session (plan 4.1)"
 NOT_RUN_OWNER = "not run: no download, by the owner's decision of 26 October 2026"
 
 
@@ -56,11 +55,14 @@ class Variant:
     paths_folder: str = "paths"
     own_entries: bool = False
     not_run: str | None = None
+    #: Sessions in each downloaded window; an unresolved trade is held to its end.
+    window: int = 5
 
 
 VARIANTS: tuple[Variant, ...] = (
     Variant("B1-2", "session stop 2", ((exits, "SESSION_STOP", 2),)),
-    Variant("B1-5", "session stop 5", ((exits, "SESSION_STOP", 5),), not_run=NOT_RUN_DATA),
+    Variant("B1-5", "session stop 5", ((exits, "SESSION_STOP", 5),),
+            paths_folder="paths_s7", window=7),
     Variant("B2", "profit target 30%",
             ((exits, "PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN", Decimal("0.30")),)),
     Variant("B3", "no stop loss", ((exits, "stop_level", _never),)),
@@ -121,10 +123,22 @@ def own_means(trades: Sequence[vx.Trade], index: dict[str, int], length: int,
     return block_mean(values, block=block, repetitions=repetitions or REPETITIONS)
 
 
+def window_ends(entries: Sequence[ve.Entry], sessions: Sequence[date],
+                window: int) -> dict[str, date]:
+    """Each entry's last downloaded session, as `veto_portfolio.window_ends` for five."""
+    if window == 5:
+        return vp.window_ends(entries, sessions)
+    out: dict[str, date] = {}
+    for e in entries:
+        at = list(sessions).index(date.fromisoformat(e.session))
+        out[e.session] = sessions[min(at + window - 1, len(sessions) - 1)]
+    return out
+
+
 def portfolio_totals(entries: Sequence[ve.Entry], done: Sequence[vx.Trade],
-                     sessions: Sequence[date]) -> dict[str, dict[str, Any]]:
+                     sessions: Sequence[date], window: int = 5) -> dict[str, dict[str, Any]]:
     trades = {(t.session, t.case): t for t in done}
-    ends = vp.window_ends(entries, sessions)
+    ends = window_ends(entries, sessions, window)
     return {case: vp.summarize(vp.run(vp.BASELINE, case, entries, trades, ends))
             for case in vx.COST_CASES}
 
@@ -145,7 +159,7 @@ def verdict(contrast: dict[str, dict[int, Mean]], better: dict[str, bool]) -> di
 def evaluate(variant: Sequence[vx.Trade], current: Sequence[vx.Trade],
              variant_entries: Sequence[ve.Entry], current_entries: Sequence[ve.Entry],
              index: dict[str, int], length: int, sessions: Sequence[date],
-             repetitions: int | None = None) -> dict[str, Any]:
+             repetitions: int | None = None, window: int = 5) -> dict[str, Any]:
     reps = repetitions or REPETITIONS
     contrast: dict[str, dict[int, Mean]] = {}
     own: dict[str, Mean] = {}
@@ -154,7 +168,7 @@ def evaluate(variant: Sequence[vx.Trade], current: Sequence[vx.Trade],
         values, gaps[case] = differences(variant, current, index, length, case)
         contrast[case] = {b: block_mean(values, block=b, repetitions=reps) for b in BLOCKS}
         own[case] = own_means(variant, index, length, case, repetitions=repetitions)
-    mine = portfolio_totals(variant_entries, variant, sessions)
+    mine = portfolio_totals(variant_entries, variant, sessions, window)
     theirs = portfolio_totals(current_entries, current, sessions)
     better = {c: mine[c]["total_usd"] > theirs[c]["total_usd"] for c in vx.COST_CASES}
     return {
@@ -199,7 +213,7 @@ def run_all(load: Loader, current: Sequence[vx.Trade], current_entries: Sequence
         trades, entries = load(v)
         out["variants"][v.key] = {"label": v.label, **evaluate(
             trades, current, entries, current_entries, index, length, sessions,
-            repetitions=repetitions)}
+            repetitions=repetitions, window=v.window)}
     out["comparisons"] = len(VARIANTS)
     out["candidates"] = [k for k, r in out["variants"].items()
                          if r.get("verdict", {}).get("candidate")]

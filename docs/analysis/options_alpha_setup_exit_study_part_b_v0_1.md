@@ -6,20 +6,21 @@
 | Plan | [Setup and exit study plan](../improvements/options_alpha_setup_exit_study_plan_v0_1.md), §4, measured as fixed in §4.1 on 5 November 2026 (commit `b04da6a`), before computing |
 | Inputs | The Part 2 entries, exit paths and cost cases, unchanged. The current rules reproduce the Part 2 trades digest `sha256:59d5e170cb6a564e27ea09c35dbb992e38c6e399ed9040f656de223112dc8fa7`. B5: its own entries and `paths_dte21/` (manifest digest `sha256:75b8f854…`) |
 | Code | `src/options_alpha_lab/study_variants.py`; run `uv run python -m options_alpha_lab.study_variants` |
-| Status | **Exploratory.** No variant passes the reading rule. No trading rule changes |
+| Status | **Closed, 5 November 2026, by the owner: no candidate, no rule change.** Exploratory. Paper stays armed with today's rules |
 
 ## 1. Summary
 
-**None of the alternatives is a candidate.** Four were computed and none clears
+**None of the alternatives is a candidate.** Five were computed and none clears
 the reading rule. B4 was not run, by the owner's decision. B1's five-session
-stop was not run for lack of data (§4). This is the result Part A predicted:
+stop needed a download, which the owner approved and which ran on 5 November
+(§4). This is the result Part A predicted:
 changing an exit changes how much is lost, not whether money is lost, because
 the setup does not pick sessions that are followed by a rise.
 
 | Variant | Mean change per trade against today, central [95%] | Rule met? |
 |---|---|---|
 | B1, session stop 2 | +2.17 [−17.18, +16.12] | no |
-| B1, session stop 5 | not run: data (§4) | — |
+| B1, session stop 5 | −20.06 [−47.09, +7.10] | no |
 | B2, profit target 30% | −1.71 [−12.51, +8.40] | no |
 | B3, no stop loss | +4.38 [−0.69, +12.37] | no |
 | B4, entry 11:00 | not run: owner | — |
@@ -41,7 +42,7 @@ frozen moving-block interval (10,000 replicates, seed 20261012, 95%) at block
 2. the same holds at blocks 5 and 20;
 3. its one-position portfolio ends higher in all three cost cases.
 
-The rule is written for six comparisons. Running four of them makes it
+The rule is written for six comparisons. Running five of them makes it
 stricter, not looser.
 
 ## 3. Numbers
@@ -62,6 +63,24 @@ pessimistic −39.79 [−67.67, −8.40]. One-position portfolio total:
 84 closed: 71 session stops, 9 stop losses, 4 invalidations (central). The
 portfolio ends higher in all three cases. The interval is about ±$17 around
 +$2. **Not a candidate (condition 1).**
+
+### B1, session stop at 5 sessions (today 3)
+
+Computed on 5 November from `paths_s7/`: the 84 Permitted trades' legs over
+seven sessions. Their first five sessions are identical to `paths/` bar for
+bar (168 of 168 legs). Manifest digest `sha256:ddccf53c…e8f`.
+
+| Case | Own mean | Change against today | Blocks 5 / 20 | Portfolio (today) |
+|---|---|---|---|---|
+| Optimistic | −43.14 | −22.82 [−50.12, +4.88] | [−48.32, +3.14] / [−53.67, +6.77] | −3,087.45 (−927.89) |
+| Central | −49.69 | −20.06 [−47.09, +7.10] | [−45.07, +5.63] / [−50.12, +8.78] | −3,322.90 (−1,478.12) |
+| Pessimistic | −59.96 | −20.17 [−46.28, +5.75] | [−44.72, +4.30] / [−49.76, +7.83] | −3,510.39 (−1,821.34) |
+
+84 closed (central): 34 by the 7-day expiry guard, 30 stop losses, 12 profit
+targets, 4 invalidations, and only 4 session stops. With 14-day expiries, a
+five-session hold usually reaches the expiry guard or the stop loss first.
+Holding longer loses about $20 more a trade, and the portfolio more than
+doubles its loss. **Not a candidate (conditions 1 and 3).**
 
 ### B2, profit target at 30% of maximum gain (today 60%)
 
@@ -84,7 +103,7 @@ worse in every case. **Not a candidate (conditions 1 and 3).**
 | Central | −25.26 | +4.38 [−0.69, +12.37] | [−0.79, +12.11] / [−0.75, +13.03] | −1,294.82 (−1,478.12) |
 | Pessimistic | −35.26 | +4.53 [−2.57, +13.63] | [−2.22, +13.33] / [−2.69, +14.15] | −1,824.82 (−1,821.34) |
 
-The closest of the four. Without the stop, trades that would have stopped out
+The closest of the five. Without the stop, trades that would have stopped out
 mostly run to the session stop (75 of 84, central) and lose a little less on
 average. The lower end clears zero only in the optimistic case, by a cent, and
 the pessimistic portfolio ends $3.48 lower. **Not a candidate (conditions 1
@@ -129,25 +148,17 @@ more. Part A's idea that slower time decay would help is not supported here.
 
 - **B4, 11:00 entry:** the owner decided on 26 October not to download for it,
   after Part A found nothing wrong at the entry.
-- **B1, session stop at 5:** the shipped policy counts *completed* sessions,
-  so a five-session stop fires at the first observation of the **sixth**
-  session. Every downloaded window ends after the fifth (147 of 149 trades
-  exactly, the other two at six and seven). The plan's 31 October note was
-  wrong to say no download was needed; §4.1 corrects it. Running it needs the
-  next two sessions of each of the 84 Permitted trades' legs (two, to leave
-  the same room for the exit fill that a three-session stop has). That is 84
-  read-only requests, about 15 minutes and under 1 MB, in a `session.py`
-  session outside market hours, with the owner's approval.
-
-Given B1 at 2 and Part A's finding that the value falls about $24 a session
-while held, a longer hold is unlikely to clear the rule. But the plan says
-results are computed, not guessed.
+- **B1, session stop at 5:** first reported as not run, because each window
+  ended after the fifth session and a five-session stop fires in the sixth
+  (§4.1). The owner approved the download on 5 November: 84 read-only
+  requests, about 16 minutes, 2.08 MB, outside market hours, with no position
+  open. It is now in §3.
 
 ## 5. Limits
 
 - Same data as Part 2, so every Part 2 limit applies, including values rebuilt
   from 5-minute bars and synthetic quotes.
-- Four comparisons were run on data already seen. A variant that passed would
+- Five comparisons were run on data already seen. A variant that passed would
   still only be a candidate for Paper testing.
 - B5's comparison uses the 47 shared sessions only. Its sessions are not a
   random sample: they are those where both versions' legs traded at 10:00.
@@ -161,9 +172,8 @@ for Paper testing.** The next useful question is about the setup itself: why
 sessions the trend-retest rule permits are not followed by a rise. That would
 be a new plan, written before anything is computed.
 
-Decisions for the owner:
-
-1. Approve the B1 (5) download, sized above, to close the list? Recommended:
-   yes. It is cheap, and it makes the list complete as written.
-2. Close Part B with "no candidate" once B1 (5) is in, and keep Paper armed
-   with today's rules? Recommended: yes.
+**Closed by the owner, 5 November 2026.** The owner approved the B1 (5)
+download and closing Part B with no candidate and no rule change. Paper stays
+armed with today's rules. The setup question is taken up in a new plan:
+[Setup follow-through study](../improvements/options_alpha_setup_follow_through_study_plan_v0_1.md),
+a draft awaiting the owner's approval.

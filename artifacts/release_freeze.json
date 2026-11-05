@@ -27,7 +27,7 @@
       "scripts/run_h0_validation.sh": "sha256:15269f3d9ada84f7c5aff93bde84024e35315f5ead7764dc7274c88ab51054fd",
       "scripts/session.py": "sha256:c2024af22611c5a121bb3ef7e1819112e82c65a59dde9c862e22cfd91eec688f",
       "scripts/ship_host.py": "sha256:b904cf304ad70cfa0c0efbf84298f37a5849c626a8e8af544361c16728676dde",
-      "scripts/veto_export.py": "sha256:ae152a0f92d0de55777a9c2a7eb2124b92bc0484b3d3c8aad4176fcd48bb6fe3",
+      "scripts/veto_export.py": "sha256:c9a0942886c214f4352ef444c248c6de0527a3fef28d81c9fbbc000108fac1a5",
       "scripts/veto_export_remote/bars.py": "sha256:9c9323b1ca54821a7edead6b21eb7114fb1c2791b89157be0e0278808e4a3cad",
       "scripts/veto_export_remote/leg_paths.py": "sha256:cf5e070f64e91f27182c180d131bf217cb2240e90aee02ee3e3c8856de4f616b",
       "scripts/veto_export_remote/option_bars.py": "sha256:5282059e60de11c19c97fad1c40a78b28207e16500dd064aed0f7ca863af1781",
@@ -108,7 +108,7 @@
       "src/options_alpha_lab/sensitivity.py": "sha256:58caf44c957ad8ffed2f0fb53204a87798a82e96ea29569de2a5970b7baf89aa",
       "src/options_alpha_lab/snapshot_io.py": "sha256:176f2f51335aa8177bbc49d78f0421f3edd7112a37c13b81d2812d3a1d565f87",
       "src/options_alpha_lab/study_decomposition.py": "sha256:22614d722875f479552214e7b430d01bac7c058da925e46c12b37cd2e0826bbe",
-      "src/options_alpha_lab/study_variants.py": "sha256:ce30c1c06c8e782c5fe802320034bfec3400dd24c616a40972f03ce6e328d4df",
+      "src/options_alpha_lab/study_variants.py": "sha256:33ce23bfa98e8b3d2df95d690861cc322293a2d6baa36e8c47d6c4354511b6dd",
       "src/options_alpha_lab/telemetry.py": "sha256:f3cf2c61c2a7ccc9caf0ec7fc5a9457bb13a423f47d4b09611a0ed7097808092",
       "src/options_alpha_lab/veto_calibration.py": "sha256:6be471e7154b97feb95312ee717d41ab09b76702f6f519e414ff7c6e94577e32",
       "src/options_alpha_lab/veto_entries.py": "sha256:10cfefe3ebd1ea2aca59548cd3d2b238369cdf14b002285fad22fb5d1750fe8e",
@@ -156,8 +156,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:b3a48d41d9a2765f11cc3774089fd895cf210cc5",
-  "freeze_digest": "sha256:3a0abdfbd6942db9fa3f9f2f78575d1250141bb8a2d933425721cf22f86069aa",
-  "frozen_at": "2026-11-05T03:21:34.688715+00:00",
+  "commit": "git:ecf523a1e75b2d3ec18d04309dbf3f9bac290067",
+  "freeze_digest": "sha256:1fea45288cc3aee616bb6121f576447c5aa68dcb648c9b131e222bffd0d9c66b",
+  "frozen_at": "2026-11-05T23:39:34.146933+00:00",
   "manifest_version": "release_freeze.v1"
 }
