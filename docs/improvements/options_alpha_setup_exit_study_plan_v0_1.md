@@ -183,3 +183,64 @@ hours with no position open. The tool is `scripts/veto_export.py paths
 --min-dte 21`; the data has its own folder, so `paths/` keeps its digest. §4's
 list of variants and its reading rule are unchanged. B1's five-session stop needs
 no download, because `paths/` already holds five sessions.
+
+### 4.1 Part B definitions (fixed 5 November 2026, before computing)
+
+Written and committed before any Part B result was computed. §4's list and
+reading rule are unchanged; this says how each is measured.
+
+**Inputs.** The Part 2 entries, exit paths and cost cases, unchanged. The
+current rules must reproduce the Part 2 trades digest
+(`sha256:59d5e170…8fa7`) before any variant is read. B5 uses its own entries
+and `paths_dte21/` (31 October download).
+
+**Each variant changes one constant of the shipped exit policy or selector,
+for the run only.** The shipped code is not edited; the constant is set for the
+simulation and restored. Every other rule, including the 7-day expiry guard and
+the invalidation, is unchanged.
+
+| # | Change for the run |
+|---|---|
+| B1 (2) | `exits.SESSION_STOP = 2` |
+| B1 (5) | `exits.SESSION_STOP = 5` (see the correction below) |
+| B2 | `exits.PROFIT_CAPTURE_FRACTION_OF_MAX_GAIN = 0.30` |
+| B3 | the stop loss never fires; nothing else changes |
+| B4 | not run (owner, 26 October) |
+| B5 | `components.MIN_DTE = 21` at entry selection; exits as today |
+
+**Per-trade result.** As in Part 2 (`veto_exits.simulate`), per spread, in USD,
+for each cost case. Permitted sessions only. Unresolved trades are left out of
+means and counted, with their bound.
+
+**Against the current rules.** For each Permitted session, the difference
+*d* = variant result − current result, in the same cost case. A session where
+either arm has no entry or an unresolved trade is a gap, and is counted. The
+mean *d* gets the frozen moving-block interval (`study_decomposition.
+block_mean`: 10,000 replicates, seed 20261012, percentile 95%) at block 10,
+and again at 5 and 20. Each variant's own mean result is reported too, with
+the same interval, as in Part 2's tables.
+
+**Portfolio.** The Part 2 one-position portfolio (`veto_portfolio.run`, the
+`baseline` arm, Permitted only, same budget rule and unresolved treatment),
+fed with the variant's trades (and, for B5, its entries). "Better" means a
+larger total in USD than the current rules' portfolio in the same cost case.
+
+**Reading rule, as §4, made exact.** A variant is a candidate for Paper
+testing only if:
+
+1. the lower end of the 95% interval of mean *d* is above zero at block 10 in
+   the central **and** the pessimistic case;
+2. it is also above zero at blocks 5 and 20, in both of those cases;
+3. its portfolio total is larger in all three cost cases.
+
+Anything else is reported as "not a candidate", whatever its mean.
+
+**Correction to the 31 October note: B1 (5) needs a download.** That note said
+`paths/` already holds five sessions, so a five-session stop needs nothing
+new. Checked on 5 November before computing: each window holds the entry
+session and the four after it (147 of 149 trades exactly five). The shipped
+policy counts *completed* sessions, so a five-session stop fires at the first
+observation of the **sixth** session, outside every window. B1 (5) is not
+computed until the owner approves a download of the next sessions for the
+Permitted trades. Until then it is reported as "not run: data", and the
+reading rule still counts six comparisons.
