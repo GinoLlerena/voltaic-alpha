@@ -29,7 +29,6 @@ out = {
         for u in (
             "postgresql",
             "options-alpha-worker",
-            "options-alpha",
             "options-alpha-api",
             "options-alpha-backup.timer",
             "options-alpha-backup-offsite.timer",

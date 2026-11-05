@@ -328,8 +328,9 @@ def main() -> int:
         if ui:
             extra = ["--ignore-window"] if args.ignore_window else []
             if run("deploy_react.py", "deploy", "--apply", "--verify-on-port-80", *extra) != 0:
-                print("\nSTOPPED: the UI deploy failed and reverted itself (port 80 is on "
-                      "Streamlit). The host code from step 2 is in place.", file=sys.stderr)
+                print("\nSTOPPED: the UI deploy failed; its own output above says whether "
+                      "it changed anything (a failure before the cut-over changes nothing). "
+                      "The host code from step 2 is in place.", file=sys.stderr)
                 return 1
         if run("ship_host.py") != 0:
             return 1
