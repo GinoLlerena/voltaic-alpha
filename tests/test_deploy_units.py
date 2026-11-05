@@ -361,3 +361,14 @@ class ScriptsAddressTheHostThatExists(unittest.TestCase):
         self.assertIn("sort -u", restore)
         self.assertNotIn('for id in "$DEMO" "$WORKER"', restore)
         self.assertNotIn('for id in "$WORKER" "$DEMO"', restore)
+
+
+class StreamlitIsNotAHealthRequirement(unittest.TestCase):
+    """Phase 1 stopped Streamlit; a host check that still wants it up refuses
+    every UI deploy (found on 4 Nov 2026, deploy_react pre-flight)."""
+
+    def test_host_checks_do_not_require_the_dashboard_unit(self) -> None:
+        remote = Path(__file__).resolve().parents[1] / "scripts" / "resize_trial_remote"
+        for name in ("host_state.py", "health.py"):
+            with self.subTest(name):
+                self.assertNotIn('"options-alpha",', (remote / name).read_text())
