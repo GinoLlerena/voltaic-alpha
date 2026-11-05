@@ -381,17 +381,24 @@ def calendar(years: list[str]) -> int:
 PATH_SESSIONS = 5
 
 
-def paths(limit: int | None) -> int:
+def paths(limit: int | None, min_dte: int | None = None) -> int:
     """Part 2 exit paths: both legs of each entered spread, from 10:05 on.
 
-    Approved by the owner on 23 October 2026 (plan section 9), Stage B.
+    Approved by the owner on 23 October 2026 (plan section 9), Stage B. With
+    `min_dte`, the setup and exit study's B5 instead: Permitted entries chosen at
+    that shortest expiry, in their own folder so `paths/` keeps its digest.
+    Approved by the owner on 31 October 2026 (study plan section 7).
     """
-    from options_alpha_lab import veto_entries
+    from options_alpha_lab import components, veto_entries, veto_replay
 
+    if min_dte is not None:
+        components.MIN_DTE = min_dte
     found, facts = veto_entries.load(CACHE)
-    entered = [e for e in found if e.status == veto_entries.ENTERED]
+    entered = [e for e in found if e.status == veto_entries.ENTERED
+               and (min_dte is None or e.group == veto_replay.PERMITTED)]
     sessions = [session for session, _ in _previous_closes()]
-    folder = CACHE / "paths"
+    name = "paths" if min_dte is None else f"paths_dte{min_dte}"
+    folder = CACHE / name
     folder.mkdir(parents=True, exist_ok=True)
     fetched = 0
     for e in entered:
@@ -415,7 +422,7 @@ def paths(limit: int | None) -> int:
         print(f"{e.session}: {bars}", flush=True)
     files = sorted(folder.glob("*.json"))
     manifest = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {"files": {}}
-    manifest["files"]["paths/"] = {
+    manifest["files"][f"{name}/"] = {
         "digest": _folder_digest(files),
         "digest_of": "each file's name and SHA-256, in name order",
         "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -456,6 +463,7 @@ def main() -> int:
     sub.add_parser("calendar").add_argument("years", nargs="+")
     q = sub.add_parser("paths")
     q.add_argument("--limit", type=int, help="fetch at most this many entries (a trial)")
+    q.add_argument("--min-dte", type=int, help="Permitted entries at this shortest expiry (B5)")
     args = parser.parse_args()
     try:
         if args.command == "spot":
@@ -463,7 +471,7 @@ def main() -> int:
         if args.command == "calendar":
             return calendar(args.years)
         if args.command == "paths":
-            return paths(args.limit)
+            return paths(args.limit, args.min_dte)
         if args.command == "chains":
             return chains(args.limit)
         if args.command == "options":
