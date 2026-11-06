@@ -1,9 +1,9 @@
-# Options Alpha — Setup follow-through study: plan (draft for the owner)
+# Options Alpha — Setup follow-through study: plan
 
 | Field | Value |
 |---|---|
 | Date | 5 November 2026, America/Lima |
-| Status | **Draft. Nothing is computed until the owner approves.** Approval freezes §3 and §4 |
+| Status | **Approved by the owner, 5 November 2026.** §3 and §4 are frozen, with the details in §3.1 fixed the same day, before anything was computed. Results: [follow-through study](../analysis/options_alpha_setup_follow_through_study_v0_1.md), computed 5 November: the setup lags |
 | Why | The setup and exit study ([Part A](../analysis/options_alpha_setup_exit_study_part_a_v0_1.md), [Part B](../analysis/options_alpha_setup_exit_study_part_b_v0_1.md)) found the loss comes from direction, not from the exits: after Permitted sessions SPY's 3-session move averaged 0.00%. [Veto backtest Part 1](../analysis/options_alpha_veto_backtest_part1_v0_1.md) had already noted that all qualifying sessions averaged +0.045% over three sessions, against +0.220% for every replayed session |
 | Boundary | Offline research only, on data already cached. No download, no paid model call, and no change to any trading rule, threshold or worker setting |
 
@@ -56,6 +56,34 @@ blocks 5 and 20.
 - *The setup leads:* it lies wholly above zero at all three.
 - *Otherwise:* no measurable difference. That still means the setup has no
   shown edge to pay for a debit spread's time decay and costs.
+
+### 3.1 Details fixed on approval, before computing
+
+The owner approved §3 and §4 on 5 November 2026. These details were left open
+by the draft and are fixed here, before any outcome is computed:
+
+1. **The h-session move** is Part 1's: from `C[-1]` to the h-th close after it.
+   In Part 1's notation that close is `C[h-1]`, so h = 3 is `C[2]`, as in
+   Part 1's +0.045% and +0.220%.
+2. **Non-qualifying** means the replay's No setup, Out of scope (bearish
+   structure) and Other/multiple vetoes sessions. Unmeasurable sessions are
+   left out, because the rule was never evaluated on them. Their count is
+   reported for context.
+3. **A session counts** in §3 and §4 only if all h closes after `C[-1]` are
+   cached. Censored sessions are counted and reported.
+4. **The confirming family (D1)** is the one the classifier itself picks: the
+   strongest bullish non-structure signal at or above 0.50, with ties broken by
+   signal ID. It is rebuilt from each row's stored signals. For Breadth-vetoed
+   sessions the bearish breadth reading is not bullish, so the same rule
+   applies.
+5. **Structure strength (D2)** is the strength of the anchor: the strongest
+   bullish structure signal.
+6. **Thirds (D2 to D4)** are cut from the qualifying sessions with an h = 3
+   outcome, ranked by the split variable. The two cut values sit at ranks
+   ⌈n/3⌉ and ⌈2n/3⌉. Lower is at or below the first, middle is above it and at
+   or below the second, upper is the rest. Ties go to the lower third, and the
+   cut values are reported. D3 is `(C[-1] − C[-21]) / C[-21]` and D4 is
+   `(C[-1] − C[-2]) / C[-2]`, in %, from the cached SPY daily bars.
 
 ## 4. Part B: where it comes from (descriptive, fixed list)
 
