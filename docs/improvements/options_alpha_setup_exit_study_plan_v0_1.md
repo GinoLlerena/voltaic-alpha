@@ -244,3 +244,12 @@ observation of the **sixth** session, outside every window. B1 (5) is not
 computed until the owner approves a download of the next sessions for the
 Permitted trades. Until then it is reported as "not run: data", and the
 reading rule still counts six comparisons.
+
+**B1 (5) download and close, 5 November 2026.** The owner approved the B1 (5)
+download sized in the Part B report: the 84 Permitted trades' two legs over
+seven sessions, with the same host, read-only GETs 0.5 seconds apart, a
+`session.py` session outside market hours, and no position open. The tool is
+`scripts/veto_export.py paths --sessions 7`, writing to `paths_s7/`, so
+`paths/` keeps its digest. B1 (5) is not a candidate. The owner closed Part B:
+no candidate, no rule change, Paper stays armed. §4 and §4.1 are unchanged.
+

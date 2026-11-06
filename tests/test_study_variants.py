@@ -35,10 +35,15 @@ def variant(key: str) -> sv.Variant:
 
 
 class TheListIsClosed(unittest.TestCase):
-    def test_six_alternatives_with_b4_and_b1_5_not_run(self) -> None:
+    def test_six_alternatives_with_only_b4_not_run(self) -> None:
         self.assertEqual([v.key for v in sv.VARIANTS],
                          ["B1-2", "B1-5", "B2", "B3", "B4", "B5"])
-        self.assertEqual({v.key for v in sv.VARIANTS if v.not_run}, {"B1-5", "B4"})
+        self.assertEqual({v.key for v in sv.VARIANTS if v.not_run}, {"B4"})
+
+    def test_b1_5_reads_the_seven_session_window(self) -> None:
+        # A five-session stop fires in the sixth session (plan 4.1).
+        v = variant("B1-5")
+        self.assertEqual((v.paths_folder, v.window), ("paths_s7", 7))
 
     def test_each_variant_changes_at_most_one_thing(self) -> None:
         for v in sv.VARIANTS:
@@ -127,6 +132,18 @@ class ReadingRule(unittest.TestCase):
         empty = {c: {b: Mean(0, 0, None, None, None) for b in sv.BLOCKS}
                  for c in vx.COST_CASES}
         self.assertFalse(sv.verdict(empty, dict.fromkeys(vx.COST_CASES, True))["candidate"])
+
+
+
+class WindowEnds(unittest.TestCase):
+    def test_an_unresolved_trade_is_held_to_its_own_window(self) -> None:
+        from options_alpha_lab import veto_entries as ve
+        days = [date(2026, 1, d) for d in (5, 6, 7, 8, 9, 12, 13, 14, 15)]
+        entry = ve.Entry(session="2026-01-06", group=vr.PERMITTED, status=ve.ENTERED,
+                         chain_calls=0, dropped=0)
+        self.assertEqual(sv.window_ends([entry], days, 5)["2026-01-06"], date(2026, 1, 12))
+        self.assertEqual(sv.window_ends([entry], days, 7)["2026-01-06"], date(2026, 1, 14))
+        self.assertEqual(sv.window_ends([entry], days[:4], 7)["2026-01-06"], date(2026, 1, 8))
 
 
 if __name__ == "__main__":

@@ -381,23 +381,30 @@ def calendar(years: list[str]) -> int:
 PATH_SESSIONS = 5
 
 
-def paths(limit: int | None, min_dte: int | None = None) -> int:
+def paths(limit: int | None, min_dte: int | None = None,
+          window: int = PATH_SESSIONS) -> int:
     """Part 2 exit paths: both legs of each entered spread, from 10:05 on.
 
     Approved by the owner on 23 October 2026 (plan section 9), Stage B. With
     `min_dte`, the setup and exit study's B5 instead: Permitted entries chosen at
     that shortest expiry, in their own folder so `paths/` keeps its digest.
-    Approved by the owner on 31 October 2026 (study plan section 7).
+    Approved by the owner on 31 October 2026 (study plan section 7). With a
+    `window` other than five, the study's B1 (5) instead: Permitted entries at
+    today's rules, with `window` sessions of bars, in their own folder.
+    Approved by the owner on 5 November 2026 (study plan section 4.1).
     """
     from options_alpha_lab import components, veto_entries, veto_replay
 
     if min_dte is not None:
         components.MIN_DTE = min_dte
     found, facts = veto_entries.load(CACHE)
+    study = min_dte is not None or window != PATH_SESSIONS
     entered = [e for e in found if e.status == veto_entries.ENTERED
-               and (min_dte is None or e.group == veto_replay.PERMITTED)]
+               and (not study or e.group == veto_replay.PERMITTED)]
     sessions = [session for session, _ in _previous_closes()]
     name = "paths" if min_dte is None else f"paths_dte{min_dte}"
+    if window != PATH_SESSIONS:
+        name += f"_s{window}"
     folder = CACHE / name
     folder.mkdir(parents=True, exist_ok=True)
     fetched = 0
@@ -408,11 +415,12 @@ def paths(limit: int | None, min_dte: int | None = None) -> int:
         if limit is not None and fetched >= limit:
             break
         at = sessions.index(e.session)
-        if at + PATH_SESSIONS - 1 < len(sessions):
-            last = sessions[at + PATH_SESSIONS - 1]
+        if at + window - 1 < len(sessions):
+            last = sessions[at + window - 1]
         else:
-            # Past the cached bars: a week of calendar days covers five sessions.
-            last = (date.fromisoformat(e.session) + timedelta(days=8)).isoformat()
+            # Past the cached bars: about 1.6 calendar days a session covers it.
+            last = (date.fromisoformat(e.session)
+                    + timedelta(days=8 if window == PATH_SESSIONS else 2 * window)).isoformat()
         assert e.long_symbol and e.short_symbol
         reply = unpack(on_host("leg_paths.py", e.session, last,
                                f"{e.long_symbol},{e.short_symbol}")["gz"])
@@ -429,7 +437,7 @@ def paths(limit: int | None, min_dte: int | None = None) -> int:
         "endpoints": ["/v1beta1/options/bars"],
         "params": {"timeframe": "5Min",
                    "window": f"10:05 New York on the entry session to the close "
-                             f"{PATH_SESSIONS} sessions later",
+                             f"{window} sessions later",
                    "contracts": "the two legs of each Step 4 entry",
                    "entries_digest": veto_entries.digest(found),
                    "rows_digest": facts["rows_digest"]},
@@ -464,6 +472,8 @@ def main() -> int:
     q = sub.add_parser("paths")
     q.add_argument("--limit", type=int, help="fetch at most this many entries (a trial)")
     q.add_argument("--min-dte", type=int, help="Permitted entries at this shortest expiry (B5)")
+    q.add_argument("--sessions", type=int, default=PATH_SESSIONS,
+                   help="sessions of bars per entry; other than 5, Permitted only (B1 (5))")
     args = parser.parse_args()
     try:
         if args.command == "spot":
@@ -471,7 +481,7 @@ def main() -> int:
         if args.command == "calendar":
             return calendar(args.years)
         if args.command == "paths":
-            return paths(args.limit, args.min_dte)
+            return paths(args.limit, args.min_dte, args.sessions)
         if args.command == "chains":
             return chains(args.limit)
         if args.command == "options":
