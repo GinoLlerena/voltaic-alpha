@@ -120,3 +120,24 @@ Host step, after merge, outside market hours with no position open, in a
 worker is unaffected. Undo: put the old unit text back and rerun
 `install_units.sh`. React keeps serving either way, because the rule does not
 change.
+
+**Phase 3 as built, 6 November 2026.** The owner said "merge and continue".
+
+- **Removed:**
+  - `app.py`, `.streamlit/` and `tests/test_dashboard.py`;
+  - the Streamlit `AppTest` tests in `test_api.py` and `test_presentation_tour.py`, and the `app.py` boundary test in `test_parity.py`;
+  - `deploy/systemd/options-alpha.service` and the `Dockerfile`.
+- **The `streamlit` dependency is removed.** Seventeen packages drop out of `uv.lock` and `requirements.txt`, and none of them is imported by the project.
+- **The parity tests stay, as API-only checks:** the read layer against the API.
+- **D2:** the commit before removal is tagged `streamlit-submission-record`, and the README's Docker instructions point at it.
+- **A phase 1 leftover fixed here:** `resize_trial_remote/health.py`, `resize_trial.py` and `capacity_baseline.py` still probed Streamlit on 8501, so a resize health check would have failed a healthy host. They now probe the React shell on the API at 8600 (key `ui`).
+- **Cleaned:** `restore_hosted_demo.sh` (port 80 to 8600, no `app.py`), `ship_host.py` (no `app.py` or `.streamlit`), `deploy_all.py`, `freeze_release.py`, `deploy_worker.sh` and `install_units.sh`.
+- **Left as history:** docstrings in `src/` that say how the read layer came out of `app.py`. Editing them would restart the worker for no change in behaviour.
+
+Host step, outside market hours with no position open, after phase 2's step:
+- **Deploy:** `deploy_all.py --apply`. `requirements.txt` changed, so it installs dependencies and restarts the services. pip does not uninstall, so Streamlit stays in the venv, unused.
+- **Clean up:**
+  - remove `/opt/options-alpha/app.py` and `/opt/options-alpha/.streamlit`;
+  - delete `/etc/systemd/system/options-alpha.service` once `is-enabled` says `disabled` and `is-active` says `inactive`;
+  - run `systemctl daemon-reload`.
+- **Check:** port 80 and the API return 200, the worker is active with one lease, and there are no open incidents.

@@ -55,8 +55,8 @@ UNIT_DIR = "/etc/systemd/system"
 #: (CI, Docker, docs, tests, the frontend source) stay out; the built UI ships
 #: with `deploy_react.py`.
 HOST_PATHS = (
-    "src", "migrations", "scripts", "deploy", "demo", "artifacts", "fixtures", ".streamlit",
-    "app.py", "alembic.ini", "pyproject.toml", "requirements.txt", "README.md",
+    "src", "migrations", "scripts", "deploy", "demo", "artifacts", "fixtures",
+    "alembic.ini", "pyproject.toml", "requirements.txt", "README.md",
 )
 #: Restarted only with --restart-worker, and only outside the trading day.
 WORKER = "options-alpha-worker"

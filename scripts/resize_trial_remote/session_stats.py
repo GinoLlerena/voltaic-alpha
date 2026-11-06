@@ -24,10 +24,10 @@ def pct(v, q):
 
 
 lat = {
-    n: [r["latency"][n]["ms"] for r in rows if r["latency"][n].get("ok")]
-    for n in ("api_status", "api_decisions", "dashboard")
+    n: [r["latency"][n]["ms"] for r in rows if r["latency"].get(n, {}).get("ok")]
+    for n in ("api_status", "api_decisions", "ui")
 }
-fails = {n: sum(1 for r in rows if not r["latency"][n].get("ok")) for n in lat}
+fails = {n: sum(1 for r in rows if not r["latency"].get(n, {}).get("ok")) for n in lat}
 psi = [r["psi"]["memory"].get("some", 0.0) for r in rows]
 
 # Longest stretch, in seconds, with MemAvailable under the floor. Measured from

@@ -567,8 +567,8 @@ def health_ok(h: dict[str, Any]) -> list[str]:
         bad.append(f"lease holders {h['lease_holders']} (want exactly 1)")
     if not isinstance(h["api_status_items"], int) or h["api_status_items"] < 1:
         bad.append(f"API payload {h['api_status_items']}")
-    if h["dashboard_http"] != 200:
-        bad.append(f"dashboard {h['dashboard_http']}")
+    if h["ui_http"] != 200:
+        bad.append(f"UI {h['ui_http']}")
     if not h["startup_reconcile_clean"]:
         bad.append("startup reconciliation not clean")
     if not h["first_tick_at"]:
@@ -619,7 +619,7 @@ def evaluate(args: argparse.Namespace) -> int:
                 f"insufficient {label} samples: {s['samples']} < "
                 f"{int(SESSION_SAMPLES * MIN_SAMPLE_FRACTION)}"
             )
-    for probe in ("api_status", "api_decisions", "dashboard"):
+    for probe in ("api_status", "api_decisions", "ui"):
         b, t = base["p95_ms"][probe], trial["p95_ms"][probe]
         if not b or not t:
             reasons.append(f"inconclusive: no {probe} latency in one window")
@@ -648,7 +648,7 @@ def evaluate(args: argparse.Namespace) -> int:
             f"{trial['low_memory_longest_s']:.0f} s (limit {LOW_MEMORY_SECONDS} s)"
         )
     if any(trial["probe_failures"].values()):
-        reasons.append(f"API/dashboard probe failures: {trial['probe_failures']}")
+        reasons.append(f"API/UI probe failures: {trial['probe_failures']}")
     if trial["backup_failures"] or trial["offsite_failures"]:
         reasons.append(
             f"backup/restore failures: {trial['backup_failures']} hourly, "

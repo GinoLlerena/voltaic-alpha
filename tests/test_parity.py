@@ -1,16 +1,15 @@
-"""`RUI-6`: the two surfaces must make the same claims about the same records.
+"""`RUI-6`: the API must make the same claims as the read layer it is built on.
 
-Streamlit and React do not share a renderer, but they do share a read layer:
-`app.py` imports `presentation/*` and holds no ORM query of its own, and the API
-builds its DTOs from the same functions. Parity is therefore structural for the
-values themselves, and the risk that remains is the DTO layer — reshaping,
-rounding, renaming or redacting on the way out, so that the browser shows
-something the dashboard does not.
+The React UI renders only what the API serves, and the API builds its DTOs from
+`presentation/*`. The risk is the DTO layer: reshaping, rounding, renaming or
+redacting on the way out, so that the browser shows something the records do
+not say.
 
-These tests call exactly what `app.py` calls, then ask the API for the same
-thing, and compare. Anything the API is allowed to add (an envelope, a schema
-version) is stripped rather than special-cased, so a genuine difference in a
-value cannot hide behind a difference in shape.
+These tests call the read layer directly, then ask the API for the same thing,
+and compare. Anything the API is allowed to add (an envelope, a schema version)
+is stripped rather than special-cased, so a genuine difference in a value
+cannot hide behind a difference in shape. (Until the Streamlit retirement,
+phase 3, the left-hand side was what `app.py` called; it is the same calls.)
 """
 
 import unittest
@@ -37,7 +36,7 @@ NOW = datetime(2026, 9, 14, 15, 0, tzinfo=UTC)
 
 
 class ParityTests(unittest.TestCase):
-    """The dashboard's calls on the left, the API's answers on the right."""
+    """The read layer on the left, the API's answers on the right."""
 
     def setUp(self) -> None:
         self.source = resolve("", DB)
@@ -48,7 +47,7 @@ class ParityTests(unittest.TestCase):
         return Session(self.engine)
 
     def _rows(self, session: Session) -> list[object]:
-        """Exactly what `app.py` loads, ordering included."""
+        """The decision list as the read layer orders it."""
         recent, _ = decision_read.listing(session, limit=200)
         return list(reversed(recent))
 
@@ -180,16 +179,3 @@ class ParityTests(unittest.TestCase):
         self.assertEqual(overview.pending, served["pending"])
 
 
-class SurfaceBoundaryTests(unittest.TestCase):
-    """Neither surface may reach past the read layer to get its numbers."""
-
-    def test_the_dashboard_holds_no_query_of_its_own(self) -> None:
-        """`RUI-1` moved the ad hoc queries behind read services.
-
-        If one comes back, the two surfaces can disagree without either being
-        wrong about its own source, and every test above would still pass.
-        """
-        source = (ROOT / "app.py").read_text(encoding="utf-8")
-        for forbidden in ("session.query", "session.execute", "session.scalars", "select("):
-            with self.subTest(construct=forbidden):
-                self.assertNotIn(forbidden, source)

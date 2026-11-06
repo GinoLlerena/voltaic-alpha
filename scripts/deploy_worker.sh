@@ -21,7 +21,7 @@ deploy_worker.sh is retired. Use:
 
   python3 scripts/ship_host.py                            # dry run: every difference
   python3 scripts/ship_host.py --apply --restart-worker   # deploy the worker (outside the day)
-  python3 scripts/ship_host.py --apply --restart options-alpha   # deploy the dashboard
+  python3 scripts/ship_host.py --apply --restart options-alpha-api   # deploy the API
   python3 scripts/ship_host.py --apply --migrate          # when the schema changes
 EOF
 exit 2

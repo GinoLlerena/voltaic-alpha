@@ -23,9 +23,9 @@ from pathlib import Path
 OUTPUT = Path("artifacts/release_freeze.json")
 
 CATEGORIES = {
-    "code": ("src/", "app.py", "scripts/"),
-    "configuration": ("pyproject.toml", "uv.lock", ".streamlit/", "docker-compose.yml",
-                      "Dockerfile", ".github/", ".env.example"),
+    "code": ("src/", "scripts/"),
+    "configuration": ("pyproject.toml", "uv.lock", "docker-compose.yml", ".github/",
+                      ".env.example"),
     "prompts": ("src/options_alpha_lab/providers/openai_thesis.py",),
     "policy": ("src/options_alpha_lab/components.py", "src/options_alpha_lab/evidence.py",
                "src/options_alpha_lab/config.py"),

@@ -43,9 +43,8 @@ ALL=(
   "${TIMERS[@]}"
 )
 
-# options-alpha.service (Streamlit) is deliberately absent: enabling it would
-# bring it back on the next boot (retirement plan, phase 1). The unit file stays
-# until phase 3; since phase 2 nothing starts it.
+# options-alpha.service (Streamlit) was removed in phase 3 of the retirement
+# plan; the host's disabled copy is deleted by hand in that phase's host step.
 
 changed=0
 for unit in "${ALL[@]}"; do

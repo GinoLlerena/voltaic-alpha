@@ -20,7 +20,7 @@ from pathlib import Path
 
 UNITS = Path(__file__).resolve().parents[1] / "deploy" / "systemd"
 WORKER = UNITS / "options-alpha-worker.service"
-DASHBOARD = UNITS / "options-alpha.service"
+API = UNITS / "options-alpha-api.service"
 INSTALLER = UNITS.parent / "install_units.sh"
 
 
@@ -67,31 +67,22 @@ class EnvironmentContractTests(unittest.TestCase):
             _parse(WORKER)["Service"]["EnvironmentFile"], "/etc/options-alpha.env"
         )
         self.assertEqual(
-            _parse(DASHBOARD)["Service"]["EnvironmentFile"],
+            _parse(API)["Service"]["EnvironmentFile"],
             "/etc/options-alpha-dashboard.env",
         )
 
     def test_the_units_do_not_use_separate_environment_files_by_accident(self) -> None:
-        """The split is deliberate: the dashboard gets no broker credentials."""
+        """The split is deliberate: the API gets no broker credentials."""
         self.assertNotEqual(
             _parse(WORKER)["Service"]["EnvironmentFile"],
-            _parse(DASHBOARD)["Service"]["EnvironmentFile"],
+            _parse(API)["Service"]["EnvironmentFile"],
         )
 
     def test_no_secret_is_baked_into_a_unit(self) -> None:
-        for path in (WORKER, DASHBOARD):
+        for path in (WORKER, API):
             text = path.read_text()
             for marker in ("ALPACA_API_KEY=", "ALPACA_SECRET_KEY=", "OPENAI_API_KEY=", "sk-"):
                 self.assertNotIn(marker, text, f"{path.name} carries a credential")
-
-
-class DashboardUnitTests(unittest.TestCase):
-    def test_it_runs_the_dashboard(self) -> None:
-        self.assertIn("streamlit run app.py", _exec_start(DASHBOARD))
-
-    def test_it_does_not_grant_itself_privileges(self) -> None:
-        service = _parse(DASHBOARD)["Service"]
-        self.assertEqual(service["NoNewPrivileges"], "true")
 
 
 class InstallerCoversWhatIsCommittedTests(unittest.TestCase):
@@ -99,17 +90,16 @@ class InstallerCoversWhatIsCommittedTests(unittest.TestCase):
         """A unit added here but not wired into the installer is dead weight."""
         installer = INSTALLER.read_text()
         for unit in sorted(p.name for p in UNITS.glob("*.service")):
-            if unit == DASHBOARD.name:
-                continue
             self.assertIn(unit, installer, f"{unit} is never installed")
         for timer in sorted(p.name for p in UNITS.glob("*.timer")):
             self.assertIn(timer, installer, f"{timer} is never installed")
 
-    def test_streamlit_is_not_enabled_again(self) -> None:
-        """Enabling it would bring it back on the next boot, and the server boots daily."""
+    def test_streamlit_is_gone(self) -> None:
+        """Retirement plan, phase 3: no unit file, and the installer never names it."""
+        self.assertFalse((UNITS / "options-alpha.service").exists())
         code = [line for line in INSTALLER.read_text().splitlines()
                 if not line.lstrip().startswith("#")]
-        self.assertNotIn(DASHBOARD.name, "\n".join(code))
+        self.assertNotIn("options-alpha.service", "\n".join(code))
 
     def test_timers_are_started_not_merely_enabled(self) -> None:
         """`enable` alone leaves a rebuilt host with no backups and no watchdog
@@ -124,7 +114,7 @@ class InstallerCoversWhatIsCommittedTests(unittest.TestCase):
 
 class UnitsParseTests(unittest.TestCase):
     def test_both_units_are_valid_ini_with_an_install_section(self) -> None:
-        for path in (WORKER, DASHBOARD):
+        for path in (WORKER, API):
             parsed = _parse(path)
             self.assertIn("Unit", parsed)
             self.assertIn("Service", parsed)

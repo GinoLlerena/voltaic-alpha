@@ -48,10 +48,11 @@ try:
 except Exception as e:
     out["api_status_items"] = f"ERROR {type(e).__name__}"
 try:
-    with urllib.request.urlopen("http://127.0.0.1:8501/", timeout=15) as r:
-        out["dashboard_http"] = r.status
+    # The React UI shell, which the API serves (Streamlit retired, phase 3).
+    with urllib.request.urlopen("http://127.0.0.1:8600/", timeout=15) as r:
+        out["ui_http"] = r.status
 except Exception as e:
-    out["dashboard_http"] = f"ERROR {type(e).__name__}"
+    out["ui_http"] = f"ERROR {type(e).__name__}"
 j = subprocess.run(
     ["/usr/bin/journalctl", "-u", "options-alpha-worker", "-b", "-o", "cat", "--no-pager"],
     capture_output=True,
