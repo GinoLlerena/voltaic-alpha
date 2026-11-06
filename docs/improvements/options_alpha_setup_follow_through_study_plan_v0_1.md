@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Date | 5 November 2026, America/Lima |
-| Status | **Approved by the owner, 5 November 2026.** §3 and §4 are frozen, with the details in §3.1 fixed the same day, before anything was computed |
+| Status | **Approved by the owner, 5 November 2026.** §3 and §4 are frozen, with the details in §3.1 fixed the same day, before anything was computed. Results: [follow-through study](../analysis/options_alpha_setup_follow_through_study_v0_1.md), computed 5 November: the setup lags |
 | Why | The setup and exit study ([Part A](../analysis/options_alpha_setup_exit_study_part_a_v0_1.md), [Part B](../analysis/options_alpha_setup_exit_study_part_b_v0_1.md)) found the loss comes from direction, not from the exits: after Permitted sessions SPY's 3-session move averaged 0.00%. [Veto backtest Part 1](../analysis/options_alpha_veto_backtest_part1_v0_1.md) had already noted that all qualifying sessions averaged +0.045% over three sessions, against +0.220% for every replayed session |
 | Boundary | Offline research only, on data already cached. No download, no paid model call, and no change to any trading rule, threshold or worker setting |
 
