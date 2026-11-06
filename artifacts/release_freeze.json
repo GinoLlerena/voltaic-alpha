@@ -10,7 +10,7 @@
       "scripts/configure_secrets.py": "sha256:6c70749aa83394d9d2260226948629cd6e1ed450771c275e37a035dd287af4e5",
       "scripts/dependency_licenses.py": "sha256:a3a036bb0c1152c7f961a4c8e3867ae140887ff33d088b7c37a4a2b37241eb00",
       "scripts/deploy_all.py": "sha256:21594e5263384f5e24b4be21d81b5850203662d03713ec8a5d244117e1794295",
-      "scripts/deploy_react.py": "sha256:5d3fa1e9527f533c522347b51fc442e421031d7209c5d4782f16977c69226f67",
+      "scripts/deploy_react.py": "sha256:66a2a154d8346cb974c2dd2b517ea873754a0712c57ff510854dbebbc89f1b1d",
       "scripts/deploy_worker.sh": "sha256:1f7c31e44076e0fdc3465b5ed3261770e0528472db51d427a6c36d553f5502e8",
       "scripts/disarm_worker.sh": "sha256:7a3289f88e5fda767c8431e1589fc3d255fb8e21d92733c8d31bca739560f68e",
       "scripts/export_openapi.py": "sha256:160751ac17030dd4af3cebe1aa098e076eed6a41394d0605306e73c3a7c3d803",
@@ -108,6 +108,7 @@
       "src/options_alpha_lab/sensitivity.py": "sha256:58caf44c957ad8ffed2f0fb53204a87798a82e96ea29569de2a5970b7baf89aa",
       "src/options_alpha_lab/snapshot_io.py": "sha256:176f2f51335aa8177bbc49d78f0421f3edd7112a37c13b81d2812d3a1d565f87",
       "src/options_alpha_lab/study_decomposition.py": "sha256:22614d722875f479552214e7b430d01bac7c058da925e46c12b37cd2e0826bbe",
+      "src/options_alpha_lab/study_follow_through.py": "sha256:729f8a588e3c1ad3ad046df14517e49d3a707c530f64a54c7da50432591f1fe5",
       "src/options_alpha_lab/study_variants.py": "sha256:33ce23bfa98e8b3d2df95d690861cc322293a2d6baa36e8c47d6c4354511b6dd",
       "src/options_alpha_lab/telemetry.py": "sha256:f3cf2c61c2a7ccc9caf0ec7fc5a9457bb13a423f47d4b09611a0ed7097808092",
       "src/options_alpha_lab/veto_calibration.py": "sha256:6be471e7154b97feb95312ee717d41ab09b76702f6f519e414ff7c6e94577e32",
@@ -156,8 +157,8 @@
       "src/options_alpha_lab/providers/openai_thesis.py": "sha256:92618e9d76929822285c1800b521061665b75b58495c9ed13cfca3690ce742e1"
     }
   },
-  "commit": "git:ecf523a1e75b2d3ec18d04309dbf3f9bac290067",
-  "freeze_digest": "sha256:1fea45288cc3aee616bb6121f576447c5aa68dcb648c9b131e222bffd0d9c66b",
-  "frozen_at": "2026-11-05T23:39:34.146933+00:00",
+  "commit": "git:8686cc36d24b4881146fd4be64728dd0e79e1fc8",
+  "freeze_digest": "sha256:3bd037af88cf16732086b66392f2375ed2d894344fe55044b4f1acb89d17bc82",
+  "frozen_at": "2026-11-06T03:57:59.950593+00:00",
   "manifest_version": "release_freeze.v1"
 }

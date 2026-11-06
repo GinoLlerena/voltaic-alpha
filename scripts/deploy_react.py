@@ -7,9 +7,9 @@ retries on network blips, and stderr never shown unredacted.
 Subcommands:
 
   inspect            read-only: what the deploy would change on the host
-  deploy [--apply]   ship, expose to the operator's IP, verify, cut port 80
-                     over, verify again; without --apply it prints the plan
-  rollback [--full]  port 80 back to Streamlit; --full also restores the API
+  deploy [--apply]   ship, install, verify on the operator's IP and on port 80;
+                     without --apply it prints the plan
+  rollback           put back the previous React build and API modules
 
 Designed to run unattended (owner, 27 September 2026: "don't start an operation
 that depends on my intervention"). Unlike the resize, nothing here stops the
@@ -18,11 +18,12 @@ revert depends on this machine staying up until the run ends - it is not a
 host-side safety net. What keeps a revert small:
 
   - the payload is two API modules and `frontend/dist`. The worker's code is
-    not touched, and neither the worker nor Streamlit is restarted;
-  - the old API module is kept on the host, and the API change is a systemd
-    drop-in, so undoing it is deleting a file and restarting one service;
-  - port 80 is switched by a second drop-in, on the port-80 unit, so the
-    rollback is starting Streamlit on 8501 and removing that drop-in;
+    not touched and the worker is not restarted;
+  - every deploy first keeps the host's API modules and build in
+    `.deploy-backup/<stamp>/`, so undoing it is copying them back and
+    restarting one service (Streamlit retirement plan, §3 and phase 2);
+  - port 80 already points at the API: the port-80 unit itself redirects it to
+    8600, so a deploy never touches the redirect;
   - the temporary security-group rule for 8600 is revoked in a `finally`.
 """
 
@@ -54,7 +55,6 @@ BACKUP_DIR = f"{HOST_ROOT}/.deploy-backup"
 SG = "sg-t4naetmr3bp6sry6lw7a"
 EIP = "47.236.50.157"
 API_PORT = 8600
-STREAMLIT_PORT = 8501
 RECORD_DIR = Path.home() / "options-alpha-offsite" / "react-deploy"
 
 #: The only source that changes. `inspect` refuses to plan if anything else in
@@ -70,21 +70,6 @@ API_DROPIN_TEXT = f"""\
 [Service]
 Environment=PRESENTATION_API_HOST=0.0.0.0
 Environment=PRESENTATION_UI_DIR={HOST_DIST}
-"""
-
-PORT80_DROPIN = "/etc/systemd/system/options-alpha-port80.service.d/react.conf"
-REDIRECT = (
-    "/usr/sbin/iptables -t nat {op} PREROUTING -p tcp --dport 80 -j REDIRECT --to-port {port}"
-)
-PORT80_DROPIN_TEXT = f"""\
-# React UI (runbook §11.2): port 80 goes to the API, which serves the UI.
-# Rollback: start Streamlit (it serves on {STREAMLIT_PORT}), delete this file,
-# daemon-reload, restart the unit.
-[Service]
-ExecStart=
-ExecStart={REDIRECT.format(op="-A", port=API_PORT)}
-ExecStop=
-ExecStop={REDIRECT.format(op="-D", port=API_PORT)}
 """
 
 #: A remote script's CommandContent is capped near 18 KB once encoded.
@@ -229,49 +214,35 @@ def check_failures(c: dict[str, str]) -> list[str]:
     return bad
 
 
-CUTOVER = f"""set -euo pipefail
-{write_dropin(PORT80_DROPIN, PORT80_DROPIN_TEXT)}
-# Stop BEFORE the reload: the loaded unit's ExecStop removes the 8501 rule it added.
-systemctl stop options-alpha-port80
-systemctl daemon-reload
-systemctl start options-alpha-port80
-iptables -t nat -S PREROUTING | grep -- '--dport 80 '
-"""
-
-REVERT_PORT80 = f"""set -euo pipefail
-# Streamlit no longer runs by default (retirement plan, phase 1); this is what
-# port 80 is about to point at.
-systemctl start options-alpha
-systemctl stop options-alpha-port80 || true
-rm -f {PORT80_DROPIN}
-rmdir --ignore-fail-on-non-empty {os.path.dirname(PORT80_DROPIN)} 2>/dev/null || true
-# A stop that failed half-way can leave either rule behind; remove both, then
-# let the unit add exactly one.
-for port in {API_PORT} {STREAMLIT_PORT}; do
-  rule="PREROUTING -p tcp --dport 80 -j REDIRECT --to-port $port"
-  while iptables -t nat -C $rule 2>/dev/null; do iptables -t nat -D $rule; done
-done
-systemctl daemon-reload
-systemctl start options-alpha-port80
-iptables -t nat -S PREROUTING | grep -- '--dport 80 '
-"""
-
-
 def revert_api_script() -> str:
-    """Remove the drop-in and put back the newest kept API modules and dist."""
+    """Put back the newest backup not yet restored: its API modules and build.
+
+    The API drop-in stays: it is what serves the build on port 80. The build is
+    copied, not moved, and the backup is then marked, so a second rollback goes
+    one deploy further back instead of finding an empty backup. A backup without
+    a build is refused rather than leaving port 80 with no UI.
+    """
     return f"""set -euo pipefail
 cd {HOST_ROOT}
-rm -f {API_DROPIN}
-last=$(ls -1d {BACKUP_DIR}/*/ 2>/dev/null | sort | tail -1)
-if [ -n "$last" ]; then
-  for f in {" ".join(API_FILES)}; do
-    if [ -f "$last/$f" ]; then install -m 644 "$last/$f" "$f"
-    elif grep -qx "$f" "$last/absent" 2>/dev/null; then rm -f "$f"; fi
-  done
-  rm -rf {HOST_DIST}
-  if [ -d "$last/dist" ]; then mv "$last/dist" {HOST_DIST}; fi
-  echo "restored from $last"
+last=""
+for d in $(ls -1d {BACKUP_DIR}/*/ 2>/dev/null | sort -r); do
+  if [ ! -e "$d/restored" ]; then last="${{d%/}}"; break; fi
+done
+if [ -z "$last" ]; then echo "no unrestored backup in {BACKUP_DIR}" >&2; exit 1; fi
+if [ ! -d "$last/dist" ]; then
+  echo "$last has no frontend build; refusing to leave port 80 without a UI" >&2; exit 1
 fi
+for f in {" ".join(API_FILES)}; do
+  if [ -f "$last/$f" ]; then install -m 644 "$last/$f" "$f"
+  elif grep -qx "$f" "$last/absent" 2>/dev/null; then rm -f "$f"; fi
+done
+work=$(mktemp -d {HOST_ROOT}/frontend/.restore.XXXXXX)
+cp -a "$last/dist" "$work/dist"
+if [ -d {HOST_DIST} ]; then mv {HOST_DIST} "$work/replaced"; fi
+mv "$work/dist" {HOST_DIST}
+rm -rf "$work"
+touch "$last/restored"
+echo "restored from $last"
 {RESTART_API}systemctl is-active options-alpha-api
 """
 
@@ -341,7 +312,9 @@ find src -type f -name '*.py' ! -path '*/__pycache__/*' -exec sha256sum {{}} + |
 echo "## state"
 echo "dist=$([ -f {HOST_DIST}/index.html ] && echo present || echo absent)"
 echo "api_dropin=$([ -f {API_DROPIN} ] && echo present || echo absent)"
-echo "port80_dropin=$([ -f {PORT80_DROPIN} ] && echo present || echo absent)"
+unused=0
+for d in {BACKUP_DIR}/*/; do [ -d "$d" ] && [ ! -e "$d/restored" ] && unused=$((unused + 1)); done
+echo "backups_unrestored=$unused"
 echo "port80_to=$(iptables -t nat -S PREROUTING | grep -- '--dport 80 ' | grep -o 'ports [0-9]*')"
 echo "api_listen=$(ss -ltn | awk '{{print $4}}' | grep ':{API_PORT}$')"
 echo "mem_available_mib=$(awk '/MemAvailable/{{print int($2/1024)}}' /proc/meminfo)"
@@ -375,6 +348,12 @@ def inspect(args: argparse.Namespace) -> int:
     payload, other = plan_differences(digests, local)
     print(json.dumps(state, indent=1))
     print("API modules the deploy replaces:", payload or "none (already current)")
+    if state.get("port80_to") != f"ports {API_PORT}":
+        # Phase 2 of the Streamlit retirement: the port-80 unit itself points at
+        # the API. Anything else means the host is not at the tested state.
+        print(f"BLOCKED: port 80 redirects to {state.get('port80_to')!r}, "
+              f"not the API on {API_PORT}")
+        return 1
     if other:
         print("BLOCKED: other package source differs on the host, so it is not at the")
         print("state this deploy was tested against:")
@@ -408,18 +387,18 @@ def deploy(args: argparse.Namespace) -> int:
     rt.log(record, "built", commit=commit[:12], files=len(manifest), bytes=len(payload),
            chunks=len(chunks(payload)), index_sha256=manifest["frontend/dist/index.html"][:16])
     if not args.apply:
-        print("\nDry run. Would: ship, install (keeping the old API), add the API drop-in,")
+        print("\nDry run. Would: ship, install (keeping the old API and build), write the")
         if args.verify_on_port_80:
-            print("restart the API, cut port 80 over, run the live suite there. Nothing changed.")
+            print("API drop-in, restart the API, run the live suite on port 80. Nothing changed.")
         else:
-            print(f"restart the API, open {API_PORT} to this machine's /32, run the live suite,")
-            print(f"cut port 80 over, run it again on port 80, revoke {API_PORT}. Nothing changed.")
+            print(f"API drop-in, restart the API, open {API_PORT} to this machine's /32, run the")
+            print(f"live suite there and on port 80, revoke {API_PORT}. Nothing changed.")
         return 0
 
     # --verify-on-port-80 (owner, 29 September 2026): a Cloudflare WARP client
     # reaches the host from several egress addresses, so no /32 rule can admit
-    # only the operator. The host checks still gate the cutover; the live suite
-    # then runs on port 80, and a failure puts Streamlit back on it.
+    # only the operator. The host checks still gate the live suite, which
+    # then runs on port 80 only, and a failure puts the previous build back.
     restricted = not args.verify_on_port_80
     record["verification"] = "operator /32 on 8600, then port 80" if restricted else "port 80 only"
     cidr = operator_cidr() if restricted else ""
@@ -449,16 +428,13 @@ def deploy(args: argparse.Namespace) -> int:
         else:
             rt.log(record, "restricted check skipped", reason="--verify-on-port-80")
 
-        stage = "port80"
-        rules = rt.remote(CUTOVER, timeout=120)
-        rt.log(record, "port 80 cut over", rules=rules.strip())
         wait_public(f"http://{EIP}/")
         if not live_suite(f"http://{EIP}"):
             raise rt.Stop("live suite failed on port 80")
         rt.log(record, "live suite passed", target=":80")
         checks = parse_checks(rt.remote(HOST_CHECKS, timeout=120))
         if bad := check_failures(checks):
-            raise rt.Stop(f"host checks failed after cutover: {bad}")
+            raise rt.Stop(f"host checks failed after the port-80 suite: {bad}")
         record["result"] = "DEPLOYED"
     except (rt.Stop, subprocess.CalledProcessError, OSError) as exc:
         record["result"] = "REVERTED"
@@ -466,12 +442,9 @@ def deploy(args: argparse.Namespace) -> int:
         rt.log(record, "failed; reverting", stage=stage, error=str(exc)[:300])
         if stage == "ship":
             rt.remote(f"rm -f /root/react-deploy-{stamp}.tar.gz*", timeout=60)
-        if stage == "port80":
-            rt.remote(REVERT_PORT80, timeout=120)
-            rt.log(record, "port 80 back on Streamlit")
-        if stage in ("api", "port80"):
+        if stage == "api":
             rt.remote(revert_api_script(), timeout=300)
-            rt.log(record, "API restored to the previous module, loopback only")
+            rt.log(record, "previous API modules and build restored")
     finally:
         if record.get("sg_open"):
             sg_rule("Revoke", cidr)
@@ -479,17 +452,13 @@ def deploy(args: argparse.Namespace) -> int:
         out.write_text(json.dumps(record, indent=2))
     print(f"\n{record['result']}  (record: {out})")
     if record["result"] == "DEPLOYED":
-        # `rollback` starts Streamlit on 8501, which has not been public since
-        # 23 October 2026, and points port 80 back at it.
-        print(f"React UI: http://{EIP}/   Streamlit rollback: deploy_react.py rollback")
+        print(f"React UI: http://{EIP}/   undo: deploy_react.py rollback")
     return 0 if record["result"] == "DEPLOYED" else 1
 
 
 def rollback(args: argparse.Namespace) -> int:
-    print(rt.remote(REVERT_PORT80, timeout=120).strip())
-    if args.full:
-        print(rt.remote(revert_api_script(), timeout=300).strip())
-    print(f"port 80 serves Streamlit again: http://{EIP}/")
+    print(rt.remote(revert_api_script(), timeout=300).strip())
+    print(f"port 80 serves the previous React build: http://{EIP}/")
     return 0
 
 
@@ -503,10 +472,9 @@ def main() -> int:
     d.add_argument(
         "--verify-on-port-80", action="store_true",
         help="skip the operator-/32 check on 8600 (it cannot admit a WARP client); "
-        "verify on port 80, reverting it to Streamlit on failure",
+        "verify on port 80, restoring the previous build on failure",
     )
-    r = sub.add_parser("rollback")
-    r.add_argument("--full", action="store_true", help="also restore the previous API")
+    sub.add_parser("rollback")
     args = parser.parse_args()
     try:
         return {"inspect": inspect, "deploy": deploy, "rollback": rollback}[args.cmd](args)

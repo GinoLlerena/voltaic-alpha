@@ -45,7 +45,7 @@ ALL=(
 
 # options-alpha.service (Streamlit) is deliberately absent: enabling it would
 # bring it back on the next boot (retirement plan, phase 1). The unit file stays
-# until phase 3, because phase 1's undo and `deploy_react.py rollback` start it.
+# until phase 3; since phase 2 nothing starts it.
 
 changed=0
 for unit in "${ALL[@]}"; do
@@ -59,6 +59,17 @@ for unit in "${ALL[@]}"; do
     changed=1
   fi
 done
+
+# Phase 2 of the Streamlit retirement: the port-80 unit now redirects to the API
+# itself, so deploy_react.py's drop-in only repeats it. The loaded unit's rule is
+# the same before and after, so removing it needs a reload, not a restart.
+OLD_PORT80_DROPIN=$DEST/options-alpha-port80.service.d/react.conf
+if [ -f "$OLD_PORT80_DROPIN" ] && grep -q -- '--to-port 8600' "$DEST/options-alpha-port80.service"; then
+  rm -f "$OLD_PORT80_DROPIN"
+  rmdir --ignore-fail-on-non-empty "$(dirname "$OLD_PORT80_DROPIN")" 2>/dev/null || true
+  echo "  options-alpha-port80.service: obsolete react.conf drop-in removed"
+  changed=1
+fi
 
 [ "$changed" = 1 ] && systemctl daemon-reload
 

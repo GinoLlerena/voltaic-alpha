@@ -300,6 +300,22 @@ class ReadOnlyRoleScriptTests(unittest.TestCase):
         self.assertIn("verify_readonly_role.sh", section)
 
 
+
+class Port80PointsAtTheApi(unittest.TestCase):
+    """Streamlit retirement, phase 2: the base unit redirects to the API."""
+
+    def test_both_commands_name_the_api_port(self) -> None:
+        service = _parse(UNITS / "options-alpha-port80.service")["Service"]
+        for key in ("ExecStart", "ExecStop"):
+            with self.subTest(key):
+                self.assertTrue(service[key].endswith("--to-port 8600"), service[key])
+
+    def test_install_units_removes_the_old_dropin_only_once_the_base_says_8600(self) -> None:
+        text = (UNITS.parent / "install_units.sh").read_text()
+        self.assertIn("react.conf", text)
+        self.assertIn("grep -q -- '--to-port 8600'", text)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
 
