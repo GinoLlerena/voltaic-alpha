@@ -6,7 +6,7 @@
 | Plan | [Setup follow-through study plan](../improvements/options_alpha_setup_follow_through_study_plan_v0_1.md), §3 and §4, approved by the owner on 5 November 2026, with the details in §3.1 fixed and committed (`297ff64`) before computing. The code was committed before it was run on the cached data |
 | Inputs | Step 2 replay rows, digest `sha256:e959635b3dc7e1861ff3c9969b53fcc29528f53e552cd1741ee8877b02bb4080`, reproduced unchanged; cached SPY daily bars. No download |
 | Code | `src/options_alpha_lab/study_follow_through.py`; run `uv run python -m options_alpha_lab.study_follow_through` |
-| Status | Exploratory, on data already seen. No rule is changed. Paper stays armed with today's rules |
+| Status | Exploratory, on data already seen. No rule is changed. **Closed by the owner, 5 November 2026 (§6):** Paper continues unchanged, research closed, no real money |
 
 ## 1. Summary
 
@@ -145,3 +145,20 @@ The owner's options (plan §6):
    support it.
 
 This study recommends no rule change on its own.
+
+## 6. The owner's decision, 5 November 2026
+
+The owner chose option 1 and closed the research:
+
+- **Paper keeps running on today's rules, unchanged.** It costs nothing and
+  keeps checking the whole system against the broker.
+- **The research track is closed.** No new hypothesis plan is commissioned
+  now.
+- **No real money on this setup.** Three studies (the veto backtest, the setup
+  and exit study, and this one) found no edge to pay for a debit spread's time
+  decay and costs over February 2024 to October 2026. Moving beyond Paper would
+  need a new hypothesis, written as its own plan and supported by forward
+  evidence.
+
+The remaining work is engineering only: Streamlit retirement phases 2 and 3,
+then maintenance.
