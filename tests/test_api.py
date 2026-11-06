@@ -279,13 +279,6 @@ class ParityWithRecordsTests(unittest.TestCase):
         kept = self.client.get(f"/api/v1/proof/{digest}.json")
         self.assertEqual(enveloped["manifest_digest"], kept.headers["X-Proof-Digest"])
 
-    def test_the_dashboard_and_api_share_one_source_rule(self) -> None:
-        app_source = (ROOT / "app.py").read_text()
-        self.assertIn("Resolver(live_url, DB)", app_source)
-        self.assertIn("_resolver(LIVE_DATABASE_URL)", app_source)
-        self.assertNotIn("create_engine(", app_source)
-
-
 class WorkspaceTests(unittest.TestCase):
     """The workspaces mirror the dashboard's tabs and add no interpretation."""
 
@@ -411,28 +404,6 @@ class AllowlistTests(unittest.TestCase):
         self.assertEqual(incident["kind"], "broker_unreachable")
         self.assertEqual(incident["withheld"], ["detail"])
 
-    def test_incident_detail_is_withheld_from_the_dashboard(self) -> None:
-        """RUI-VAL-007: the public page printed exception text verbatim."""
-        from streamlit.testing.v1 import AppTest
-
-        canary = "reconciliation could not read broker state: 401 key=PKLEAKED123"
-        live = self._with_incident(canary)
-        saved = os.environ.get("DASHBOARD_DATABASE_URL")
-        os.environ["DASHBOARD_DATABASE_URL"] = f"sqlite+pysqlite:///{live}"
-        try:
-            run = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
-        finally:
-            if saved is None:
-                os.environ.pop("DASHBOARD_DATABASE_URL", None)
-            else:
-                os.environ["DASHBOARD_DATABASE_URL"] = saved
-        self.assertFalse(run.exception)
-        rendered = " ".join(m.value for m in run.markdown)
-        self.assertIn("broker_unreachable", rendered, "the incident must still be shown")
-        self.assertIn("detail withheld", rendered)
-        self.assertNotIn("PKLEAKED123", rendered)
-
-
 class PerRequestSourceTests(unittest.TestCase):
     """RUI-VAL-006: the answer is recomputed; only the engines are kept."""
 
@@ -497,32 +468,10 @@ class PerRequestSourceTests(unittest.TestCase):
 
 
 class ListAndCopyParityTests(unittest.TestCase):
-    """The sidebar list and the authority copy, served exactly as the page shows them."""
+    """The grouped decision list, as the API serves it to the React UI."""
 
     def setUp(self) -> None:
         self.client = _frozen_client()
-
-    def _page(self, view: str = "Notable"):  # type: ignore[no-untyped-def]
-        from streamlit.testing.v1 import AppTest
-
-        saved = os.environ.pop("DASHBOARD_DATABASE_URL", None)
-        try:
-            run = AppTest.from_file(str(ROOT / "app.py"), default_timeout=120).run()
-            if view != "Notable":
-                run.radio[0].set_value(view).run()
-            return run
-        finally:
-            if saved is not None:
-                os.environ["DASHBOARD_DATABASE_URL"] = saved
-
-    def test_grouped_entries_match_the_page_in_every_view(self) -> None:
-        for view in ("Notable", "Positions", "Refusals", "Everything"):
-            with self.subTest(view=view):
-                # AppTest exposes radio options by their formatted label, which
-                # makes this the stricter check: same entries, same order, same text.
-                page = list(self._page(view).radio[1].options)
-                data = self.client.get(f"/api/v1/decisions/grouped?view={view}").json()["data"]
-                self.assertEqual([e["label"] for e in data["entries"]], page)
 
     def test_notable_lists_every_position_on_committed_evidence(self) -> None:
         """RUI-VAL-009: this view listed three of five and hid the lifecycle case."""
@@ -535,22 +484,6 @@ class ListAndCopyParityTests(unittest.TestCase):
     def test_a_pin_outside_the_source_is_reported(self) -> None:
         data = self.client.get(f"/api/v1/decisions/grouped?pin={'0' * 64}").json()["data"]
         self.assertTrue(data["pin_missing"])
-
-    def test_every_served_rule_is_rendered_by_the_page(self) -> None:
-        run = self._page()
-        rendered = " ".join(m.value for m in run.markdown) + " ".join(
-            m.value for m in run.sidebar.markdown
-        )
-        copy = self.client.get("/api/v1/copy").json()["data"]
-        import html as _html
-
-        rendered = _html.unescape(rendered)
-        for rule in copy["write_guards"] + copy["model_limits"]:
-            self.assertIn(rule["name"], rendered)
-            self.assertIn(rule["effect"], rendered)
-        self.assertIn(copy["write_guards_note"], rendered)
-        for line in copy["disclosures"]:
-            self.assertIn(line, rendered)
 
     def test_halt_states_cover_every_execution_state(self) -> None:
         from options_alpha_lab.architecture.contracts import ExecutionState

@@ -33,7 +33,6 @@ CGROUP_ROOT = Path("/sys/fs/cgroup/system.slice")
 #: unit -> cgroup directory, relative to system.slice
 SERVICES = {
     "worker": "options-alpha-worker.service",
-    "dashboard": "options-alpha.service",
     "api": "options-alpha-api.service",
     "postgres": "system-postgresql.slice/postgresql@16-main.service",
     "backup": "options-alpha-backup.service",
@@ -42,7 +41,8 @@ SERVICES = {
 PROBES = {
     "api_status": "http://127.0.0.1:8600/api/v1/system/status",
     "api_decisions": "http://127.0.0.1:8600/api/v1/decisions",
-    "dashboard": "http://127.0.0.1:8501/_stcore/health",
+    # The React UI shell, served by the API (Streamlit retired, phase 3).
+    "ui": "http://127.0.0.1:8600/",
 }
 
 

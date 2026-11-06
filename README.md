@@ -63,7 +63,21 @@ someone has to navigate to is one they will not read.
 ```bash
 uv sync
 bash scripts/run_h0_validation.sh          # nine gates, clean checkout
-uv run streamlit run app.py                # the five judge views
+(cd frontend && pnpm install && pnpm build) # the React UI
+uv run python -m options_alpha_lab.api      # API + UI on http://127.0.0.1:8600
+```
+
+With no database configured, the API serves the committed evidence in
+`demo/h0_demo.db`.
+
+**The original submission (Streamlit).** The judges' Docker image and the
+Streamlit dashboard it ran were retired on 6 November 2026 (Streamlit
+retirement plan, phase 3). They are kept, runnable, at the tag
+`streamlit-submission-record`:
+
+```bash
+git checkout streamlit-submission-record
+docker build -t options-alpha . && docker run -p 8501:8501 options-alpha
 ```
 
 ## Quick start
@@ -317,18 +331,24 @@ an approved exit policy. The disposition of every lifecycle finding is in
 section 0 of the
 [Exit Policy and Position-Lifecycle Review](docs/implementation/options_alpha_exit_policy_review_v0_1.md).
 
-## The judge dashboard
+## The UI
 
-`app.py` serves five read-only views over the committed evidence in
-`demo/h0_demo.db`: mode and health with a live `NO_NEW_RISK` demonstration,
-evidence and the deterministic qualification, the bounded model memo, the
-approval and request hash lineage including the exact bytes sent to the broker,
-and the reconciled outcome or refusal.
+The React UI (`frontend/`) is served by the read-only presentation API
+(`python -m options_alpha_lab.api`), over the live worker database or, with
+none configured, the committed evidence in `demo/h0_demo.db`. It shows mode and
+health, evidence and the deterministic qualification, the bounded model memo,
+the approval and request hash lineage including the exact bytes sent to the
+broker, and the reconciled outcome or refusal.
 
-The dashboard has no control actions. It cannot start a run, approve an intent,
-or reach a broker, and a test parses `app.py` and fails if it so much as
-references the gateway. The surface a judge browses is not the surface that
-trades.
+It has no control actions. Every API route is a GET, any write method returns
+405 (`tests/test_api.py`, `ReadOnlyBoundaryTests`), the API reads through a
+SELECT-only database role, and `scripts/check_no_write_path.py` fails CI if any
+source outside the execution gateway can express a broker write. The surface a
+reviewer browses is not the surface that trades.
+
+*Until 6 November 2026* this section described the Streamlit dashboard in
+`app.py`, which served the same five views. It was retired once React had
+served port 80 for five weeks. See the tag `streamlit-submission-record`.
 
 ## Results, including the unflattering ones
 

@@ -41,7 +41,7 @@ class RequirementsSyncTests(unittest.TestCase):
 
     def test_requirements_installs_the_project_itself(self) -> None:
         # Without this line a host installs the dependencies but not
-        # options_alpha_lab, and app.py fails on import.
+        # options_alpha_lab, and the worker and API fail on import.
         lines = [line.strip() for line in REQUIREMENTS.read_text(encoding="utf-8").splitlines()]
         self.assertIn(".", lines)
 

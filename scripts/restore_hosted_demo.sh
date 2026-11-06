@@ -37,7 +37,7 @@ DEMO=i-t4n88bkfwsq0lhzmfjii          # options-alpha-demo, public dashboard
 # real worker with neither.
 WORKER="$DEMO"                       # one box since the consolidation
 DEMO_SG=sg-t4naetmr3bp6sry6lw7a
-STREAMLIT_PORT=8501
+API_PORT=8600                        # serves the React UI (Streamlit retired)
 PUBLIC_PORT=80
 
 APPLY=0
@@ -255,7 +255,7 @@ if wants code; then
   # Cloud Assistant rather than scp, so this needs no private key. The worker
   # runs a plain venv, and nothing in this payload adds a dependency, so no
   # reinstall is required - but the service has to restart to pick it up.
-  ship "$WORKER" src app.py
+  ship "$WORKER" src
   remote "$WORKER" 'set -euo pipefail
 cd /opt/options-alpha
 # The package was installed non-editable, so site-packages held a *copy* and
@@ -359,10 +359,10 @@ fi
 # --- port 80 -----------------------------------------------------------------
 if wants port80; then
   say "5. Serve the dashboard on port 80"
-  # A redirect rather than moving Streamlit itself: it needs no knowledge of the
-  # unit file, no capability grant to bind a privileged port, and it is undone
-  # by deleting one rule. Port 8501 is not public: its security-group rule was
-  # revoked on 23 October 2026, and a rollback points port 80 back at Streamlit.
+  # A redirect to the API, which serves the React UI: no capability grant to
+  # bind a privileged port, and it is undone by deleting one rule. The build and
+  # the API's public drop-in come from scripts/deploy_react.py, run after this
+  # (Streamlit retirement plan, phase 3).
   note "opening $PUBLIC_PORT/tcp on $DEMO_SG"
   run aliyun ecs AuthorizeSecurityGroup --RegionId "$REGION" --SecurityGroupId "$DEMO_SG" \
     --IpProtocol tcp --PortRange "$PUBLIC_PORT/$PUBLIC_PORT" --SourceCidrIp 0.0.0.0/0 \
@@ -376,8 +376,10 @@ if wants port80; then
 # gets discovered during a demo.
 # Idempotent: drop every copy of the rule first, so re-running does not stack
 # duplicates, then let the unit add exactly one.
-while iptables -t nat -C PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT 2>/dev/null; do
-  iptables -t nat -D PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port $STREAMLIT_PORT
+for port in $API_PORT 8501; do  # 8501: a leftover from before the Streamlit retirement
+  while iptables -t nat -C PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port \$port 2>/dev/null; do
+    iptables -t nat -D PREROUTING -p tcp --dport $PUBLIC_PORT -j REDIRECT --to-port \$port
+  done
 done
 systemctl restart options-alpha-port80
 echo \"unit: \$(systemctl is-enabled options-alpha-port80) / \$(systemctl is-active options-alpha-port80)\"
@@ -392,7 +394,7 @@ if wants verify; then
     warn "no public address yet; skipping the reachability check"
   else
     note "address: $ip"
-    for url in "http://$ip/" "http://$ip/_stcore/health" "http://$ip:$STREAMLIT_PORT/"; do
+    for url in "http://$ip/" "http://$ip/api/v1/system/status"; do
       if [ "$APPLY" = 1 ]; then
         code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo 000)
         [ "$code" = 200 ] && note "200  $url" || warn "$code  $url"

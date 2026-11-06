@@ -154,7 +154,7 @@ def restarts_for(changed: list[str], root: Path = ROOT) -> list[str]:
     packaged data file) cannot be traced through imports, so it restarts every
     service: unknown fails toward restarting.
     """
-    source = [f for f in changed if f.startswith("src/") or f == "app.py"]
+    source = [f for f in changed if f.startswith("src/")]
     if any(not f.endswith(".py") for f in source):
         return list(ENTRY_POINTS)
     return [
