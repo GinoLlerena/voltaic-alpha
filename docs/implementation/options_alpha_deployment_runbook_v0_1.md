@@ -649,7 +649,7 @@ The trial measures the current stack; changing it mid-trial voids the comparison
     python3 scripts/deploy_react.py inspect          # read-only
     python3 scripts/deploy_react.py deploy           # dry run: builds, changes nothing
     python3 scripts/deploy_react.py deploy --apply
-    python3 scripts/deploy_react.py rollback [--full]
+    python3 scripts/deploy_react.py rollback
 
 What `deploy --apply` does:
 
@@ -677,6 +677,24 @@ same by hand at any time and never stops the instance.
 
 After cutover: recheck memory and latency on the next full session against
 the 25 September baseline (`resize_trial.py evaluate` without `--apply`).
+
+### 11.3 Since the Streamlit retirement, phase 2 (5 November 2026)
+
+Steps 3, 5 and 6 above, and the revert, describe the procedure while Streamlit
+was the rollback. Since phase 2:
+
+- `options-alpha-port80.service` itself redirects 80 to the API on 8600.
+  `deploy_react.py` no longer cuts port 80 over, and `install_units.sh`
+  removes the old `react.conf` drop-in. `inspect` refuses unless port 80
+  already points at 8600.
+- The host checks no longer include Streamlit, and nothing starts it.
+- **Rollback** (and the automatic revert of a failed deploy) puts back the
+  newest backup in `.deploy-backup/` not yet restored: its API modules and its
+  `frontend/dist`, copied, not moved. The backup is then marked `restored`, so
+  a second `rollback` goes one deploy further back. A backup without a build is
+  refused, so port 80 is never left without a UI. The API drop-in is kept,
+  since it is what serves the build. `--full` is gone, because every rollback
+  restores both the build and the API modules.
 
 ## 12. Deploying host code (1 October 2026)
 

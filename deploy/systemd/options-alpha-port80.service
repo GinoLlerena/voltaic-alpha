@@ -1,13 +1,16 @@
 [Unit]
-Description=Redirect 80 to the Streamlit dashboard on 8501
+Description=Redirect 80 to the API on 8600, which serves the React UI
 After=network-online.target
 Wants=network-online.target
 
+# Streamlit retirement plan, phase 2: this used to redirect to Streamlit on
+# 8501, with a drop-in from deploy_react.py sending it to the API instead. The
+# API is now the only UI, so the base unit says so and the drop-in is gone.
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8501
-ExecStop=/usr/sbin/iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8501
+ExecStart=/usr/sbin/iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8600
+ExecStop=/usr/sbin/iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8600
 
 [Install]
 WantedBy=multi-user.target

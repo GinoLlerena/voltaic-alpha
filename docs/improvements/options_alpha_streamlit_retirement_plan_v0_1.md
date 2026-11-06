@@ -99,3 +99,24 @@ systemctl disable --now options-alpha
 Check: port 80 and the API return 200, the worker is unaffected, and
 `systemctl is-enabled options-alpha` says `disabled`. Undo:
 `systemctl enable --now options-alpha`.
+
+**Phase 2 as built, 5 November 2026.** The owner said "go" on 5 November.
+
+- `options-alpha-port80.service` now redirects 80 to the API on 8600.
+  `install_units.sh` removes `deploy_react.py`'s `react.conf` drop-in once the
+  base unit says 8600. The loaded rule is the same before and after, so this
+  needs a `daemon-reload`, not a restart.
+- `deploy_react.py` has no port-80 cutover and no Streamlit start. The §3
+  rollback is in place: a failed deploy and `rollback` restore the newest
+  unrestored `.deploy-backup/<stamp>/` (API modules and build, copied), mark it
+  `restored`, and keep the API drop-in. A backup without a build is refused.
+  Tests run the script against a scratch tree.
+- `inspect`, and so `deploy`, refuse unless port 80 points at 8600.
+
+Host step, after merge, outside market hours with no position open, in a
+`session.py start --reason dev` session: `ship_host.py --apply`, then
+`bash /opt/options-alpha/deploy/install_units.sh`. Check: exactly one
+`80 → 8600` rule, no `react.conf`, port 80 and the API return 200, and the
+worker is unaffected. Undo: put the old unit text back and rerun
+`install_units.sh`. React keeps serving either way, because the rule does not
+change.
