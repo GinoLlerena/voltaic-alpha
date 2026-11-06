@@ -312,7 +312,9 @@ find src -type f -name '*.py' ! -path '*/__pycache__/*' -exec sha256sum {{}} + |
 echo "## state"
 echo "dist=$([ -f {HOST_DIST}/index.html ] && echo present || echo absent)"
 echo "api_dropin=$([ -f {API_DROPIN} ] && echo present || echo absent)"
-echo "backups_unrestored=$(for d in {BACKUP_DIR}/*/; do [ -d "$d" ] && [ ! -e "$d/restored" ] && echo x; done | wc -l)"
+unused=0
+for d in {BACKUP_DIR}/*/; do [ -d "$d" ] && [ ! -e "$d/restored" ] && unused=$((unused + 1)); done
+echo "backups_unrestored=$unused"
 echo "port80_to=$(iptables -t nat -S PREROUTING | grep -- '--dport 80 ' | grep -o 'ports [0-9]*')"
 echo "api_listen=$(ss -ltn | awk '{{print $4}}' | grep ':{API_PORT}$')"
 echo "mem_available_mib=$(awk '/MemAvailable/{{print int($2/1024)}}' /proc/meminfo)"
@@ -349,7 +351,8 @@ def inspect(args: argparse.Namespace) -> int:
     if state.get("port80_to") != f"ports {API_PORT}":
         # Phase 2 of the Streamlit retirement: the port-80 unit itself points at
         # the API. Anything else means the host is not at the tested state.
-        print(f"BLOCKED: port 80 redirects to {state.get('port80_to')!r}, not the API on {API_PORT}")
+        print(f"BLOCKED: port 80 redirects to {state.get('port80_to')!r}, "
+              f"not the API on {API_PORT}")
         return 1
     if other:
         print("BLOCKED: other package source differs on the host, so it is not at the")
